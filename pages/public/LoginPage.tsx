@@ -1,51 +1,30 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserRole } from '../../types';
-import { Mail, Lock, Dumbbell, ArrowRight, AlertCircle, PlayCircle } from 'lucide-react';
+import { Mail, Lock, Dumbbell, ArrowRight, AlertCircle } from 'lucide-react';
+import { useAuth, homePathForRole } from '../../lib/AuthContext';
 
-interface LoginPageProps {
-  onLogin: (role: UserRole) => void;
-}
-
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [role, setRole] = useState<UserRole>(UserRole.ADMIN);
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
 
-    // Validation des identifiants demandés pour l'admin
-    if (role === UserRole.ADMIN) {
-      if (email === 'contact@mktraining.fr' && password === 'test123') {
-        onLogin(UserRole.ADMIN);
-        navigate('/app');
-      } else {
-        setError("Identifiants admin invalides. Utilisez contact@mktraining.fr / test123");
-      }
-    } else {
-      // Pour le mode membre, on accepte n'importe quelle connexion non vide pour la démo
-      if (email && password) {
-        onLogin(UserRole.MEMBER);
-        navigate('/membre');
-      } else {
-        setError("Veuillez remplir tous les champs.");
-      }
+    const { error: signInError, role } = await signIn(email, password);
+    setLoading(false);
+
+    if (signInError) {
+      setError('Email ou mot de passe incorrect.');
+      return;
     }
-  };
-
-  const handleDirectAdminLogin = () => {
-    onLogin(UserRole.ADMIN);
-    navigate('/app');
-  };
-
-  const handleDirectMemberLogin = () => {
-    onLogin(UserRole.MEMBER);
-    navigate('/membre');
+    // Redirection selon le rôle réel du compte (back-office ou espace membre).
+    navigate(homePathForRole(role));
   };
 
   return (
@@ -72,23 +51,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex bg-gray-100 p-1 rounded-2xl mb-8">
-              <button
-                type="button"
-                onClick={() => { setRole(UserRole.ADMIN); setError(null); }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${role === UserRole.ADMIN ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                MANAGER
-              </button>
-              <button
-                type="button"
-                onClick={() => { setRole(UserRole.MEMBER); setError(null); }}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${role === UserRole.MEMBER ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                MEMBRE
-              </button>
-            </div>
-
             <div className="space-y-4">
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
@@ -97,7 +59,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={role === UserRole.ADMIN ? "contact@mktraining.fr" : "Email membre"}
+                  placeholder="votre@email.fr"
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
                 />
               </div>
@@ -109,7 +71,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="test123"
+                  placeholder="Mot de passe"
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm font-medium"
                 />
               </div>
@@ -125,49 +87,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
             <button
               type="submit"
-              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center space-x-2 group"
+              disabled={loading}
+              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center space-x-2 group disabled:opacity-60"
             >
-              <span>Se connecter</span>
-              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              <span>{loading ? 'Connexion…' : 'Se connecter'}</span>
+              {!loading && <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
-
-          {/* BOUTON ACCÈS DIRECT TEST */}
-          <div className="mt-8 space-y-3 pt-6 border-t border-gray-100">
-            {role === UserRole.ADMIN ? (
-              <button 
-                onClick={handleDirectAdminLogin}
-                className="w-full p-4 bg-indigo-50 hover:bg-indigo-100 rounded-2xl border border-indigo-100 transition-all group flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm">
-                    <PlayCircle size={18} />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Accès Test Admin</p>
-                    <p className="text-xs text-indigo-700 font-bold">Connexion instantanée</p>
-                  </div>
-                </div>
-                <ArrowRight size={16} className="text-indigo-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-            ) : (
-              <button 
-                onClick={handleDirectMemberLogin}
-                className="w-full p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 transition-all group flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="bg-white p-2 rounded-xl text-slate-600 shadow-sm">
-                    <PlayCircle size={18} />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Accès Test Membre</p>
-                    <p className="text-xs text-slate-700 font-bold">Espace Thomas Pesquet</p>
-                  </div>
-                </div>
-                <ArrowRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-            )}
-          </div>
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500 font-medium">

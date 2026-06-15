@@ -1,9 +1,9 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import PublicLayout from './layouts/PublicLayout';
 import AppLayout from './layouts/AppLayout';
 import MemberLayout from './layouts/MemberLayout';
+import ProtectedRoute from './lib/ProtectedRoute';
 
 // Public Pages
 import HomePage from './pages/public/HomePage';
@@ -33,11 +33,7 @@ import MemberSubscription from './pages/member/MemberSubscription';
 import MemberProfile from './pages/member/MemberProfile';
 import MemberNotifications from './pages/member/MemberNotifications';
 
-import { UserRole } from './types';
-
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<{ role: UserRole } | null>(null);
-
   return (
     <HashRouter>
       <Routes>
@@ -47,16 +43,16 @@ const App: React.FC = () => {
           <Route path="/fonctionnalites" element={<FeaturesPage />} />
           <Route path="/tarifs" element={<PricingPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/connexion" element={<LoginPage onLogin={(role) => setCurrentUser({ role })} />} />
+          <Route path="/connexion" element={<LoginPage />} />
           <Route path="/inscription-salle" element={<RegisterGymPage />} />
           <Route path="/salles" element={<GymsExplorerPage />} />
           <Route path="/salle/:gymId" element={<GymPublicPage />} />
         </Route>
 
         {/* Admin/Back-Office Routes */}
-        <Route path="/app" element={<AppLayout />}>
+        <Route path="/app" element={<ProtectedRoute space="app"><AppLayout /></ProtectedRoute>}>
           <Route index element={<AdminDashboard />} />
-          
+
           {/* CRM Sub-routes */}
           <Route path="crm" element={<CRMPage />} />
           <Route path="crm/prospects" element={<CRMPage tab="prospects" />} />
@@ -86,7 +82,7 @@ const App: React.FC = () => {
           <Route path="surveillance" element={<SurveillancePage />} />
 
           <Route path="equipe" element={<TeamPage />} />
-          
+
           {/* Settings Sub-routes */}
           <Route path="parametres" element={<SettingsPage />} />
           <Route path="parametres/salle" element={<SettingsPage section="salle" />} />
@@ -94,7 +90,7 @@ const App: React.FC = () => {
         </Route>
 
         {/* Member Space Routes */}
-        <Route path="/membre" element={<MemberLayout />}>
+        <Route path="/membre" element={<ProtectedRoute space="member"><MemberLayout /></ProtectedRoute>}>
           <Route index element={<MemberDashboard />} />
           <Route path="reservations" element={<MemberReservations />} />
           <Route path="mon-abonnement" element={<MemberSubscription />} />
