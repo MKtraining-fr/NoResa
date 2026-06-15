@@ -1,0 +1,7 @@
+{
+  "name": "NoResa - Gym Management & Booking Ecosystem",
+  "description": "A comprehensive SaaS platform for gym owners (Back-Office), gym members (PWA Member Space), and a marketing site (Public Vitrine).",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
