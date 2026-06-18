@@ -12,6 +12,7 @@ import {
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate } from '../../lib/membersApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup } from '../../lib/gocardless';
+import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
 
 // Initiales (ex. "Jean Dupont" -> "JD") pour les avatars, en attendant les photos webcam.
@@ -36,6 +37,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [memberSales, setMemberSales] = useState<any[]>([]);
+  const [memberContracts, setMemberContracts] = useState<any[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [detailTab, setDetailTab] = useState<'profil' | 'activite' | 'finance'>('profil');
   
@@ -219,8 +221,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     let active = true;
     if (selectedContact?.id) {
       getMemberSales(selectedContact.id).then((s) => { if (active) setMemberSales(s); });
+      getMemberContracts(selectedContact.id).then((c) => { if (active) setMemberContracts(c); });
     } else {
       setMemberSales([]);
+      setMemberContracts([]);
     }
     return () => { active = false; };
   }, [selectedContact?.id]);
@@ -448,11 +452,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
           <p className="text-sm text-gray-500 mt-1">Gestion et suivi de votre base de données.</p>
         </div>
         <button 
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => { if (activeTab === 'membres' || activeTab === undefined) { window.location.hash = '#/app/inscription'; } else { setIsAddModalOpen(true); } }}
           className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
         >
           <UserPlus size={18} />
-          <span>Ajouter un {activeTab === 'partenaires' ? 'Partenaire' : activeTab === 'prospects' ? 'Prospect' : 'Membre'}</span>
+          <span>{activeTab === 'partenaires' ? 'Ajouter un Partenaire' : activeTab === 'prospects' ? 'Ajouter un Prospect' : 'Nouvelle inscription'}</span>
         </button>
       </div>
 
@@ -1156,6 +1160,47 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </button>
                     </div>
                   )}
+
+                  <div className="space-y-4">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
+                      <FileText size={14} /> <span>Contrat d'adhésion</span>
+                    </h3>
+                    {memberContracts.length === 0 ? (
+                      <p className="text-xs font-bold text-gray-400 px-1">Aucun contrat signé pour ce membre.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {memberContracts.map((c: any) => (
+                          <div key={c.id} className="p-5 border border-gray-100 rounded-[1.5rem] bg-white flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-black text-gray-900">Contrat {c.contract_number || '—'}</p>
+                              <p className="text-[11px] font-bold text-gray-400">
+                                {(c.signed_at || c.created_at) ? new Date(c.signed_at || c.created_at).toLocaleDateString('fr-FR') : ''}
+                                {c.formula_label ? ' · ' + c.formula_label : ''}
+                                {c.total_due != null ? ' · ' + Number(c.total_due).toFixed(2) + ' €' : ''}
+                              </p>
+                            </div>
+                            {c.pdf_path ? (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const u = await getContractUrl(c.pdf_path);
+                                    if (u) window.open(u, '_blank');
+                                    else alert("Impossible d'ouvrir le contrat.");
+                                  } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
+                                }}
+                                title="Voir / télécharger le contrat signé (PDF)"
+                                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors shrink-0"
+                              >
+                                <FileText size={14} /> Contrat
+                              </button>
+                            ) : (
+                              <span className="text-[11px] font-black text-amber-600 uppercase shrink-0">En cours</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="space-y-4">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
