@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
-import { getGymId } from './membersApi';
+import { getGymId, createMember, patchMember } from './membersApi';
+import { startMandateSetup } from './gocardless';
 
 // --- Catalogue des formules (grille du contrat A.R.A.P.S) -------------------
 
@@ -148,4 +149,120 @@ export async function getMemberContracts(memberId: string): Promise<any[]> {
     .order('created_at', { ascending: false });
   if (error) { console.error('contractsApi.getMemberContracts', error); return []; }
   return data ?? [];
+}
+
+// --- Orchestration complète de l'inscription --------------------------------
+
+export interface InscriptionData {
+  // Identité
+  civility?: string;
+  firstName: string;
+  lastName: string;
+  birthDate?: string;       // 'YYYY-MM-DD'
+  nationality?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  phone?: string;
+  email?: string;
+  profession?: string;
+  company?: string;
+  // Formule
+  formula: Formula;
+  formulaPaymentMethod: string;   // règlement de la formule (Prélèvement / Espèces / CB / Chèque / Comptant)
+  badgePaymentMethod: string;     // règlement du badge
+  services: { label: string; price: number }[];
+  // Déclarations + signature
+  consentCga: boolean;
+  consentMedical: boolean;
+  signatureDataUrl: string;
+  signerName: string;
+  totalDue: number;
+}
+
+export interface InscriptionResult {
+  memberId: string;
+  contractId: string;
+  contractNumber: string;
+  authorisationUrl?: string;  // présent si formule en prélèvement (mandat GoCardless à finaliser)
+  generate: any;
+}
+
+/**
+ * Inscription complète :
+ *  - formule en prélèvement -> création membre + mandat GoCardless (renvoie une URL à finaliser par l'adhérent)
+ *  - sinon (comptant / espèces / séance / carnet) -> création membre simple
+ *  Puis : création du contrat + génération du PDF signé + email.
+ */
+export async function submitInscription(d: InscriptionData): Promise<InscriptionResult> {
+  const gymId = await getGymId();
+  if (!gymId) throw new Error('Impossible de déterminer la salle (gym_id).');
+
+  let memberId: string;
+  let authorisationUrl: string | undefined;
+
+  if (d.formula.recurring) {
+    if (!d.email) throw new Error('Un email est requis pour une formule en prélèvement automatique.');
+    const r = await startMandateSetup({
+      firstName: d.firstName,
+      lastName: d.lastName,
+      email: d.email,
+      phone: d.phone,
+      gymId,
+      subscriptionLabel: d.formula.label,
+      price: d.formula.price,
+    });
+    memberId = r.member_id;
+    authorisationUrl = r.authorisation_url;
+    // Complète la fiche créée par le flux GoCardless (adresse, périodicité, mode de règlement)
+    await patchMember(memberId, {
+      address: d.address || null,
+      city: d.city || null,
+      postal_code: d.postalCode || null,
+      periodicity: d.formula.periodicity || null,
+      payment_method_label: d.formulaPaymentMethod || 'Prélèvement',
+    });
+  } else {
+    const m = await createMember({
+      firstName: d.firstName,
+      lastName: d.lastName,
+      email: d.email,
+      phone: d.phone,
+      address: d.address,
+      city: d.city,
+      postalCode: d.postalCode,
+      subscriptionLabel: d.formula.label,
+      price: d.formula.price,
+      periodicity: d.formula.periodicity,
+      paymentMethodLabel: d.formulaPaymentMethod,
+    });
+    memberId = m.id;
+  }
+
+  const options: ContractOption[] = [
+    { label: BADGE.label, price: BADGE.price, payment: d.badgePaymentMethod },
+    ...d.services.map((s) => ({ label: s.label, price: s.price })),
+  ];
+
+  const { id: contractId, contractNumber } = await createContract({
+    memberId,
+    civility: d.civility,
+    birthDate: d.birthDate,
+    nationality: d.nationality,
+    profession: d.profession,
+    company: d.company,
+    formulaLabel: d.formula.label,
+    formulaPrice: d.formula.price,
+    paymentMethod: d.formulaPaymentMethod,
+    engagement: d.formula.engagement,
+    badgePaymentMethod: d.badgePaymentMethod,
+    options,
+    totalDue: d.totalDue,
+    consentCga: d.consentCga,
+    consentMedical: d.consentMedical,
+    signerName: d.signerName,
+  });
+
+  const generate = await generateContract(contractId, d.signatureDataUrl, true);
+  return { memberId, contractId, contractNumber, authorisationUrl, generate };
 }

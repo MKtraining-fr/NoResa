@@ -25,6 +25,7 @@ import TeamPage from './pages/app/TeamPage';
 import SettingsPage from './pages/app/SettingsPage';
 import SurveillancePage from './pages/app/SurveillancePage';
 import AccessControlPage from './pages/app/AccessControlPage';
+import InscriptionPage from './pages/app/InscriptionPage';
 
 // Member Pages
 import MemberDashboard from './pages/member/MemberDashboard';
@@ -52,6 +53,9 @@ const App: React.FC = () => {
         {/* Admin/Back-Office Routes */}
         <Route path="/app" element={<ProtectedRoute space="app"><AppLayout /></ProtectedRoute>}>
           <Route index element={<AdminDashboard />} />
+
+          {/* Nouvelle inscription (parcours tablette + contrat signé) */}
+          <Route path="inscription" element={<InscriptionPage />} />
 
           {/* CRM Sub-routes */}
           <Route path="crm" element={<CRMPage />} />
