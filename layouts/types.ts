@@ -12,7 +12,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
-  gymId?: string;a
+  gymId?: string;
 }
 
 export interface Gym {
@@ -41,10 +41,6 @@ export interface Product {
   stock: number;
   category: string;
   image?: string;
-  vatRate?: number;
-  sku?: string;
-  supplier?: string;
-  minStockAlert?: number | null;
 }
 
 export type ContactStatus = 
@@ -79,13 +75,6 @@ export interface Member {
   paymentMethod?: string;
   periodicity?: string;
   paidBy?: string;
-  subscriptionStart?: string;
-  subscriptionEnd?: string;
   city?: string;
-  postalCode?: string;
   photoPath?: string;
-  gocardlessStatus?: string;
-  gocardlessMandateId?: string;
-  gocardlessCustomerId?: string;
-  archivedAt?: string;
 }

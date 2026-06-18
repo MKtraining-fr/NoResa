@@ -2,6 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { APP_NAV_ITEMS, MOCK_MEMBERS, MOCK_PARTNERS, MOCK_PRODUCTS } from '../constants';
+import { searchMembers } from '../lib/membersApi';
+
+const initials = (a?: string, b?: string) =>
+  `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
 import { 
   ChevronDown, ChevronRight, LogOut, Search, Bell, Menu, X, 
   Dumbbell, User, Target, Briefcase, ShoppingBag, ArrowUpRight 
@@ -11,12 +15,24 @@ const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [expandedItems, setExpandedItems] = useState<string[]>(['CRM', 'Planning', 'Finance', 'Boutique']);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   
   // State pour la recherche globale
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [memberResults, setMemberResults] = useState<any[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Recherche réelle des membres (mot partiel, n° client, email, téléphone), avec anti-rebond
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) { setMemberResults([]); return; }
+    const t = setTimeout(async () => {
+      const found = await searchMembers(q, 6);
+      setMemberResults(found);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev => 
@@ -42,11 +58,11 @@ const AppLayout: React.FC = () => {
     if (!searchQuery.trim()) return null;
     const query = searchQuery.toLowerCase();
 
-    const members = MOCK_MEMBERS.filter(m => 
-      m.status !== 'PROSPECT' && 
-      (`${m.firstName} ${m.lastName}`.toLowerCase().includes(query) || m.email.toLowerCase().includes(query))
-    );
+    // Membres : données réelles (via Supabase)
+    const members = memberResults;
 
+    // Prospects / Partenaires / Produits : données d'exemple tant que leurs tables
+    // ne sont pas connectées à la base.
     const prospects = MOCK_MEMBERS.filter(m => 
       m.status === 'PROSPECT' && 
       (`${m.firstName} ${m.lastName}`.toLowerCase().includes(query) || m.email.toLowerCase().includes(query))
@@ -188,10 +204,10 @@ const AppLayout: React.FC = () => {
                       <div className="space-y-1">
                         {results.members.map(m => (
                           <button key={m.id} onClick={() => handleResultClick('member', m.id)} className="w-full flex items-center p-2 hover:bg-indigo-50 rounded-xl transition-colors group text-left">
-                            <img src={`https://picsum.photos/seed/${m.id}/40/40`} className="w-8 h-8 rounded-lg mr-3 shadow-sm" alt="" />
+                            <div className="w-8 h-8 rounded-lg mr-3 shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{initials(m.firstName, m.lastName)}</div>
                             <div>
                               <p className="text-xs font-black text-gray-900 group-hover:text-indigo-600">{m.firstName} {m.lastName}</p>
-                              <p className="text-[10px] text-gray-400 font-bold">{m.email}</p>
+                              <p className="text-[10px] text-gray-400 font-bold">{m.memberNumber ? `N° ${m.memberNumber}` : ''}{m.memberNumber && (m.phone || m.email) ? ' • ' : ''}{m.phone || m.email || ''}</p>
                             </div>
                             <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-400 transition-all" />
                           </button>

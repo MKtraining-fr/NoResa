@@ -4,10 +4,14 @@ import {
   ShoppingBag, Plus, Package, TrendingUp, Search, Truck, 
   ShoppingCart, ArrowUpRight, X, Minus, Trash2, CheckCircle2, 
   CreditCard, Banknote, User, UserPlus, Check, ChevronDown,
-  Edit2, Save, Calendar, Camera, Tag
+  Edit2, Save, Calendar, Camera, Tag, AlertTriangle, Download, Send, Pencil, FileText
 } from 'lucide-react';
 import { Product, Member } from '../../types';
-import { MOCK_MEMBERS, MOCK_PRODUCTS } from '../../constants.tsx';
+import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
+import { searchMembers, createQuickMember } from '../../lib/membersApi';
+
+const initials = (a?: string, b?: string) =>
+  `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
 
 interface BoutiquePageProps {
   view?: string;
@@ -27,6 +31,52 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [cart, setCart] = useState<{ product: Product, quantity: number }[]>([]);
   const [saleStep, setSaleStep] = useState<'cart' | 'payment' | 'success'>('cart');
 
+  const [products, setProducts] = useState<Product[]>([]);
+  const [memberResults, setMemberResults] = useState<Member[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [saleResult, setSaleResult] = useState<{ sale_id: string; invoice_number: string; total_ttc: number } | null>(null);
+  const [invoiceMsg, setInvoiceMsg] = useState<string | null>(null);
+  const [sales, setSales] = useState<any[]>([]);
+  const [stats, setStats] = useState<BoutiqueStats | null>(null);
+  const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
+  const [stockEdit, setStockEdit] = useState<Product | null>(null);
+  const [stockValue, setStockValue] = useState('');
+  const [alertValue, setAlertValue] = useState('');
+  const [posSearch, setPosSearch] = useState('');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickFirst, setQuickFirst] = useState('');
+  const [quickLast, setQuickLast] = useState('');
+  const [quickEmail, setQuickEmail] = useState('');
+  const [creatingMember, setCreatingMember] = useState(false);
+
+  const lowStock = (p: Product) => p.stock <= (p.minStockAlert ?? 3);
+  const lowStockProducts = products.filter(lowStock);
+
+  useEffect(() => {
+    const load = () => getProducts().then(setProducts);
+    load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
+  }, []);
+  useEffect(() => {
+    if (activeView === 'ventes') {
+      getRecentSales().then(setSales);
+      getStats().then(setStats);
+    }
+    if (activeView === 'fournisseurs') {
+      getSuppliers().then(setSuppliers);
+    }
+  }, [activeView]);
+
+  // Recherche client en direct (nom, n° client, email, téléphone)
+  useEffect(() => {
+    const q = memberSearchTerm.trim();
+    if (!q) { setMemberResults([]); return; }
+    const t = setTimeout(() => { searchMembers(q, 6).then(setMemberResults); }, 250);
+    return () => clearTimeout(t);
+  }, [memberSearchTerm]);
+
   useEffect(() => {
     setActiveView(view);
   }, [view]);
@@ -42,7 +92,8 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   }, []);
 
   const addToCart = (product: Product) => {
-    if (product.stock <= 0) return;
+    // On autorise la vente même si le stock affiché est à 0 ou négatif
+    // (les stocks importés ne sont pas fiables ; ils se régularisent à l'usage).
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
@@ -65,18 +116,148 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const cartTva = cart.reduce((sum, item) => {
+    const lineTtc = item.product.price * item.quantity;
+    const rate = item.product.vatRate || 0;
+    return sum + (lineTtc - lineTtc / (1 + rate));
+  }, 0);
 
   const resetSale = () => {
     setCart([]);
     setSelectedMember(null);
     setMemberSearchTerm('');
+    setPaymentMethod(null);
+    setSaleResult(null);
+    setInvoiceMsg(null);
     setSaleStep('cart');
     setIsSelling(false);
   };
 
-  const filteredMembers = MOCK_MEMBERS.filter(m => 
-    `${m.firstName} ${m.lastName}`.toLowerCase().includes(memberSearchTerm.toLowerCase())
-  );
+  const handleCheckout = async () => {
+    if (cart.length === 0 || processing) return;
+    setProcessing(true);
+    try {
+      const res = await recordSale(
+        selectedMember?.id ?? null,
+        paymentMethod || 'Espèces',
+        cart.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
+      );
+      setSaleResult(res);
+      setSaleStep('success');
+      getProducts().then(setProducts); // rafraîchit les stocks
+    } catch (e) {
+      console.error(e);
+      alert("L'encaissement a échoué : " + ((e as Error)?.message || ''));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSendInvoice = async () => {
+    if (!saleResult) return;
+    setInvoiceMsg('Envoi en cours…');
+    try {
+      await sendInvoice(saleResult.sale_id);
+      setInvoiceMsg('Facture envoyée par email ✓');
+    } catch (e) {
+      setInvoiceMsg('Échec : ' + ((e as Error)?.message || ''));
+    }
+  };
+
+  const posProducts = posSearch.trim()
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(posSearch.toLowerCase()) ||
+        (p.sku || '').toLowerCase().includes(posSearch.toLowerCase()))
+    : products;
+
+  // Douchette code-barres : tape le code puis Entrée -> ajoute au panier
+  const handlePosKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const term = posSearch.trim().toLowerCase();
+    if (!term) return;
+    const bySku = products.find(p => (p.sku || '').toLowerCase() === term);
+    const target = bySku || (posProducts.length === 1 ? posProducts[0] : null);
+    if (target) { addToCart(target); setPosSearch(''); }
+  };
+
+  const handleQuickCreate = async () => {
+    if (!quickFirst.trim() || !quickLast.trim() || creatingMember) return;
+    setCreatingMember(true);
+    try {
+      const m = await createQuickMember({
+        firstName: quickFirst.trim(),
+        lastName: quickLast.trim(),
+        email: quickEmail.trim() || undefined,
+      });
+      setSelectedMember(m);
+      setIsSearchingMember(false);
+      setQuickOpen(false);
+      setQuickFirst(''); setQuickLast(''); setQuickEmail('');
+      setMemberSearchTerm('');
+    } catch (e) {
+      alert("Création du client impossible : " + ((e as Error)?.message || ''));
+    } finally {
+      setCreatingMember(false);
+    }
+  };
+
+  const handleResendInvoice = async (saleId: string) => {
+    try {
+      await sendInvoice(saleId);
+      getRecentSales().then(setSales);
+      alert('Facture envoyée ✓');
+    } catch (e) {
+      alert('Échec : ' + ((e as Error)?.message || ''));
+    }
+  };
+
+  const handleOpenPdf = async (path: string) => {
+    const url = await getInvoiceUrl(path);
+    if (url) window.open(url, '_blank');
+  };
+
+  // Ouvre la facture ; la génère d'abord si elle n'existe pas encore.
+  const handleViewInvoice = async (saleId: string, path?: string | null) => {
+    try {
+      const url = await viewInvoice(saleId, path);
+      if (url) { window.open(url, '_blank'); getRecentSales().then(setSales); }
+      else alert("Impossible d'ouvrir la facture.");
+    } catch (e) {
+      alert('Échec : ' + ((e as Error)?.message || ''));
+    }
+  };
+
+  const handleDeleteSale = async (saleId: string) => {
+    if (!window.confirm('Supprimer cette vente ? Le stock sera réajusté et le paiement lié supprimé.')) return;
+    try {
+      await deleteSale(saleId);
+      getRecentSales().then(setSales);
+      getStats().then(setStats);
+      getProducts().then(setProducts);
+    } catch (e) {
+      alert('Suppression impossible : ' + ((e as Error)?.message || ''));
+    }
+  };
+
+  const openStockEdit = (p: Product) => {
+    setStockEdit(p);
+    setStockValue(String(p.stock));
+    setAlertValue(p.minStockAlert != null ? String(p.minStockAlert) : '');
+  };
+  const handleSaveStock = async () => {
+    if (!stockEdit) return;
+    try {
+      await updateProductStock(
+        stockEdit.id,
+        parseInt(stockValue, 10) || 0,
+        alertValue === '' ? null : (parseInt(alertValue, 10) || 0),
+      );
+      setStockEdit(null);
+      getProducts().then(setProducts);
+    } catch (e) {
+      alert('Mise à jour du stock impossible : ' + ((e as Error)?.message || ''));
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 relative">
@@ -116,11 +297,31 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
         {activeView === 'produits' && (
           <div className="p-8">
+            {lowStockProducts.length > 0 && (
+              <div className="mb-8 bg-red-50/70 border border-red-100 rounded-[2rem] p-6">
+                <div className="flex items-center mb-4">
+                  <div className="bg-red-100 text-red-600 p-2 rounded-xl mr-3"><AlertTriangle size={18} /></div>
+                  <h3 className="text-sm font-black text-red-700 uppercase tracking-widest">À réapprovisionner ({lowStockProducts.length})</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {lowStockProducts.map(p => (
+                    <span key={p.id} className="inline-flex items-center bg-white border border-red-100 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-700">
+                      {p.name}
+                      <span className={`ml-2 font-black ${p.stock <= 0 ? 'text-red-600' : 'text-amber-600'}`}>{p.stock}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-               {MOCK_PRODUCTS.map(product => (
+               {products.map(product => (
                  <div key={product.id} className="group border border-gray-50 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white relative">
-                    <div className="relative overflow-hidden aspect-square">
-                      <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" alt="" />
+                    <div className="relative overflow-hidden aspect-square bg-gray-50 flex items-center justify-center">
+                      {product.image ? (
+                        <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" alt="" />
+                      ) : (
+                        <Package size={48} className="text-gray-300" />
+                      )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     </div>
                     <div className="p-6 space-y-4">
@@ -130,9 +331,9 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                        </div>
                        <div className="flex items-center justify-between">
                           <p className="text-xl font-black text-gray-900">{product.price.toFixed(2)} €</p>
-                          <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${product.stock < 10 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
-                            {product.stock} en stock
-                          </div>
+                          <button onClick={() => openStockEdit(product)} title="Modifier le stock" className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 hover:ring-2 hover:ring-indigo-300 transition-all ${lowStock(product) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                            {product.stock} en stock <Pencil size={10} />
+                          </button>
                        </div>
                        <button onClick={() => { setIsSelling(true); addToCart(product); }} className="w-full py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Vendre l'article</button>
                     </div>
@@ -149,14 +350,129 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
         )}
 
         {activeView === 'ventes' && (
-          <div className="p-10 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="bg-indigo-50 p-8 rounded-full text-indigo-600">
-              <TrendingUp size={48} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black">Historique des Ventes</h3>
-              <p className="text-gray-500 max-w-sm mt-2 font-medium">Visualisez l'ensemble de vos transactions boutique et analysez vos meilleures ventes.</p>
-            </div>
+          <div className="p-8">
+            {stats && (
+              <div className="mb-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CA aujourd'hui</p>
+                    <p className="text-2xl font-black text-gray-900">{stats.ca_today.toFixed(2)} €</p>
+                  </div>
+                  <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-5">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">CA ce mois</p>
+                    <p className="text-2xl font-black text-indigo-700">{stats.ca_month.toFixed(2)} €</p>
+                  </div>
+                  <div className="bg-green-50/70 border border-green-100 rounded-2xl p-5">
+                    <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Marge ce mois</p>
+                    <p className="text-2xl font-black text-green-700">{stats.margin_month.toFixed(2)} €</p>
+                  </div>
+                  <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-5">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ventes ce mois</p>
+                    <p className="text-2xl font-black text-gray-900">{stats.sales_month}</p>
+                  </div>
+                </div>
+                {stats.top_products.length > 0 && (
+                  <div className="bg-white border border-gray-100 rounded-2xl p-5">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Top produits</h4>
+                    <div className="space-y-2">
+                      {stats.top_products.map((t, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <span className="font-bold text-gray-700"><span className="text-gray-300 font-black mr-2">{i + 1}</span>{t.name}</span>
+                          <span className="font-black text-gray-500">{t.qty} vendus · {Number(t.revenue).toFixed(2)} €</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {sales.length === 0 ? (
+              <div className="p-10 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-indigo-50 p-8 rounded-full text-indigo-600"><TrendingUp size={48} /></div>
+                <div>
+                  <h3 className="text-xl font-black">Historique des Ventes</h3>
+                  <p className="text-gray-500 max-w-sm mt-2 font-medium">Aucune vente pour le moment. Lancez une vente pour la voir apparaître ici.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                      <th className="py-3 px-3">Facture</th>
+                      <th className="py-3 px-3">Date</th>
+                      <th className="py-3 px-3">Client</th>
+                      <th className="py-3 px-3">Paiement</th>
+                      <th className="py-3 px-3 text-right">Total TTC</th>
+                      <th className="py-3 px-3 text-center">Facture email</th>
+                      <th className="py-3 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sales.map((s: any) => (
+                      <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors text-sm">
+                        <td className="py-3 px-3 font-black text-gray-900">{s.invoice_number || '—'}</td>
+                        <td className="py-3 px-3 text-gray-500 font-medium">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : '—'}</td>
+                        <td className="py-3 px-3 font-bold text-gray-700">{s.member ? `${s.member.first_name} ${s.member.last_name}` : 'Anonyme'}</td>
+                        <td className="py-3 px-3 text-gray-500 font-medium">{s.payment_method || '—'}</td>
+                        <td className="py-3 px-3 text-right font-black text-indigo-600">{Number(s.total_ttc || 0).toFixed(2)} €</td>
+                        <td className="py-3 px-3 text-center">
+                          {s.invoice_email_status === 'sent'
+                            ? <span className="text-[10px] font-black text-green-600 uppercase">Envoyée</span>
+                            : <span className="text-[10px] font-black text-gray-300 uppercase">—</span>}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => handleViewInvoice(s.id, s.invoice_pdf_path)} title="Voir / générer la facture PDF" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><FileText size={15} /></button>
+                            {s.invoice_pdf_path && (
+                              <button onClick={() => handleOpenPdf(s.invoice_pdf_path)} title="Télécharger le PDF" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Download size={15} /></button>
+                            )}
+                            {s.member?.email && (
+                              <button onClick={() => handleResendInvoice(s.id)} title="Envoyer / renvoyer la facture par email" className="p-2 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"><Send size={15} /></button>
+                            )}
+                            <button onClick={() => handleDeleteSale(s.id)} title="Supprimer la vente" className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={15} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeView === 'fournisseurs' && (
+          <div className="p-8">
+            {suppliers.length === 0 ? (
+              <div className="p-10 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-indigo-50 p-8 rounded-full text-indigo-600"><Truck size={48} /></div>
+                <h3 className="text-xl font-black">Aucun fournisseur</h3>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {suppliers.map(s => (
+                  <div key={s.id} className="border border-gray-100 rounded-[2rem] p-6 bg-white hover:shadow-xl transition-all">
+                    <div className="flex items-center space-x-4 mb-4">
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-black uppercase shrink-0">{initials(s.name, '')}</div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-black text-gray-900 truncate">{s.name}</h4>
+                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{s.supplier_type || 'fournisseur'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 text-xs font-bold text-gray-500">
+                      {s.contact_name && <p className="flex items-center gap-2"><User size={12} /> {s.contact_name}</p>}
+                      {s.email && <p className="flex items-center gap-2 truncate"><Tag size={12} /> {s.email}</p>}
+                      {s.phone && <p className="flex items-center gap-2">{s.phone}</p>}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Produits</span>
+                      <span className="text-sm font-black text-gray-900">{s.productCount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -231,19 +547,27 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                  <input 
                   type="text" 
+                  value={posSearch}
+                  onChange={(e) => setPosSearch(e.target.value)}
+                  onKeyDown={handlePosKeyDown}
+                  autoFocus
                   placeholder="Rechercher un article ou scanner un code-barre..." 
                   className="w-full bg-white border border-gray-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-4 focus:ring-indigo-500/5 text-sm font-bold shadow-sm"
                  />
                </div>
 
                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {MOCK_PRODUCTS.map(product => (
+                  {posProducts.map(product => (
                     <button 
                       key={product.id} 
                       onClick={() => addToCart(product)} 
                       className="flex flex-col text-left bg-white p-5 rounded-3xl border border-transparent hover:border-indigo-600 hover:shadow-xl transition-all group relative active:scale-95"
                     >
-                       <img src={product.image} className="w-full h-32 rounded-2xl object-cover mb-4 shadow-sm" alt="" />
+                       {product.image ? (
+                         <img src={product.image} className="w-full h-32 rounded-2xl object-cover mb-4 shadow-sm" alt="" />
+                       ) : (
+                         <div className="w-full h-32 rounded-2xl mb-4 shadow-sm bg-gray-50 flex items-center justify-center"><Package size={36} className="text-gray-300" /></div>
+                       )}
                        <h4 className="text-xs font-black text-gray-900 truncate">{product.name}</h4>
                        <div className="flex items-center justify-between mt-2">
                          <p className="text-md font-black text-indigo-600">{product.price.toFixed(2)} €</p>
@@ -267,10 +591,10 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     <div className={`flex items-center space-x-3 p-4 rounded-2xl transition-all border ${selectedMember ? 'bg-indigo-50 border-indigo-100 ring-2 ring-indigo-500/10' : 'bg-gray-50 border-gray-50'}`}>
                       {selectedMember ? (
                         <>
-                          <img src={`https://picsum.photos/seed/${selectedMember.id}/40/40`} className="w-10 h-10 rounded-xl shadow-sm border border-white" alt="" />
+                          <div className="w-10 h-10 rounded-xl shadow-sm border border-white bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black uppercase">{initials(selectedMember.firstName, selectedMember.lastName)}</div>
                           <div className="flex-grow">
                             <p className="text-xs font-black text-indigo-900">{selectedMember.firstName} {selectedMember.lastName}</p>
-                            <p className="text-[10px] font-bold text-indigo-400">Score de fidélité : Or</p>
+                            <p className="text-[10px] font-bold text-indigo-400">{selectedMember.memberNumber ? `N° ${selectedMember.memberNumber}` : (selectedMember.email || 'Client')}</p>
                           </div>
                           <button onClick={() => setSelectedMember(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
                         </>
@@ -291,22 +615,44 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     
                     {isSearchingMember && !selectedMember && memberSearchTerm && (
                       <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-50 z-10 overflow-hidden max-h-48 overflow-y-auto">
-                        {filteredMembers.map(m => (
+                        {memberResults.map(m => (
                           <button 
                             key={m.id} 
                             onClick={() => { setSelectedMember(m); setIsSearchingMember(false); }}
                             className="w-full p-4 flex items-center space-x-3 hover:bg-indigo-50 transition-colors text-left"
                           >
-                            <img src={`https://picsum.photos/seed/${m.id}/40/40`} className="w-8 h-8 rounded-lg" alt="" />
-                            <span className="text-xs font-bold">{m.firstName} {m.lastName}</span>
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black uppercase">{initials(m.firstName, m.lastName)}</div>
+                            <span className="text-xs font-bold">{m.firstName} {m.lastName}{m.memberNumber ? ` · N° ${m.memberNumber}` : ''}</span>
                           </button>
                         ))}
-                        {filteredMembers.length === 0 && (
+                        {memberResults.length === 0 && !quickOpen && (
                           <div className="p-4 text-center">
                             <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">Aucun membre trouvé</p>
-                            <button className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center justify-center w-full hover:underline">
+                            <button
+                              onClick={() => {
+                                const parts = memberSearchTerm.trim().split(' ');
+                                setQuickFirst(parts[0] || '');
+                                setQuickLast(parts.slice(1).join(' ') || '');
+                                setQuickOpen(true);
+                              }}
+                              className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center justify-center w-full hover:underline"
+                            >
                               <UserPlus size={12} className="mr-1" /> Créer une fiche rapide
                             </button>
+                          </div>
+                        )}
+                        {quickOpen && (
+                          <div className="p-4 space-y-2">
+                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Nouveau client</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input value={quickFirst} onChange={e => setQuickFirst(e.target.value)} placeholder="Prénom" className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+                              <input value={quickLast} onChange={e => setQuickLast(e.target.value)} placeholder="Nom" className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+                            </div>
+                            <input value={quickEmail} onChange={e => setQuickEmail(e.target.value)} placeholder="Email (pour la facture)" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
+                            <div className="flex gap-2">
+                              <button onClick={handleQuickCreate} disabled={!quickFirst.trim() || !quickLast.trim() || creatingMember} className={`flex-grow py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${(!quickFirst.trim() || !quickLast.trim() || creatingMember) ? 'bg-gray-100 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{creatingMember ? 'Création…' : 'Créer & sélectionner'}</button>
+                              <button onClick={() => setQuickOpen(false)} className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200">Annuler</button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -324,7 +670,11 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     ) : (
                       cart.map(item => (
                         <div key={item.product.id} className="flex items-center space-x-4 p-4 bg-gray-50/50 border border-gray-100 rounded-3xl animate-in slide-in-from-right-4 duration-300">
-                          <img src={item.product.image} className="w-12 h-12 rounded-xl object-cover shadow-sm" alt="" />
+                          {item.product.image ? (
+                            <img src={item.product.image} className="w-12 h-12 rounded-xl object-cover shadow-sm" alt="" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl shadow-sm bg-white border border-gray-100 flex items-center justify-center"><Package size={20} className="text-gray-300" /></div>
+                          )}
                           <div className="flex-grow">
                             <p className="text-xs font-black text-gray-900 truncate w-32">{item.product.name}</p>
                             <p className="text-xs font-black text-indigo-600 mt-0.5">{item.product.price.toFixed(2)} €</p>
@@ -344,12 +694,12 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                <div className="p-10 border-t border-gray-50 bg-gray-50/20">
                   <div className="space-y-3 mb-8">
                     <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-                       <span>Sous-total</span>
-                       <span>{cartTotal.toFixed(2)} €</span>
+                       <span>Total HT</span>
+                       <span>{(cartTotal - cartTva).toFixed(2)} €</span>
                     </div>
                     <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-                       <span>TVA (20%)</span>
-                       <span>{(cartTotal * 0.2).toFixed(2)} €</span>
+                       <span>dont TVA</span>
+                       <span>{cartTva.toFixed(2)} €</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                        <span className="text-sm font-black tracking-widest uppercase">Total à payer</span>
@@ -358,25 +708,25 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                     <button className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-600 hover:text-indigo-600 transition-all group shadow-sm">
-                        <CreditCard size={20} className="mb-2 text-gray-400 group-hover:text-indigo-600" />
+                     <button onClick={() => setPaymentMethod('CB')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'CB' ? 'border-indigo-600 text-indigo-600 ring-2 ring-indigo-500/10' : 'border-gray-100 hover:border-indigo-600 hover:text-indigo-600'}`}>
+                        <CreditCard size={20} className={`mb-2 ${paymentMethod === 'CB' ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600'}`} />
                         <span className="text-[10px] font-black uppercase tracking-widest">CB / Sans contact</span>
                      </button>
-                     <button className="flex flex-col items-center justify-center p-4 bg-white border border-gray-100 rounded-2xl hover:border-green-600 hover:text-green-600 transition-all group shadow-sm">
-                        <Banknote size={20} className="mb-2 text-gray-400 group-hover:text-green-600" />
+                     <button onClick={() => setPaymentMethod('Espèces')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'Espèces' ? 'border-green-600 text-green-600 ring-2 ring-green-500/10' : 'border-gray-100 hover:border-green-600 hover:text-green-600'}`}>
+                        <Banknote size={20} className={`mb-2 ${paymentMethod === 'Espèces' ? 'text-green-600' : 'text-gray-400 group-hover:text-green-600'}`} />
                         <span className="text-[10px] font-black uppercase tracking-widest">Espèces</span>
                      </button>
                   </div>
 
                   <button 
-                    onClick={() => setSaleStep('success')} 
-                    disabled={cart.length === 0} 
+                    onClick={handleCheckout} 
+                    disabled={cart.length === 0 || processing} 
                     className={`w-full py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center space-x-3 active:scale-[0.98] ${
-                      cart.length === 0 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'
+                      cart.length === 0 || processing ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'
                     }`}
                   >
                     <CheckCircle2 size={20} />
-                    <span>Valider & Encaisser</span>
+                    <span>{processing ? 'Encaissement…' : 'Valider & Encaisser'}</span>
                   </button>
                </div>
             </div>
@@ -395,14 +745,55 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
               <div className="space-y-2">
                 <h2 className="text-4xl font-black">Vente terminée !</h2>
                 <p className="text-indigo-100 font-bold opacity-80 uppercase tracking-widest text-xs">Paiement confirmé • Stock mis à jour</p>
+                {saleResult && (
+                  <p className="text-white font-black text-lg pt-2">Facture {saleResult.invoice_number} — {saleResult.total_ttc?.toFixed(2)} €</p>
+                )}
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <button className="w-full sm:w-auto px-10 py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl">Imprimer le ticket</button>
+                <button
+                  onClick={() => saleResult && handleViewInvoice(saleResult.sale_id, null)}
+                  className="w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl bg-white text-indigo-600 hover:bg-indigo-50 transition-colors"
+                >
+                  Voir la facture (PDF)
+                </button>
+                <button
+                  onClick={handleSendInvoice}
+                  disabled={!selectedMember?.email}
+                  title={selectedMember?.email ? '' : "Aucun email client : rattachez un membre avec email pour envoyer la facture"}
+                  className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-colors ${selectedMember?.email ? 'bg-white text-indigo-600 hover:bg-indigo-50' : 'bg-white/30 text-white/60 cursor-not-allowed'}`}
+                >
+                  Envoyer la facture par email
+                </button>
                 <button onClick={resetSale} className="w-full sm:w-auto px-10 py-4 bg-indigo-500/50 border border-white/20 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-white/10 transition-colors">Terminer</button>
               </div>
+              {invoiceMsg && <p className="text-white/90 font-bold text-sm">{invoiceMsg}</p>}
+              {!selectedMember && <p className="text-indigo-100/70 text-xs font-medium">Vente anonyme — rattachez un client avant l'encaissement pour pouvoir envoyer une facture par email.</p>}
            </div>
         </div>
       )}
+      {/* MODALE STOCK */}
+      {stockEdit && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setStockEdit(null)}>
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
+              <h2 className="text-lg font-black truncate pr-2">{stockEdit.name}</h2>
+              <button onClick={() => setStockEdit(null)} className="p-1.5 hover:bg-white/10 rounded-xl"><X size={20} /></button>
+            </div>
+            <div className="p-8 space-y-5">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock actuel</label>
+                <input type="number" value={stockValue} onChange={e => setStockValue(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Seuil d'alerte (stock bas)</label>
+                <input type="number" value={alertValue} onChange={e => setAlertValue(e.target.value)} placeholder="par défaut : 3" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+              </div>
+              <button onClick={handleSaveStock} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-widest text-xs">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

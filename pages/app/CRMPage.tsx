@@ -1,15 +1,26 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, Filter, MoreHorizontal, UserPlus, Mail, Phone, 
   Target, UserCheck, Briefcase, X, Save, Calendar, 
   MapPin, Activity, Award, Star, History, Building2,
   User, ChevronRight, CheckCircle2, Clock, Trash2,
   ShieldAlert, HeartPulse, ImageIcon, Briefcase as JobIcon,
-  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2
+  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera,
+  RotateCcw, Link2, Hash, FileText
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember } from '../../utils/storage';
-import { Member, ContactStatus } from '../../types';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate } from '../../lib/membersApi';
+import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
+import { startMandateSetup } from '../../lib/gocardless';
+import { Member, ContactStatus, Product } from '../../types';
+
+// Initiales (ex. "Jean Dupont" -> "JD") pour les avatars, en attendant les photos webcam.
+const getInitials = (first?: string, last?: string): string => {
+  const a = (first || '').trim();
+  const b = (last || '').trim();
+  const initials = `${a.charAt(0)}${b.charAt(0)}`.toUpperCase();
+  return initials || (a || b).charAt(0).toUpperCase() || '?';
+};
 
 interface CRMPageProps {
   tab?: string;
@@ -21,11 +32,17 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editBackup, setEditBackup] = useState<any | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [memberSales, setMemberSales] = useState<any[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [detailTab, setDetailTab] = useState<'profil' | 'activite' | 'finance'>('profil');
   
   // State database & search
   const [contacts, setContacts] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
 
   // Add form states
   const [addFirstName, setAddFirstName] = useState('');
@@ -35,30 +52,299 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [addDob, setAddDob] = useState('');
   const [addJob, setAddJob] = useState('');
   const [addAddress, setAddAddress] = useState('');
+  const [addCity, setAddCity] = useState('');
+  const [addPostalCode, setAddPostalCode] = useState('');
   const [addStatus, setAddStatus] = useState<ContactStatus>('PROSPECT_NEW');
   const [addNotes, setAddNotes] = useState('');
   const [trialSession, setTrialSession] = useState(false);
+
+  // Inscription membre : formule, photo, mandat
+  const [addFormula, setAddFormula] = useState('');
+  const [addPrice, setAddPrice] = useState('');
+  const [addPeriodicity, setAddPeriodicity] = useState('Mensuel');
+  const [formulaOptions, setFormulaOptions] = useState<Product[]>([]);
+  const [addPhotoFile, setAddPhotoFile] = useState<File | null>(null);
+  const [addPhotoPreview, setAddPhotoPreview] = useState<string | null>(null);
+  const [useMandate, setUseMandate] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  // Paiement hors GoCardless : mode, début, durée, fin
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [addPaymentMethod, setAddPaymentMethod] = useState('Espèces');
+  const [addStartDate, setAddStartDate] = useState(todayStr);
+  const [addDuration, setAddDuration] = useState('1 mois');
+  const [addEndDate, setAddEndDate] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d.toISOString().split('T')[0]; });
+  const [mandateResult, setMandateResult] = useState<{ authorisation_url: string; member_number?: string } | null>(null);
+  const addPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // Archivés (corbeille)
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedContacts, setArchivedContacts] = useState<Member[]>([]);
+
+  // Édition du numéro d'adhérent dans la fiche
+  const [editingNumber, setEditingNumber] = useState(false);
+  const [numberDraft, setNumberDraft] = useState('');
+  const [savingNumber, setSavingNumber] = useState(false);
+
+  // Rattacher un mandat GoCardless existant
+  const [linkMandateId, setLinkMandateId] = useState('');
+  const [linkCustomerId, setLinkCustomerId] = useState('');
+  const [linkingMandate, setLinkingMandate] = useState(false);
 
   // Custom partner states
   const [partnerCompany, setPartnerCompany] = useState('');
   const [partnerCategory, setPartnerCategory] = useState('Équipementier');
 
   useEffect(() => {
-    setContacts(getMembers());
+    const load = () => getMembers().then(setContacts).catch(console.error);
+    load();
+    window.addEventListener('focus', load);
+    return () => window.removeEventListener('focus', load);
   }, []);
 
   useEffect(() => {
     setActiveTab(tab);
   }, [tab]);
 
+  // Formules d'abonnement proposées à l'inscription (depuis la Boutique)
+  useEffect(() => {
+    getProducts()
+      .then(ps => setFormulaOptions(ps.filter(p => p.category === 'Abonnements & Séances')))
+      .catch(() => {});
+  }, []);
+
   const openContactDetails = (contact: any) => {
     setSelectedContact({ ...contact });
     setIsDetailModalOpen(true);
     setIsEditing(false);
     setDetailTab('profil');
+    setPhotoUrl(null);
   };
 
-  const handleSaveAdd = (e: React.FormEvent) => {
+  // --- Édition d'une fiche depuis la fenêtre de détail ---
+  const startEditing = () => {
+    setEditBackup({ ...selectedContact });
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (editBackup) setSelectedContact(editBackup);
+    setIsEditing(false);
+  };
+
+  const updateField = (field: string, value: any) => {
+    setSelectedContact((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdateContact = async () => {
+    try {
+      await saveMember(selectedContact);
+      setContacts(await getMembers());
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      alert("La sauvegarde a échoué. Vérifie ta connexion et réessaie.");
+    }
+  };
+
+  // --- Archivés (corbeille) ---
+  const loadArchived = async () => {
+    try { setArchivedContacts(await getArchivedMembers()); }
+    catch (err) { console.error(err); }
+  };
+  const openArchived = async () => { await loadArchived(); setShowArchived(true); };
+  const handleRestore = async (id: string) => {
+    try {
+      await restoreMember(id);
+      await loadArchived();
+      setContacts(await getMembers());
+    } catch (err) { console.error(err); alert("La restauration a échoué."); }
+  };
+  const handleHardDelete = async (id: string) => {
+    if (!window.confirm('Supprimer DÉFINITIVEMENT cette fiche et toutes ses données ? Cette action est irréversible.')) return;
+    try {
+      await hardDeleteMember(id);
+      await loadArchived();
+    } catch (err) { console.error(err); alert("La suppression définitive a échoué."); }
+  };
+
+  // --- Édition du numéro d'adhérent ---
+  const startEditNumber = () => { setNumberDraft(selectedContact?.memberNumber || ''); setEditingNumber(true); };
+  const handleSaveNumber = async () => {
+    if (!selectedContact) return;
+    setSavingNumber(true);
+    try {
+      await updateMemberNumber(selectedContact.id, numberDraft);
+      updateField('memberNumber', numberDraft.trim());
+      setContacts(await getMembers());
+      setEditingNumber(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible de modifier le numéro.");
+    } finally { setSavingNumber(false); }
+  };
+
+  // --- Rattacher un mandat GoCardless existant ---
+  const handleLinkMandate = async () => {
+    if (!selectedContact) return;
+    if (!linkMandateId.trim()) { alert('Renseigne au moins le mandate_id (colonne du fichier).'); return; }
+    setLinkingMandate(true);
+    try {
+      await linkMandate(selectedContact.id, { mandateId: linkMandateId, customerId: linkCustomerId });
+      updateField('gocardlessMandateId', linkMandateId.trim());
+      updateField('gocardlessStatus', 'mandate_active');
+      if (linkCustomerId.trim()) updateField('gocardlessCustomerId', linkCustomerId.trim());
+      setLinkMandateId(''); setLinkCustomerId('');
+      setContacts(await getMembers());
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Le rattachement a échoué.");
+    } finally { setLinkingMandate(false); }
+  };
+
+  // Charge l'URL signée de la photo quand on ouvre une fiche
+  useEffect(() => {
+    let active = true;
+    if (selectedContact?.photoPath) {
+      getPhotoUrl(selectedContact.photoPath).then((url) => {
+        if (active) setPhotoUrl(url);
+      });
+    } else {
+      setPhotoUrl(null);
+    }
+    return () => { active = false; };
+  }, [selectedContact?.id, selectedContact?.photoPath]);
+
+  // Charge l'historique d'achats du client
+  useEffect(() => {
+    let active = true;
+    if (selectedContact?.id) {
+      getMemberSales(selectedContact.id).then((s) => { if (active) setMemberSales(s); });
+    } else {
+      setMemberSales([]);
+    }
+    return () => { active = false; };
+  }, [selectedContact?.id]);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permet de re-sélectionner le même fichier
+    if (!file || !selectedContact?.id) return;
+    setPhotoUploading(true);
+    try {
+      const path = await uploadMemberPhoto(selectedContact.id, file);
+      const url = await getPhotoUrl(path);
+      setPhotoUrl(url);
+      setSelectedContact((prev: any) => ({ ...prev, photoPath: path }));
+      setContacts(await getMembers());
+    } catch (err) {
+      console.error(err);
+      alert("L'envoi de la photo a échoué. Réessaie.");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleAddPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAddPhotoFile(file);
+    setAddPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const resetAddForm = () => {
+    setAddFirstName(''); setAddLastName(''); setAddEmail(''); setAddPhone('');
+    setAddDob(''); setAddJob(''); setAddAddress(''); setAddCity(''); setAddPostalCode('');
+    setAddStatus('PROSPECT_NEW'); setAddNotes(''); setPartnerCompany('');
+    setAddFormula(''); setAddPrice(''); setAddPeriodicity('Mensuel');
+    setAddPhotoFile(null); setAddPhotoPreview(null); setUseMandate(true);
+    setMandateResult(null); setTrialSession(false);
+    setAddPaymentMethod('Espèces'); setAddStartDate(todayStr); setAddDuration('1 mois'); setAddEndDate(computeEnd(todayStr, '1 mois'));
+  };
+
+  const selectFormula = (name: string) => {
+    setAddFormula(name);
+    const p = formulaOptions.find(o => o.name === name);
+    if (p) setAddPrice(String(p.price));
+  };
+
+  const monthsForDuration = (d: string) => d === '3 mois' ? 3 : d === '6 mois' ? 6 : d === '12 mois' ? 12 : d === 'Ponctuel' ? 0 : 1;
+  const computeEnd = (start: string, duration: string) => {
+    if (!start) return '';
+    const dt = new Date(start + 'T00:00:00');
+    const m = monthsForDuration(duration);
+    if (m === 0) return start; // ponctuel : fin = début
+    dt.setMonth(dt.getMonth() + m);
+    return dt.toISOString().split('T')[0];
+  };
+  const onStartChange = (v: string) => { setAddStartDate(v); setAddEndDate(computeEnd(v, addDuration)); };
+  const onDurationChange = (v: string) => { setAddDuration(v); setAddEndDate(computeEnd(addStartDate, v)); };
+
+  const closeAddModal = () => { setIsAddModalOpen(false); resetAddForm(); };
+
+  // Inscription d'un membre par le staff (avec ou sans mandat GoCardless)
+  const handleInscribeMember = async () => {
+    if (!addFirstName.trim() || !addLastName.trim()) { alert('Le prénom et le nom sont requis.'); return; }
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const priceNum = addPrice ? parseFloat(addPrice.replace(',', '.')) : undefined;
+
+      if (useMandate) {
+        if (!addEmail.trim()) { alert("Un email est requis pour générer le mandat GoCardless."); setSubmitting(false); return; }
+        const gymId = await getGymId();
+        if (!gymId) throw new Error("Salle introuvable (gym_id).");
+        const res = await startMandateSetup({
+          firstName: addFirstName.trim(),
+          lastName: addLastName.trim(),
+          email: addEmail.trim(),
+          phone: addPhone || undefined,
+          gymId,
+          subscriptionLabel: addFormula || undefined,
+          price: priceNum,
+          redirectUrl: `${window.location.origin}/#/app`,
+        });
+        // Complète la fiche créée par la fonction (adresse, notes, périodicité)
+        await patchMember(res.member_id, {
+          address: addAddress || null,
+          city: addCity || null,
+          postal_code: addPostalCode || null,
+          notes: addNotes || null,
+          periodicity: addPeriodicity || null,
+        });
+        if (addPhotoFile) { try { await uploadMemberPhoto(res.member_id, addPhotoFile); } catch (err) { console.error(err); } }
+        setContacts(await getMembers());
+        setMandateResult({ authorisation_url: res.authorisation_url, member_number: (res as any).member_number });
+      } else {
+        const m = await createMember({
+          firstName: addFirstName.trim(),
+          lastName: addLastName.trim(),
+          email: addEmail || undefined,
+          phone: addPhone || undefined,
+          address: addAddress || undefined,
+          city: addCity || undefined,
+          postalCode: addPostalCode || undefined,
+          subscriptionLabel: addFormula || undefined,
+          price: priceNum ?? null,
+          periodicity: addPeriodicity || undefined,
+          paymentMethodLabel: addPaymentMethod || undefined,
+          subscriptionStart: addStartDate || undefined,
+          subscriptionEnd: addEndDate || computeEnd(addStartDate, addDuration) || undefined,
+          notes: addNotes || undefined,
+        });
+        if (addPhotoFile) { try { await uploadMemberPhoto(m.id, addPhotoFile); } catch (err) { console.error(err); } }
+        setContacts(await getMembers());
+        closeAddModal();
+        alert(`Membre créé (n° ${m.memberNumber || ''}).`);
+      }
+    } catch (e) {
+      alert("Échec de l'inscription : " + ((e as Error)?.message || ''));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (activeTab === 'partenaires') {
@@ -67,21 +353,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         firstName: 'Contact',
         lastName: partnerCompany || 'Partenaire sans nom',
         email: addEmail,
-        phone: addPhone || '01 02 03 04 05',
+        phone: addPhone || '',
         address: addAddress,
         status: 'PARTNER',
         joinDate: new Date().toISOString().split('T')[0],
         trialSessionDone: false,
         notes: `Catégorie: ${partnerCategory}`
       };
-      saveMember(newPartner);
+      await saveMember(newPartner);
     } else {
       const newMember: Member = {
         id: `member_${Date.now()}`,
         firstName: addFirstName,
         lastName: addLastName,
         email: addEmail,
-        phone: addPhone || '06 12 34 56 78',
+        phone: addPhone || '',
         address: addAddress,
         dob: addDob,
         job: addJob,
@@ -90,11 +376,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         trialSessionDone: trialSession,
         notes: addNotes
       };
-      saveMember(newMember);
+      await saveMember(newMember);
     }
 
     setIsAddModalOpen(false);
-    setContacts(getMembers());
+    setContacts(await getMembers());
     
     // Reset forms
     setAddFirstName('');
@@ -126,13 +412,27 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       filtered = filtered.filter(m => 
         m.firstName.toLowerCase().includes(query) || 
         m.lastName.toLowerCase().includes(query) ||
+        (m.memberNumber && m.memberNumber.toLowerCase().includes(query)) ||
         (m.email && m.email.toLowerCase().includes(query)) ||
         (m.phone && m.phone.toLowerCase().includes(query)) ||
         (m.notes && m.notes.toLowerCase().includes(query))
       );
     }
 
-    return filtered;
+    const num = (m: any) => parseInt(m.memberNumber || '0', 10) || 0;
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'name_desc': return (b.lastName || '').localeCompare(a.lastName || '', 'fr');
+        case 'number_asc': return num(a) - num(b);
+        case 'number_desc': return num(b) - num(a);
+        case 'date_desc': return (b.joinDate || '').localeCompare(a.joinDate || '');
+        case 'date_asc': return (a.joinDate || '').localeCompare(b.joinDate || '');
+        case 'name_asc':
+        default: return (a.lastName || '').localeCompare(b.lastName || '', 'fr');
+      }
+    });
+
+    return sorted;
   };
 
   return (
@@ -184,6 +484,29 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium"
             />
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trier</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold text-gray-700"
+            >
+              <option value="name_asc">Nom (A → Z)</option>
+              <option value="name_desc">Nom (Z → A)</option>
+              <option value="number_asc">N° client (croissant)</option>
+              <option value="number_desc">N° client (décroissant)</option>
+              <option value="date_desc">Inscription (récent)</option>
+              <option value="date_asc">Inscription (ancien)</option>
+            </select>
+            <button
+              type="button"
+              onClick={openArchived}
+              className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+              title="Voir les fiches archivées"
+            >
+              <Trash2 size={16} /> Archivés
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -191,8 +514,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             <thead>
               <tr className="bg-gray-50/50 text-gray-400 text-xs font-bold uppercase tracking-wider border-y border-gray-100">
                 <th className="px-6 py-4">{activeTab === 'partenaires' ? 'Entreprise / Contact' : 'Nom / Prénom'}</th>
+                <th className="px-6 py-4">N° Client</th>
+                <th className="px-6 py-4">Téléphone</th>
                 <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4">{activeTab === 'partenaires' ? 'Catégorie' : 'Séance d\'Essai'}</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -205,7 +529,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <img src={`https://picsum.photos/seed/${member.id}/40/40`} className="w-10 h-10 rounded-xl shadow-sm" alt="" />
+                      <div className="w-10 h-10 rounded-xl shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black uppercase shrink-0" aria-hidden="true">
+                        {getInitials(member.firstName, member.lastName)}
+                      </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">
                           {member.status === 'PARTNER' ? member.lastName : `${member.firstName} ${member.lastName}`}
@@ -215,23 +541,17 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <span className="text-sm font-bold text-gray-900">{member.memberNumber || '—'}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-bold text-gray-700">{member.phone || '—'}</span>
+                  </td>
+                  <td className="px-6 py-4">
                     <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                       member.status === 'MEMBER_ACTIVE' || member.status === 'PARTNER' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                     }`}>
                       {member.status.replace('MEMBER_', '').replace('PROSPECT_', '')}
                     </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    {member.status === 'PARTNER' ? (
-                       <span className="text-xs font-bold text-gray-500">{member.notes?.replace('Catégorie: ', '') || 'Autre'}</span>
-                    ) : member.status.startsWith('PROSPECT') ? (
-                       <div className="flex items-center space-x-2">
-                         <div className={`w-2 h-2 rounded-full ${member.trialSessionDone ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                         <span className="text-xs font-bold text-gray-500">{member.trialSessionDone ? 'Effectuée' : 'S\'est inscrit'}</span>
-                       </div>
-                    ) : (
-                      <span className="text-xs text-gray-400 font-bold">Client Actif</span>
-                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"><ChevronRight size={18} /></button>
@@ -258,9 +578,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   <p className="text-indigo-100 text-xs font-bold uppercase tracking-widest mt-0.5">Enregistrement complet du profil</p>
                 </div>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={24} /></button>
+              <button onClick={closeAddModal} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={24} /></button>
             </div>
 
+            {mandateResult && (
+              <div className="p-10 space-y-6 text-center overflow-y-auto">
+                <div className="mx-auto w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><CheckCircle2 size={32} /></div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">Fiche créée{mandateResult.member_number ? ` (n° ${mandateResult.member_number})` : ''}</h3>
+                  <p className="text-sm font-medium text-gray-500 mt-1">Dernière étape : le client signe son mandat de prélèvement (sur place ou via ce lien).</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left break-all text-xs font-bold text-gray-600">{mandateResult.authorisation_url}</div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <a href={mandateResult.authorisation_url} target="_blank" rel="noreferrer" className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition-colors">Ouvrir la signature</a>
+                  <button type="button" onClick={() => { try { navigator.clipboard?.writeText(mandateResult.authorisation_url); } catch (_) {} }} className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-gray-200 transition-colors">Copier le lien</button>
+                </div>
+                <button type="button" onClick={closeAddModal} className="text-xs font-bold text-gray-400 hover:text-gray-600 underline">Terminer</button>
+              </div>
+            )}
+
+            {!mandateResult && (
             <form onSubmit={handleSaveAdd} className="flex-grow overflow-y-auto p-8 space-y-10 pwa-hide-scrollbar">
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -269,6 +606,19 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
                     <User size={14} /> <span>1. Informations Générales</span>
                   </h3>
+
+                  {activeTab !== 'partenaires' && (
+                    <div className="flex items-center space-x-4">
+                      <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="w-20 h-20 rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-all shrink-0">
+                        {addPhotoPreview ? <img src={addPhotoPreview} alt="" className="w-full h-full object-cover" /> : <Camera size={22} className="text-gray-300" />}
+                      </button>
+                      <div>
+                        <p className="text-xs font-black text-gray-700">Photo du membre</p>
+                        <p className="text-[10px] font-bold text-gray-400">Importer un fichier ou prendre une photo (tablette/mobile)</p>
+                      </div>
+                      <input ref={addPhotoInputRef} type="file" accept="image/*" capture="user" onChange={handleAddPhoto} className="hidden" />
+                    </div>
+                  )}
                   
                   {activeTab === 'partenaires' ? (
                     <div className="space-y-4">
@@ -327,60 +677,144 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
-                      <MapPin size={10} /> <span>Adresse Postale</span>
-                    </label>
-                    <textarea rows={2} value={addAddress} onChange={(e) => setAddAddress(e.target.value)} placeholder="12 rue des Lilas, 75000 Paris" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                        <MapPin size={10} /> <span>Adresse</span>
+                      </label>
+                      <input type="text" value={addAddress} onChange={(e) => setAddAddress(e.target.value)} placeholder="12 rue des Lilas" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Code postal</label>
+                        <input type="text" value={addPostalCode} onChange={(e) => setAddPostalCode(e.target.value)} placeholder="11400" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      </div>
+                      <div className="col-span-2 space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ville</label>
+                        <input type="text" value={addCity} onChange={(e) => setAddCity(e.target.value)} placeholder="Castelnaudary" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-8">
                   <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
-                    <Target size={14} /> <span>2. Qualification & Suivi</span>
+                    <Target size={14} /> <span>2. {activeTab === 'membres' ? 'Formule & Paiement' : 'Qualification & Suivi'}</span>
                   </h3>
 
-                  <div className="space-y-4 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Étape de conversion</label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {activeTab === 'membres' ? (
-                        <div className="p-3 bg-green-50 rounded-xl border border-green-100 text-green-700 text-xs font-bold flex items-center space-x-2">
-                          <UserCheck size={16} /> <span>Membre Actif du Club</span>
+                  {activeTab === 'membres' ? (
+                    <div className="space-y-5">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Formule d'abonnement</label>
+                        <select value={addFormula} onChange={(e) => selectFormula(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
+                          <option value="">— Choisir une formule —</option>
+                          {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2)} €)</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prix (€)</label>
+                          <input type="text" value={addPrice} onChange={(e) => setAddPrice(e.target.value)} placeholder="29.90" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                         </div>
-                      ) : activeTab === 'prospects' ? (
-                        ['PROSPECT_NEW', 'PROSPECT_FOLLOWUP', 'PROSPECT_TRIAL'].map(status => (
-                          <label key={status} className="flex items-center space-x-3 p-3 bg-white rounded-xl border border-transparent hover:border-indigo-200 cursor-pointer transition-all">
-                            <input type="radio" name="status" value={status} checked={addStatus === status} onChange={() => setAddStatus(status as ContactStatus)} className="w-4 h-4 text-indigo-600" />
-                            <span className="text-xs font-bold">
-                              {status === 'PROSPECT_NEW' ? 'Nouveau Prospect' : status === 'PROSPECT_FOLLOWUP' ? 'Relancé' : 'En période d\'essai'}
-                            </span>
-                          </label>
-                        ))
-                      ) : (
-                        <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-700 text-xs font-bold flex items-center space-x-2">
-                          <Briefcase size={16} /> <span>Partenaire Officiel</span>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Périodicité</label>
+                          <select value={addPeriodicity} onChange={(e) => setAddPeriodicity(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                            <option>Mensuel</option>
+                            <option>Trimestriel</option>
+                            <option>Annuel</option>
+                            <option>Ponctuel</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-5 bg-indigo-50 rounded-3xl border border-indigo-100">
+                        <div className="flex items-center space-x-3">
+                          <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><CreditCard size={20} /></div>
+                          <div>
+                            <p className="text-sm font-black text-indigo-900">Prélèvement GoCardless</p>
+                            <p className="text-[10px] font-bold text-indigo-400 uppercase">Génère un mandat à faire signer</p>
+                          </div>
+                        </div>
+                        <button type="button" onClick={() => setUseMandate(!useMandate)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${useMandate ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${useMandate ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                      {useMandate && <p className="text-[11px] font-bold text-gray-400 px-1">Un lien de signature sera généré : le client le signe sur place (tablette) ou via le lien. L'email est alors obligatoire.</p>}
+
+                      {!useMandate && (
+                        <div className="space-y-3 p-5 bg-gray-50 rounded-3xl border border-gray-100">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paiement & période (sans prélèvement)</p>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
+                            <select value={addPaymentMethod} onChange={(e) => setAddPaymentMethod(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
+                              <option>Espèces</option>
+                              <option>Carte bancaire</option>
+                              <option>Chèque</option>
+                              <option>Virement</option>
+                              <option>Chèque(s) vacances / ANCV</option>
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Début</label>
+                              <input type="date" value={addStartDate} onChange={(e) => onStartChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Durée</label>
+                              <select value={addDuration} onChange={(e) => onDurationChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                                <option>1 mois</option>
+                                <option>3 mois</option>
+                                <option>6 mois</option>
+                                <option>12 mois</option>
+                                <option>Ponctuel</option>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fin</label>
+                              <input type="date" value={addEndDate} onChange={(e) => setAddEndDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                            </div>
+                          </div>
+                          <p className="text-[11px] font-bold text-gray-400 px-1">La date de fin se calcule automatiquement selon la durée, et reste modifiable. Elle sert aux alertes de renouvellement du tableau de bord.</p>
                         </div>
                       )}
                     </div>
-                  </div>
-
-                  {activeTab !== 'partenaires' && (
-                    <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><Activity size={20} /></div>
-                        <div>
-                          <p className="text-sm font-black text-indigo-900">Séance d'essai</p>
-                          <p className="text-[10px] font-bold text-indigo-400 uppercase">A-t-il testé la salle ?</p>
+                  ) : (
+                    <>
+                      <div className="space-y-4 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Étape de conversion</label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {activeTab === 'prospects' ? (
+                            ['PROSPECT_NEW', 'PROSPECT_FOLLOWUP', 'PROSPECT_TRIAL'].map(status => (
+                              <label key={status} className="flex items-center space-x-3 p-3 bg-white rounded-xl border border-transparent hover:border-indigo-200 cursor-pointer transition-all">
+                                <input type="radio" name="status" value={status} checked={addStatus === status} onChange={() => setAddStatus(status as ContactStatus)} className="w-4 h-4 text-indigo-600" />
+                                <span className="text-xs font-bold">
+                                  {status === 'PROSPECT_NEW' ? 'Nouveau Prospect' : status === 'PROSPECT_FOLLOWUP' ? 'Relancé' : 'En période d\'essai'}
+                                </span>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-700 text-xs font-bold flex items-center space-x-2">
+                              <Briefcase size={16} /> <span>Partenaire Officiel</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <button 
-                        type="button"
-                        onClick={() => setTrialSession(!trialSession)}
-                        className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${trialSession ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${trialSession ? 'translate-x-6' : 'translate-x-1'}`} />
-                      </button>
-                    </div>
+
+                      {activeTab === 'prospects' && (
+                        <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
+                          <div className="flex items-center space-x-3">
+                            <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><Activity size={20} /></div>
+                            <div>
+                              <p className="text-sm font-black text-indigo-900">Séance d'essai</p>
+                              <p className="text-[10px] font-bold text-indigo-400 uppercase">A-t-il testé la salle ?</p>
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => setTrialSession(!trialSession)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${trialSession ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${trialSession ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="p-6 bg-red-50/50 rounded-3xl border border-red-100 space-y-4">
@@ -395,17 +829,31 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                 </div>
               </div>
             </form>
+            )}
 
+            {!mandateResult && (
             <div className="p-8 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
-               <button onClick={() => setIsAddModalOpen(false)} className="px-6 py-4 text-gray-400 font-bold text-sm hover:text-gray-600">Annuler</button>
-               <button 
-                onClick={handleSaveAdd}
-                className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
-               >
-                 <Save size={18} />
-                 <span>Enregistrer le {activeTab.slice(0, -1)}</span>
-               </button>
+               <button onClick={closeAddModal} className="px-6 py-4 text-gray-400 font-bold text-sm hover:text-gray-600">Annuler</button>
+               {activeTab === 'membres' ? (
+                 <button
+                   onClick={handleInscribeMember}
+                   disabled={submitting}
+                   className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-60"
+                 >
+                   <Save size={18} />
+                   <span>{submitting ? 'Création…' : (useMandate ? 'Inscrire + générer le mandat' : 'Inscrire le membre')}</span>
+                 </button>
+               ) : (
+                 <button
+                  onClick={handleSaveAdd}
+                  className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                 >
+                   <Save size={18} />
+                   <span>Enregistrer le {activeTab.slice(0, -1)}</span>
+                 </button>
+               )}
             </div>
+            )}
           </div>
         </div>
       )}
@@ -418,14 +866,39 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             <div className={`p-10 ${activeTab === 'membres' ? 'bg-indigo-600' : activeTab === 'prospects' ? 'bg-amber-500' : 'bg-slate-800'} text-white flex items-center justify-between shrink-0 relative overflow-hidden`}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
               <div className="flex items-center space-x-8 relative z-10">
-                <img src={`https://picsum.photos/seed/${selectedContact.id}/150/150`} className="w-24 h-24 rounded-[2rem] border-4 border-white/20 shadow-xl" alt="" />
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="w-24 h-24 rounded-[2rem] border-4 border-white/20 shadow-xl bg-white/20 flex items-center justify-center text-3xl font-black uppercase overflow-hidden group relative"
+                    title="Ajouter ou changer la photo"
+                  >
+                    {photoUrl ? (
+                      <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{getInitials(selectedContact.firstName, selectedContact.lastName)}</span>
+                    )}
+                    <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Camera size={22} className="text-white" />
+                    </span>
+                  </button>
+                  {photoUploading && (
+                    <span className="absolute inset-0 bg-black/50 rounded-[2rem] flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest">Envoi…</span>
+                  )}
+                  <input ref={photoInputRef} type="file" accept="image/*" capture="user" onChange={handlePhotoChange} className="hidden" />
+                </div>
                 <div>
                   <h2 className="text-3xl font-black">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
                   <div className="flex items-center space-x-3 mt-2">
                     <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest">
                       {activeTab === 'prospects' ? 'Prospect chaud' : activeTab === 'membres' ? (selectedContact.subscription || 'Membre Actif') : selectedContact.category}
                     </span>
-                    {activeTab === 'membres' && <span className="flex items-center text-[10px] font-bold"><Zap size={10} className="mr-1" /> Score engagement : 92%</span>}
+                    {activeTab === 'membres' && (
+                      <span className="flex items-center text-[10px] font-bold">
+                        <Zap size={10} className="mr-1" /> N° adhérent {selectedContact.memberNumber || '—'}
+                        <button type="button" onClick={() => { setDetailTab('finance'); startEditNumber(); }} title="Modifier le numéro d'adhérent" className="ml-2 inline-flex items-center justify-center p-1 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"><Edit2 size={11} /></button>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -442,7 +915,63 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             )}
 
             <div className="flex-grow overflow-y-auto p-10 space-y-12 pwa-hide-scrollbar">
-              
+
+              {isEditing ? (
+                <div className="max-w-2xl mx-auto space-y-6">
+                  <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
+                    <Edit2 size={14} /> <span>Modifier la fiche</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prénom</label>
+                      <input type="text" value={selectedContact.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom</label>
+                      <input type="text" value={selectedContact.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</label>
+                      <input type="email" value={selectedContact.email || ''} onChange={(e) => updateField('email', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Téléphone</label>
+                      <input type="tel" value={selectedContact.phone || ''} onChange={(e) => updateField('phone', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Abonnement</label>
+                      <input type="text" value={selectedContact.subscription || ''} onChange={(e) => updateField('subscription', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarif (€)</label>
+                      <input type="number" step="0.01" value={selectedContact.price ?? ''} onChange={(e) => updateField('price', e.target.value === '' ? undefined : Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Statut</label>
+                      <select value={selectedContact.status === 'MEMBER_ACTIVE' ? 'MEMBER_ACTIVE' : 'MEMBER_INACTIVE'} onChange={(e) => updateField('status', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                        <option value="MEMBER_ACTIVE">Actif</option>
+                        <option value="MEMBER_INACTIVE">Inactif</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
+                      <input type="text" value={selectedContact.paymentMethod || ''} onChange={(e) => updateField('paymentMethod', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</label>
+                    <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
+                  </div>
+                  <p className="text-[11px] font-bold text-gray-400">L'adresse et la photo (webcam) seront modifiables dans une prochaine étape.</p>
+                </div>
+              ) : (
+              <>
               {/* VUE PROFIL (Commune à tous) */}
               {detailTab === 'profil' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
@@ -457,32 +986,44 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
                         <span className="text-xs font-bold text-gray-400">Téléphone</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.phone || '06 12 34 56 78'}</span>
+                        <span className="text-sm font-black text-gray-900">{selectedContact.phone || 'Non renseigné'}</span>
                       </div>
                       <div className="flex flex-col p-4 bg-gray-50 rounded-2xl space-y-2">
                         <span className="text-xs font-bold text-gray-400">Adresse postale</span>
-                        <span className="text-sm font-black text-gray-900 leading-relaxed">{selectedContact.address || '12 Rue de la Paix, 75000 Paris'}</span>
+                        <span className="text-sm font-black text-gray-900 leading-relaxed">{selectedContact.address || 'Non renseignée'}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-8">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
-                      <ShieldAlert size={14} /> <span>Qualification & Divers</span>
+                      <ShieldAlert size={14} /> <span>Abonnement & Divers</span>
                     </h3>
                     <div className="grid grid-cols-1 gap-4">
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Profession</span>
-                        <span className="text-sm font-black text-gray-900">Architecte Logiciel</span>
+                        <span className="text-xs font-bold text-gray-400">Abonnement</span>
+                        <span className="text-sm font-black text-gray-900 text-right">{selectedContact.subscription || 'Non renseigné'}</span>
                       </div>
                       <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Date de naissance</span>
-                        <span className="text-sm font-black text-gray-900">12 Mai 1988</span>
+                        <span className="text-xs font-bold text-gray-400">Tarif</span>
+                        <span className="text-sm font-black text-gray-900">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</span>
                       </div>
-                      <div className="p-4 bg-red-50/50 rounded-2xl border border-red-100 flex items-center justify-between">
-                        <span className="text-xs font-black text-red-600">Urgence : Julie Pesquet</span>
-                        <span className="text-sm font-black text-red-900">06 52 41 87 96</span>
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                        <span className="text-xs font-bold text-gray-400">Date d'inscription</span>
+                        <span className="text-sm font-black text-gray-900">{selectedContact.joinDate || '—'}</span>
                       </div>
+                      {selectedContact.emergencyContact?.phone && (
+                        <div className="p-4 bg-red-50/50 rounded-2xl border border-red-100 flex items-center justify-between">
+                          <span className="text-xs font-black text-red-600">Urgence : {selectedContact.emergencyContact.name || 'Contact'}</span>
+                          <span className="text-sm font-black text-red-900">{selectedContact.emergencyContact.phone}</span>
+                        </div>
+                      )}
+                      {selectedContact.notes && (
+                        <div className="flex flex-col p-4 bg-amber-50/60 rounded-2xl border border-amber-100 space-y-2">
+                          <span className="text-xs font-bold text-amber-600">Notes</span>
+                          <span className="text-sm font-bold text-gray-800 leading-relaxed">{selectedContact.notes}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -490,40 +1031,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
               {/* VUE ACTIVITE (Spécifique Client) */}
               {detailTab === 'activite' && (
-                <div className="space-y-10">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
-                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Visites ce mois</p>
-                      <p className="text-3xl font-black text-indigo-900 mt-1">14</p>
-                    </div>
-                    <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
-                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Temps moyen</p>
-                      <p className="text-3xl font-black text-indigo-900 mt-1">72 min</p>
-                    </div>
-                    <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
-                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Cours favori</p>
-                      <p className="text-lg font-black text-indigo-900 mt-2 uppercase">CrossFit WOD</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
-                      <CalendarCheck size={14} /> <span>Dernières visites & Réservations</span>
-                    </h3>
-                    <div className="divide-y divide-gray-100 border border-gray-100 rounded-[2rem] overflow-hidden bg-white">
-                      {[1, 2, 3, 4].map(i => (
-                        <div key={i} className="p-5 flex items-center justify-between hover:bg-gray-50">
-                          <div className="flex items-center space-x-4">
-                            <div className="bg-gray-100 p-2.5 rounded-xl"><Activity size={18} className="text-gray-400" /></div>
-                            <div>
-                              <p className="text-sm font-black text-gray-900">{i % 2 === 0 ? 'CrossFit WOD' : 'Accès Libre Plateau'}</p>
-                              <p className="text-[10px] font-bold text-gray-400">Coach: David Strong • Mardi 12 Mars, 18:00</p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-black px-3 py-1 bg-green-100 text-green-700 rounded-lg">EFFECTUÉ</span>
-                        </div>
-                      ))}
-                    </div>
+                <div className="space-y-6">
+                  <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
+                    <div className="bg-gray-100 p-4 rounded-2xl text-gray-400 mb-4"><CalendarCheck size={28} /></div>
+                    <p className="text-sm font-black text-gray-700">Aucune visite enregistrée pour l'instant</p>
+                    <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les visites et réservations apparaîtront ici une fois le contrôle d'accès et le planning connectés à la base.</p>
                   </div>
                 </div>
               )}
@@ -533,61 +1045,251 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                 <div className="space-y-12">
                   <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl shadow-indigo-100">
                     <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement Actuel</p>
-                      <h4 className="text-2xl font-black">Plan Premium (Engagement 12 mois)</h4>
-                      <p className="text-sm opacity-90">Prochain prélèvement : 01 Avril 2024</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement actuel</p>
+                      <h4 className="text-2xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
+                      <p className="text-sm opacity-90">
+                        {selectedContact.paymentMethod ? `Paiement : ${selectedContact.paymentMethod}` : 'Mode de paiement non renseigné'}
+                        {selectedContact.periodicity ? ` • ${selectedContact.periodicity}` : ''}
+                      </p>
+                      {selectedContact.paidBy && (
+                        <p className="text-xs opacity-75">Réglé par : {selectedContact.paidBy}</p>
+                      )}
+                      {(selectedContact.subscriptionStart || selectedContact.subscriptionEnd) && (
+                        <p className="text-xs opacity-90 font-bold mt-1">
+                          Période : {selectedContact.subscriptionStart || '—'} → {selectedContact.subscriptionEnd || '—'}
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
-                      <p className="text-4xl font-black">49.90 €</p>
-                      <p className="text-[10px] font-black opacity-80 uppercase mt-1">Status : ACTIF</p>
+                      <p className="text-4xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
+                      <p className="text-[10px] font-black opacity-80 uppercase mt-1">
+                        Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="space-y-6">
+                  {/* Numéro d'adhérent (modifiable) */}
+                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl"><Hash size={18} /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Numéro d'adhérent</p>
+                        {editingNumber ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="text"
+                              value={numberDraft}
+                              onChange={(e) => setNumberDraft(e.target.value)}
+                              className="w-28 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
+                              placeholder="ex. 338"
+                            />
+                            <button type="button" onClick={handleSaveNumber} disabled={savingNumber} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50">
+                              <Save size={14} /> {savingNumber ? '…' : 'OK'}
+                            </button>
+                            <button type="button" onClick={() => setEditingNumber(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <p className="text-2xl font-black text-gray-900">{selectedContact.memberNumber || '—'}</p>
+                        )}
+                      </div>
+                    </div>
+                    {!editingNumber && (
+                      <button type="button" onClick={startEditNumber} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
+                        <Edit2 size={14} /> Modifier
+                      </button>
+                    )}
+                  </div>
+
+                  {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
+                    <div className="p-6 bg-white rounded-[2rem] border border-gray-100 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
+                        <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${
+                          selectedContact.gocardlessStatus === 'mandate_active' ? 'bg-green-100 text-green-700'
+                          : selectedContact.gocardlessStatus === 'pending' ? 'bg-amber-100 text-amber-700'
+                          : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'bg-blue-100 text-blue-700'
+                          : selectedContact.gocardlessStatus === 'cancelled' || selectedContact.gocardlessStatus === 'failed' ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-600'}`}>
+                          {selectedContact.gocardlessStatus === 'mandate_active' ? 'Mandat actif'
+                            : selectedContact.gocardlessStatus === 'pending' ? 'En attente de signature'
+                            : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'Mandat soumis'
+                            : selectedContact.gocardlessStatus === 'cancelled' ? 'Annulé'
+                            : selectedContact.gocardlessStatus === 'failed' ? 'Échec'
+                            : selectedContact.gocardlessStatus === 'expired' ? 'Expiré'
+                            : (selectedContact.gocardlessStatus || 'Inconnu')}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                          <p className="text-[10px] font-black text-gray-400 uppercase">Mandat</p>
+                          <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessMandateId || '—'}</p>
+                        </div>
+                        <div className="bg-gray-50 rounded-xl px-4 py-3">
+                          <p className="text-[10px] font-black text-gray-400 uppercase">Client GoCardless</p>
+                          <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessCustomerId || '—'}</p>
+                        </div>
+                      </div>
+                      {selectedContact.gocardlessCustomerId && (
+                        <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-black text-indigo-600 hover:text-indigo-800">
+                          <ChevronRight size={14} /> <span>Ouvrir la fiche dans GoCardless</span>
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
+                      <div>
+                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
+                        <p className="text-[11px] font-medium text-gray-400 mt-1">Aucun mandat de prélèvement pour l'instant. Si ce client a déjà un mandat GoCardless (voir le fichier de rapprochement), colle ses identifiants ici.</p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase">mandate_id</label>
+                          <input type="text" value={linkMandateId} onChange={(e) => setLinkMandateId(e.target.value)} placeholder="MD000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase">customer_id (optionnel)</label>
+                          <input type="text" value={linkCustomerId} onChange={(e) => setLinkCustomerId(e.target.value)} placeholder="CU000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleLinkMandate} disabled={linkingMandate} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                        <Link2 size={14} /> {linkingMandate ? 'Rattachement…' : 'Lier ce mandat'}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
                       <ShoppingBag size={14} /> <span>Historique des achats Boutique</span>
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {[
-                        { item: 'Protéine Whey 1kg', price: '34.90', date: '05 Mars 2024' },
-                        { item: 'Shaker NoResa', price: '9.90', date: '12 Fév. 2024' }
-                      ].map((buy, idx) => (
-                        <div key={idx} className="p-5 border border-gray-100 rounded-3xl flex items-center justify-between hover:bg-gray-50 transition-all">
-                           <div className="flex items-center space-x-3">
-                             <div className="bg-gray-100 p-2 rounded-xl text-gray-400"><ShoppingBag size={16} /></div>
-                             <div>
-                               <p className="text-xs font-black text-gray-900">{buy.item}</p>
-                               <p className="text-[10px] font-bold text-gray-400">{buy.date}</p>
-                             </div>
-                           </div>
-                           <p className="text-sm font-black text-indigo-600">{buy.price} €</p>
-                        </div>
-                      ))}
-                    </div>
+                    {memberSales.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center text-center py-12 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
+                        <div className="bg-gray-100 p-3 rounded-2xl text-gray-400 mb-3"><ShoppingBag size={24} /></div>
+                        <p className="text-sm font-black text-gray-700">Aucun achat enregistré</p>
+                        <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les ventes rattachées à ce client apparaîtront ici.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {memberSales.map((s: any) => (
+                          <div key={s.id} className="p-5 border border-gray-100 rounded-[1.5rem] bg-white">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-black text-gray-900">Facture {s.invoice_number || '—'}</p>
+                                <p className="text-[11px] font-bold text-gray-400">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : ''} · {s.payment_method || '—'}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg font-black text-indigo-600">{Number(s.total_ttc || 0).toFixed(2)} €</span>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const u = await viewInvoice(s.id, s.invoice_pdf_path);
+                                      if (u) { window.open(u, '_blank'); if (selectedContact?.id) setMemberSales(await getMemberSales(selectedContact.id)); }
+                                      else alert("Impossible d'ouvrir la facture.");
+                                    } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
+                                  }}
+                                  title="Voir / télécharger la facture PDF"
+                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                                >
+                                  <FileText size={14} /> Facture
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(s.lines || []).map((l: any, i: number) => (
+                                <span key={i} className="inline-flex items-center bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-600">
+                                  {l.quantity}× {l.product?.name || 'Article'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
+              </>
               )}
             </div>
 
             {/* Footer de la modale */}
             <div className="p-10 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
-               <button 
-                 onClick={() => {
-                   deleteMember(selectedContact.id);
-                   setContacts(getMembers());
-                   setIsDetailModalOpen(false);
-                 }}
-                 className="text-xs font-bold text-red-500 hover:underline"
-               >
-                 Supprimer le contact
-               </button>
-               <div className="flex space-x-4">
-                 <button onClick={() => setIsDetailModalOpen(false)} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
-                 <button className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                   <Edit2 size={18} />
-                   <span>Modifier la fiche</span>
-                 </button>
-               </div>
+               {isEditing ? (
+                 <>
+                   <button onClick={cancelEditing} className="text-xs font-bold text-gray-400 hover:text-gray-600">Annuler</button>
+                   <button
+                     onClick={handleUpdateContact}
+                     className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                   >
+                     <Save size={18} />
+                     <span>Enregistrer</span>
+                   </button>
+                 </>
+               ) : (
+                 <>
+                   <button
+                     onClick={async () => {
+                       if (!window.confirm('Archiver ce contact ? Sa fiche et toutes ses données seront conservées dans les Archivés, et restaurables à tout moment.')) return;
+                       await deleteMember(selectedContact.id);
+                       setContacts(await getMembers());
+                       setIsDetailModalOpen(false);
+                     }}
+                     className="text-xs font-bold text-red-500 hover:underline"
+                   >
+                     Archiver le contact
+                   </button>
+                   <div className="flex space-x-4">
+                     <button onClick={() => setIsDetailModalOpen(false)} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
+                     <button onClick={startEditing} className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                       <Edit2 size={18} />
+                       <span>Modifier la fiche</span>
+                     </button>
+                   </div>
+                 </>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE ARCHIVÉS (corbeille) */}
+      {showArchived && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-100 text-gray-500 p-2.5 rounded-xl"><Trash2 size={18} /></div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900">Fiches archivées</h3>
+                  <p className="text-xs font-bold text-gray-400">{archivedContacts.length} fiche(s) · données conservées · restaurables</p>
+                </div>
+              </div>
+              <button onClick={() => setShowArchived(false)} className="p-2 text-gray-400 hover:text-gray-700"><X size={22} /></button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {archivedContacts.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-sm font-black text-gray-700">Aucune fiche archivée</p>
+                  <p className="text-xs font-bold text-gray-400 mt-1">Les contacts archivés apparaîtront ici.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {archivedContacts.map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between gap-4 py-3 px-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-black uppercase shrink-0">{getInitials(m.firstName, m.lastName)}</div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-gray-900 truncate">{m.firstName} {m.lastName} {m.memberNumber ? <span className="text-gray-400 font-black">· n° {m.memberNumber}</span> : null}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest truncate">{m.email || 'Pas d\'email'}{m.archivedAt ? ` · archivé le ${String(m.archivedAt).split('T')[0]}` : ''}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button type="button" onClick={() => handleRestore(m.id)} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700"><RotateCcw size={14} /> Restaurer</button>
+                        <button type="button" onClick={() => handleHardDelete(m.id)} className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-red-100"><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

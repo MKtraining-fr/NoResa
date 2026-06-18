@@ -38,7 +38,7 @@ export const MOCK_SESSIONS = [
 
 export const APP_NAV_ITEMS = [
   { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
-  { label: 'CRM', path: '/app/crm', icon: Users, subItems: ['Prospects', 'Membres', 'Partenaires'] },
+  { label: 'CRM', path: '/app/crm', icon: Users, subItems: ['Membres', 'Prospects', 'Partenaires'] },
   { label: 'Planning', path: '/app/planning', icon: Calendar, subItems: ['Cours', 'Coachs'] },
   { label: 'Finance', path: '/app/finance', icon: Wallet, subItems: ['Abonnements', 'Paiements'] },
   { label: 'Boutique', path: '/app/boutique', icon: ShoppingBag, subItems: ['Produits', 'Ventes', 'Fournisseurs'] },

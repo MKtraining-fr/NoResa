@@ -1,0 +1,12 @@
+# index.html ne doit jamais être mis en cache "dur" : on revalide à chaque visite
+# (sinon, après un redéploiement, le navigateur garde l'ancienne page qui pointe
+#  vers des fichiers JS/CSS supprimés -> 404 -> impossible de se connecter).
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Les fichiers compilés ont un nom unique (hash) : on peut les mettre en cache "pour toujours".
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
