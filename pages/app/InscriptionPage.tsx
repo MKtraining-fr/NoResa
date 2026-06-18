@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
-  CreditCard, Loader2, BadgeCheck, PartyPopper,
+  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera,
 } from 'lucide-react';
 import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
@@ -30,6 +30,20 @@ const InscriptionPage: React.FC = () => {
   const [profession, setProfession] = useState('');
   const [company, setCompany] = useState('');
 
+  // Photo
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
+  const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) { setPhoto(f); setPhotoPreview(URL.createObjectURL(f)); }
+  };
+
+  // Période d'abonnement
+  const today = new Date().toISOString().split('T')[0];
+  const [subStart, setSubStart] = useState(today);
+  const [subEnd, setSubEnd] = useState('');
+
   // Formule
   const [formulaKey, setFormulaKey] = useState('');
   const [formulaPaymentMethod, setFormulaPaymentMethod] = useState('');
@@ -50,9 +64,16 @@ const InscriptionPage: React.FC = () => {
   const total = (formula ? formula.price : 0) + BADGE.price + chosenServices.reduce((a, s) => a + s.price, 0);
   const eur = (n: number) => `${(n || 0).toFixed(2)} €`;
 
-  // Mode de règlement par défaut selon la formule
+  // Mode de règlement + période par défaut selon la formule
   useEffect(() => {
-    if (formula) setFormulaPaymentMethod(formula.recurring ? 'Prélèvement' : 'Espèces');
+    if (!formula) return;
+    setFormulaPaymentMethod(formula.recurring ? 'Prélèvement' : 'Espèces');
+    if (formula.key === 'mois') {
+      const d = new Date(subStart || today); d.setMonth(d.getMonth() + 1);
+      setSubEnd(d.toISOString().split('T')[0]);
+    } else if (formula.recurring) {
+      setSubEnd('');
+    }
   }, [formulaKey]); // eslint-disable-line
 
   // --- Signature (canvas tactile) -------------------------------------------
@@ -131,6 +152,9 @@ const InscriptionPage: React.FC = () => {
         address: address || undefined, postalCode: postalCode || undefined, city: city || undefined,
         phone: phone || undefined, email: email.trim() || undefined,
         profession: profession || undefined, company: company || undefined,
+        photo,
+        subscriptionStart: subStart || undefined,
+        subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
         services: chosenServices.map((s) => ({ label: s.label, price: s.price })),
         consentCga, consentMedical,
@@ -150,6 +174,7 @@ const InscriptionPage: React.FC = () => {
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
     setProfession(''); setCompany(''); setFormulaKey(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
+    setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd('');
   };
 
   const openContract = async () => {
@@ -232,6 +257,19 @@ const InscriptionPage: React.FC = () => {
         {/* ÉTAPE 0 — Identité */}
         {step === 0 && (
           <div className="space-y-5">
+            <div className="flex items-center gap-5">
+              <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+                {photoPreview ? <img src={photoPreview} alt="" className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={32} />}
+              </div>
+              <div>
+                <span className={label}>Photo de l'adhérent</span>
+                <input ref={photoInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={onPhoto} />
+                <button onClick={() => photoInputRef.current?.click()} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 font-semibold text-gray-700 hover:bg-gray-50">
+                  <Camera size={18} /> {photoPreview ? 'Changer la photo' : 'Prendre / choisir une photo'}
+                </button>
+                {photoPreview && <button onClick={() => { setPhoto(null); setPhotoPreview(''); }} className="ml-2 text-sm text-gray-400 hover:text-red-600">Retirer</button>}
+              </div>
+            </div>
             <div>
               <span className={label}>Civilité</span>
               <div className="flex gap-3">
@@ -280,6 +318,21 @@ const InscriptionPage: React.FC = () => {
                 </div>
               </div>
             ))}
+
+            <div>
+              <span className={label}>Période d'abonnement</span>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[11px] text-gray-400">Début</span>
+                  <input type="date" className={field} value={subStart} onChange={(e) => setSubStart(e.target.value)} />
+                </div>
+                <div>
+                  <span className="text-[11px] text-gray-400">Fin {formula && !formula.recurring ? '' : '(facultatif)'}</span>
+                  <input type="date" className={field} value={subEnd} onChange={(e) => setSubEnd(e.target.value)} />
+                </div>
+              </div>
+              {formula?.recurring && <p className="text-[11px] text-gray-400 mt-1">Formule avec engagement reconduit tacitement : la date de fin est facultative.</p>}
+            </div>
 
             <div>
               <span className={label}>Règlement de la formule</span>

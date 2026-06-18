@@ -181,11 +181,11 @@ const AdminDashboard: React.FC = () => {
         <div className="flex space-x-3">
           <button className="px-4 py-2 bg-white border border-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors">Exporter</button>
           <button 
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => { window.location.hash = '#/app/inscription'; }}
             className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white text-sm font-bold rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
           >
             <UserPlus size={18} />
-            <span>Ajouter un Membre</span>
+            <span>Nouvelle inscription</span>
           </button>
         </div>
       </div>

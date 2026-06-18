@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { getGymId, createMember, patchMember } from './membersApi';
+import { getGymId, createMember, patchMember, uploadMemberPhoto } from './membersApi';
 import { startMandateSetup } from './gocardless';
 
 // --- Catalogue des formules (grille du contrat A.R.A.P.S) -------------------
@@ -167,6 +167,10 @@ export interface InscriptionData {
   email?: string;
   profession?: string;
   company?: string;
+  photo?: File | null;
+  // Période (utile pour les contrats à courte durée)
+  subscriptionStart?: string;   // 'YYYY-MM-DD'
+  subscriptionEnd?: string;     // 'YYYY-MM-DD'
   // Formule
   formula: Formula;
   formulaPaymentMethod: string;   // règlement de la formule (Prélèvement / Espèces / CB / Chèque / Comptant)
@@ -221,6 +225,8 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       postal_code: d.postalCode || null,
       periodicity: d.formula.periodicity || null,
       payment_method_label: d.formulaPaymentMethod || 'Prélèvement',
+      subscription_start: d.subscriptionStart || null,
+      subscription_end: d.subscriptionEnd || null,
     });
   } else {
     const m = await createMember({
@@ -235,8 +241,15 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       price: d.formula.price,
       periodicity: d.formula.periodicity,
       paymentMethodLabel: d.formulaPaymentMethod,
+      subscriptionStart: d.subscriptionStart,
+      subscriptionEnd: d.subscriptionEnd,
     });
     memberId = m.id;
+  }
+
+  // Photo (optionnelle) — ne bloque pas l'inscription si l'upload échoue
+  if (d.photo) {
+    try { await uploadMemberPhoto(memberId, d.photo); } catch (e) { console.error('upload photo', e); }
   }
 
   const options: ContractOption[] = [
