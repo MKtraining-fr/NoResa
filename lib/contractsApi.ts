@@ -205,8 +205,11 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   let memberId: string;
   let authorisationUrl: string | undefined;
 
-  if (d.formula.recurring) {
-    if (!d.email) throw new Error('Un email est requis pour une formule en prélèvement automatique.');
+  // Le mandat SEPA (GoCardless) se met en place UNIQUEMENT si le règlement choisi est le prélèvement.
+  const usesMandate = d.formulaPaymentMethod === 'Prélèvement';
+
+  if (usesMandate) {
+    if (!d.email) throw new Error('Un email est requis pour un règlement par prélèvement automatique.');
     const r = await startMandateSetup({
       firstName: d.firstName,
       lastName: d.lastName,

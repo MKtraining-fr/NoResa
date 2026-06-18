@@ -141,7 +141,7 @@ const InscriptionPage: React.FC = () => {
   const submit = async () => {
     if (!formula) { setError('Choisissez une formule.'); setStep(1); return; }
     if (sigEmpty) { setError("La signature est obligatoire."); return; }
-    if (formula.recurring && !email.trim()) { setError("Un email est requis pour une formule en prélèvement."); setStep(0); return; }
+    if (formulaPaymentMethod === 'Prélèvement' && !email.trim()) { setError("Un email est requis pour un règlement par prélèvement."); setStep(0); return; }
     setError('');
     setSubmitting(true);
     try {
@@ -293,7 +293,7 @@ const InscriptionPage: React.FC = () => {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div><span className={label}>Téléphone</span><input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-              <div><span className={label}>Email {formula?.recurring ? '*' : ''}</span><input type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <div><span className={label}>Email {formulaPaymentMethod === 'Prélèvement' ? '*' : ''}</span><input type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div><span className={label}>Profession</span><input className={field} value={profession} onChange={(e) => setProfession(e.target.value)} /></div>
