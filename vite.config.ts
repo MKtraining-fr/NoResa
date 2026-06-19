@@ -18,6 +18,16 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'vendor-charts': ['recharts'],
+              'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            },
+          },
+        },
+      },
     };
 });
