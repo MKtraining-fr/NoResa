@@ -268,6 +268,7 @@ export interface NewMemberInput {
   paymentMethodLabel?: string;
   subscriptionStart?: string;
   subscriptionEnd?: string;
+  cardNumber?: string;   // numéro de badge / carte (lu par le contrôleur ZKTeco), stocké dans rfid_badge + qr_code
   notes?: string;
 }
 
@@ -297,6 +298,8 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       payment_method_label: p.paymentMethodLabel || null,
       subscription_start: p.subscriptionStart || null,
       subscription_end: p.subscriptionEnd || null,
+      rfid_badge: p.cardNumber || null,
+      qr_code: p.cardNumber || null,
       notes: p.notes || null,
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],
@@ -311,6 +314,34 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
 export async function patchMember(id: string, fields: Record<string, any>): Promise<void> {
   const { error } = await supabase.from('members').update(fields).eq('id', id);
   if (error) { console.error('membersApi.patchMember', error); throw error; }
+}
+
+/** Vrai si ce numéro de badge est déjà utilisé par un membre ACTIF (non archivé). */
+export async function isCardNumberTaken(cardNumber: string, excludeMemberId?: string): Promise<boolean> {
+  const card = (cardNumber || '').trim();
+  if (!card) return false;
+  let q = supabase.from('members')
+    .select('id', { count: 'exact', head: true })
+    .eq('rfid_badge', card)
+    .is('archived_at', null);
+  if (excludeMemberId) q = q.neq('id', excludeMemberId);
+  const { count, error } = await q;
+  if (error) { console.error('membersApi.isCardNumberTaken', error); return false; }
+  return (count ?? 0) > 0;
+}
+
+/**
+ * Génère un numéro de badge unique (aléatoire), avec relance automatique en cas de doublon.
+ * Prévu pour la phase QR (quand NoResa attribue le numéro). Démarre haut (7 chiffres) pour
+ * ne pas entrer en collision avec les badges physiques existants.
+ */
+export async function generateCardNumber(maxTries = 20): Promise<string> {
+  for (let i = 0; i < maxTries; i++) {
+    // entier à 7 chiffres entre 1 000 000 et 9 999 999 (compatible Wiegand 34 bits)
+    const candidate = String(Math.floor(1_000_000 + Math.random() * 8_999_999));
+    if (!(await isCardNumberTaken(candidate))) return candidate;
+  }
+  throw new Error("Impossible de générer un numéro de badge unique, réessayez.");
 }
 
 /** Création express d'un client depuis la caisse (prénom + nom suffisent). */

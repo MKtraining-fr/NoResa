@@ -8,6 +8,7 @@ import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
   submitInscription, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
+import { generateCardNumber } from '../../lib/membersApi';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
 const RED = '#C81E1E';
@@ -29,6 +30,15 @@ const InscriptionPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [profession, setProfession] = useState('');
   const [company, setCompany] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [genningCard, setGenningCard] = useState(false);
+
+  const handleGenerateCard = async () => {
+    setGenningCard(true);
+    try { setCardNumber(await generateCardNumber()); }
+    catch (e) { setError((e as Error)?.message || 'Génération impossible.'); }
+    finally { setGenningCard(false); }
+  };
 
   // Photo
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -153,6 +163,7 @@ const InscriptionPage: React.FC = () => {
         phone: phone || undefined, email: email.trim() || undefined,
         profession: profession || undefined, company: company || undefined,
         photo,
+        cardNumber: cardNumber.trim() || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
@@ -174,7 +185,7 @@ const InscriptionPage: React.FC = () => {
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
     setProfession(''); setCompany(''); setFormulaKey(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
-    setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd('');
+    setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
   };
 
   const openContract = async () => {
@@ -298,6 +309,16 @@ const InscriptionPage: React.FC = () => {
             <div className="grid sm:grid-cols-2 gap-4">
               <div><span className={label}>Profession</span><input className={field} value={profession} onChange={(e) => setProfession(e.target.value)} /></div>
               <div><span className={label}>Entreprise</span><input className={field} value={company} onChange={(e) => setCompany(e.target.value)} /></div>
+            </div>
+            <div>
+              <span className={label}>Numéro de badge</span>
+              <div className="flex gap-2">
+                <input className={field} value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ex. 3616701" />
+                <button type="button" onClick={handleGenerateCard} disabled={genningCard} className="shrink-0 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                  {genningCard ? '…' : 'Générer'}
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">Saisis le numéro imprimé sur le badge. La génération automatique sera activée avec les QR codes.</p>
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { getGymId, createMember, patchMember, uploadMemberPhoto } from './membersApi';
+import { getGymId, createMember, patchMember, uploadMemberPhoto, isCardNumberTaken } from './membersApi';
 import { startMandateSetup } from './gocardless';
 
 // --- Catalogue des formules (grille du contrat A.R.A.P.S) -------------------
@@ -168,6 +168,7 @@ export interface InscriptionData {
   profession?: string;
   company?: string;
   photo?: File | null;
+  cardNumber?: string;        // numéro de badge (saisi manuellement pour l'instant)
   // Période (utile pour les contrats à courte durée)
   subscriptionStart?: string;   // 'YYYY-MM-DD'
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
@@ -202,6 +203,11 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   const gymId = await getGymId();
   if (!gymId) throw new Error('Impossible de déterminer la salle (gym_id).');
 
+  // Numéro de badge déjà utilisé par un membre actif ?
+  if (d.cardNumber && (await isCardNumberTaken(d.cardNumber))) {
+    throw new Error(`Le numéro de badge ${d.cardNumber} est déjà attribué à un membre actif.`);
+  }
+
   let memberId: string;
   let authorisationUrl: string | undefined;
 
@@ -230,6 +236,8 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       payment_method_label: d.formulaPaymentMethod || 'Prélèvement',
       subscription_start: d.subscriptionStart || null,
       subscription_end: d.subscriptionEnd || null,
+      rfid_badge: d.cardNumber || null,
+      qr_code: d.cardNumber || null,
     });
   } else {
     const m = await createMember({
@@ -246,6 +254,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       paymentMethodLabel: d.formulaPaymentMethod,
       subscriptionStart: d.subscriptionStart,
       subscriptionEnd: d.subscriptionEnd,
+      cardNumber: d.cardNumber,
     });
     memberId = m.id;
   }
