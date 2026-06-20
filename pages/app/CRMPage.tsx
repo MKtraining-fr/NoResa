@@ -9,7 +9,7 @@ import {
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera,
   RotateCcw, Link2, Hash, FileText
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
 import { enqueueAccessCommand } from '../../lib/accessApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup } from '../../lib/gocardless';
@@ -90,6 +90,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [editingCard, setEditingCard] = useState(false);
   const [cardDraft, setCardDraft] = useState('');
   const [savingCard, setSavingCard] = useState(false);
+  const [editingCode, setEditingCode] = useState(false);
+  const [codeDraft, setCodeDraft] = useState('');
+  const [savingCode, setSavingCode] = useState(false);
 
   // Rattacher un mandat GoCardless existant
   const [linkMandateId, setLinkMandateId] = useState('');
@@ -209,6 +212,25 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } finally { setSavingCard(false); }
   };
 
+  const startEditCode = () => { setCodeDraft((selectedContact as any)?.keypadCode || ''); setEditingCode(true); };
+  const handleGenerateCode = async () => {
+    try { setCodeDraft(await generateKeypadCode()); }
+    catch (err: any) { alert(err?.message || 'Génération impossible.'); }
+  };
+  const handleSaveCode = async () => {
+    if (!selectedContact) return;
+    setSavingCode(true);
+    try {
+      await updateKeypadCode(selectedContact.id, codeDraft);
+      updateField('keypadCode' as any, codeDraft.trim());
+      setContacts(await getMembers());
+      setEditingCode(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible de modifier le code clavier.");
+    } finally { setSavingCode(false); }
+  };
+
   // --- Accès contrôleur (via le pont) : bloquer / débloquer / (re)créer ---
   const [accessBusy, setAccessBusy] = useState(false);
   const sendAccess = async (action: 'grant' | 'block' | 'unblock' | 'revoke') => {
@@ -220,6 +242,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       await enqueueAccessCommand({
         memberId: selectedContact.id, pin,
         cardNumber: selectedContact.cardNumber || null,
+        keypadCode: (selectedContact as any).keypadCode || null,
         name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
         action,
       });
@@ -1178,6 +1201,40 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                     {!editingCard && (
                       <button type="button" onClick={startEditCard} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
+                        <Edit2 size={14} /> Modifier
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Code clavier (6 chiffres) — tapé au clavier du tripode, écrit dans Password côté contrôleur */}
+                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><Hash size={18} /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Code clavier</p>
+                        {editingCode ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={codeDraft}
+                              onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                              className="w-32 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-widest"
+                              placeholder="6 chiffres"
+                            />
+                            <button type="button" onClick={handleGenerateCode} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-black text-xs uppercase hover:bg-gray-200">Générer</button>
+                            <button type="button" onClick={handleSaveCode} disabled={savingCode} className="flex items-center gap-1 bg-amber-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 disabled:opacity-50">
+                              <Save size={14} /> {savingCode ? '…' : 'OK'}
+                            </button>
+                            <button type="button" onClick={() => setEditingCode(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <p className="text-2xl font-black text-gray-900 tracking-[0.2em]">{(selectedContact as any).keypadCode || '—'}</p>
+                        )}
+                      </div>
+                    </div>
+                    {!editingCode && (
+                      <button type="button" onClick={startEditCode} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
                         <Edit2 size={14} /> Modifier
                       </button>
                     )}

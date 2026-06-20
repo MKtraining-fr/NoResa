@@ -80,6 +80,7 @@ function rowToMember(r: any): Member {
     gocardlessCustomerId: r.gocardless_customer_id ?? undefined,
     archivedAt: r.archived_at ?? undefined,
     cardNumber: r.rfid_badge ?? undefined,
+    keypadCode: r.keypad_code ?? undefined,
   } as Member;
 }
 
@@ -94,7 +95,7 @@ export async function getMembers(): Promise<Member[]> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code'
     )
     .is('archived_at', null)
     .order('last_name', { ascending: true });
@@ -115,7 +116,7 @@ export async function getArchivedMembers(): Promise<Member[]> {
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, archived_at, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code'
     )
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false });
@@ -270,6 +271,7 @@ export interface NewMemberInput {
   subscriptionStart?: string;
   subscriptionEnd?: string;
   cardNumber?: string;   // numéro de badge / carte (lu par le contrôleur ZKTeco), stocké dans rfid_badge + qr_code
+  keypadCode?: string;   // code clavier 6 chiffres (stocké dans keypad_code, écrit dans Password côté contrôleur)
   notes?: string;
 }
 
@@ -301,6 +303,7 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       subscription_end: p.subscriptionEnd || null,
       rfid_badge: p.cardNumber || null,
       qr_code: p.cardNumber || null,
+      keypad_code: p.keypadCode || null,
       notes: p.notes || null,
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],
@@ -355,6 +358,41 @@ export async function updateCardNumber(id: string, card: string): Promise<void> 
     .update({ rfid_badge: v || null, qr_code: v || null })
     .eq('id', id);
   if (error) { console.error('membersApi.updateCardNumber', error); throw error; }
+}
+
+/** Vrai si ce code clavier est déjà utilisé par un autre membre actif. */
+export async function isKeypadCodeTaken(code: string, excludeMemberId?: string): Promise<boolean> {
+  const v = (code || '').trim();
+  if (!v) return false;
+  let q = supabase.from('members')
+    .select('id', { count: 'exact', head: true })
+    .eq('keypad_code', v)
+    .is('archived_at', null);
+  if (excludeMemberId) q = q.neq('id', excludeMemberId);
+  const { count, error } = await q;
+  if (error) { console.error('membersApi.isKeypadCodeTaken', error); return false; }
+  return (count ?? 0) > 0;
+}
+
+/** Génère un code clavier unique à 6 chiffres (100000–999999), anti-collision. */
+export async function generateKeypadCode(maxTries = 30): Promise<string> {
+  for (let i = 0; i < maxTries; i++) {
+    const candidate = String(Math.floor(100000 + Math.random() * 900000));
+    if (!(await isKeypadCodeTaken(candidate))) return candidate;
+  }
+  throw new Error('Impossible de générer un code clavier unique, réessayez.');
+}
+
+/** Attribue / modifie / efface le code clavier d'un membre (stocké dans keypad_code). */
+export async function updateKeypadCode(id: string, code: string): Promise<void> {
+  const v = (code || '').trim();
+  if (v && (await isKeypadCodeTaken(v, id))) {
+    throw new Error(`Le code ${v} est déjà attribué à un autre membre actif.`);
+  }
+  const { error } = await supabase.from('members')
+    .update({ keypad_code: v || null })
+    .eq('id', id);
+  if (error) { console.error('membersApi.updateKeypadCode', error); throw error; }
 }
 
 /** Création express d'un client depuis la caisse (prénom + nom suffisent). */
@@ -437,7 +475,7 @@ export async function searchMembers(query: string, limit = 8): Promise<Member[]>
       'id, first_name, last_name, email, phone, address, postal_code, city, ' +
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
-        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge'
+        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code'
     )
     .or(
       `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},member_number.ilike.${like}`

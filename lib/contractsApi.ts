@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { getGymId, createMember, patchMember, uploadMemberPhoto, isCardNumberTaken } from './membersApi';
+import { getGymId, createMember, patchMember, uploadMemberPhoto, isCardNumberTaken, generateKeypadCode } from './membersApi';
 import { startMandateSetup } from './gocardless';
 import { enqueueAccessCommand } from './accessApi';
 
@@ -191,6 +191,7 @@ export interface InscriptionResult {
   contractId: string;
   contractNumber: string;
   authorisationUrl?: string;  // présent si formule en prélèvement (mandat GoCardless à finaliser)
+  keypadCode?: string;        // code clavier 6 chiffres généré pour ce membre
   generate: any;
 }
 
@@ -208,6 +209,10 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   if (d.cardNumber && (await isCardNumberTaken(d.cardNumber))) {
     throw new Error(`Le numéro de badge ${d.cardNumber} est déjà attribué à un membre actif.`);
   }
+
+  // Code clavier 6 chiffres : généré automatiquement pour chaque membre (en plus du badge éventuel)
+  let keypadCode = '';
+  try { keypadCode = await generateKeypadCode(); } catch (e) { console.error('generateKeypadCode', e); }
 
   let memberId: string;
   let authorisationUrl: string | undefined;
@@ -239,6 +244,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       subscription_end: d.subscriptionEnd || null,
       rfid_badge: d.cardNumber || null,
       qr_code: d.cardNumber || null,
+      keypad_code: keypadCode || null,
     });
   } else {
     const m = await createMember({
@@ -256,6 +262,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       subscriptionStart: d.subscriptionStart,
       subscriptionEnd: d.subscriptionEnd,
       cardNumber: d.cardNumber,
+      keypadCode: keypadCode || undefined,
     });
     memberId = m.id;
   }
@@ -265,16 +272,16 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     try { await uploadMemberPhoto(memberId, d.photo); } catch (e) { console.error('upload photo', e); }
   }
 
-  // Accès : si un numéro de badge est renseigné, on pousse l'accès vers le contrôleur
-  // (via le pont). Ne bloque jamais l'inscription en cas d'échec.
-  if (d.cardNumber) {
+  // Accès : on pousse vers le contrôleur (via le pont) le badge ET/OU le code clavier.
+  // Ne bloque jamais l'inscription en cas d'échec.
+  if (d.cardNumber || keypadCode) {
     try {
       const { data: mrow } = await supabase.from('members')
         .select('member_number').eq('id', memberId).maybeSingle();
       const pin = mrow?.member_number ? String(mrow.member_number) : '';
       if (pin) {
         await enqueueAccessCommand({
-          memberId, pin, cardNumber: d.cardNumber,
+          memberId, pin, cardNumber: d.cardNumber || null, keypadCode: keypadCode || null,
           name: `${d.firstName} ${d.lastName}`, action: 'grant',
         });
       }
@@ -306,5 +313,5 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   });
 
   const generate = await generateContract(contractId, d.signatureDataUrl, true);
-  return { memberId, contractId, contractNumber, authorisationUrl, generate };
+  return { memberId, contractId, contractNumber, authorisationUrl, keypadCode, generate };
 }
