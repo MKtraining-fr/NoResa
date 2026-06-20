@@ -9,6 +9,7 @@ import {
 import { Product, Member } from '../../types';
 import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
+import { activatePurchasedAccess } from '../../lib/accessApi';
 
 const initials = (a?: string, b?: string) =>
   `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
@@ -37,6 +38,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [processing, setProcessing] = useState(false);
   const [saleResult, setSaleResult] = useState<{ sale_id: string; invoice_number: string; total_ttc: number } | null>(null);
   const [invoiceMsg, setInvoiceMsg] = useState<string | null>(null);
+  const [accessMsg, setAccessMsg] = useState<string | null>(null);
   const [sales, setSales] = useState<any[]>([]);
   const [stats, setStats] = useState<BoutiqueStats | null>(null);
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
@@ -129,6 +131,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
     setPaymentMethod(null);
     setSaleResult(null);
     setInvoiceMsg(null);
+    setAccessMsg(null);
     setSaleStep('cart');
     setIsSelling(false);
   };
@@ -145,6 +148,28 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       setSaleResult(res);
       setSaleStep('success');
       getProducts().then(setProducts); // rafraîchit les stocks
+
+      // Active l'accès pour les produits ponctuels (1 mois / 10 séances / 1 séance)
+      setAccessMsg(null);
+      if (selectedMember?.id) {
+        try {
+          const labels: string[] = [];
+          for (const item of cart) {
+            const kind = await activatePurchasedAccess(
+              selectedMember as any,
+              { name: item.product.name, price: item.product.price },
+              paymentMethod || 'Espèces',
+            );
+            if (kind) labels.push(item.product.name);
+          }
+          if (labels.length) {
+            setAccessMsg(`Accès activé pour ${selectedMember.firstName} (${labels.join(', ')}). Le code clavier est prêt — le pont applique l'accès dans quelques secondes.`);
+          }
+        } catch (e) {
+          console.error('activation accès', e);
+          setAccessMsg("Vente enregistrée, mais l'activation de l'accès a échoué : " + ((e as Error)?.message || '') + ". Tu peux l'activer manuellement depuis la fiche.");
+        }
+      }
     } catch (e) {
       console.error(e);
       alert("L'encaissement a échoué : " + ((e as Error)?.message || ''));
@@ -766,6 +791,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                 </button>
                 <button onClick={resetSale} className="w-full sm:w-auto px-10 py-4 bg-indigo-500/50 border border-white/20 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-white/10 transition-colors">Terminer</button>
               </div>
+              {accessMsg && <p className="text-white bg-white/15 rounded-2xl px-5 py-3 font-bold text-sm max-w-xl mx-auto">{accessMsg}</p>}
               {invoiceMsg && <p className="text-white/90 font-bold text-sm">{invoiceMsg}</p>}
               {!selectedMember && <p className="text-indigo-100/70 text-xs font-medium">Vente anonyme — rattachez un client avant l'encaissement pour pouvoir envoyer une facture par email.</p>}
            </div>

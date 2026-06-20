@@ -13,7 +13,7 @@ import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, c
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
-import { startMandateSetup, getMemberGocardlessPayments, type GocardlessPayment } from '../../lib/gocardless';
+import { startMandateSetup, getMemberGocardlessPayments, changeFormula, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
 
@@ -350,27 +350,29 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   };
   const handleSaveFormula = async () => {
     if (!selectedContact?.id) return;
+    if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
+    const isPrelevement = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+    if (isPrelevement) {
+      const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${formulaDraft.price} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
+      if (!ok) return;
+    }
     setSavingFormula(true);
     try {
-      await patchMember(selectedContact.id, {
-        subscription_label: formulaDraft.label || null,
-        price: formulaDraft.price === '' ? null : Number(formulaDraft.price),
-        periodicity: formulaDraft.periodicity || null,
-        subscription_start: formulaDraft.start || null,
-        subscription_end: formulaDraft.end || null,
-        payment_method_label: formulaDraft.method || null,
-      });
+      const res = await changeFormula(selectedContact.id, formulaDraft.label, Number(formulaDraft.price));
+      if (res.error) { alert('Échec : ' + res.error); return; }
       updateField('subscription', formulaDraft.label);
-      updateField('price', formulaDraft.price === '' ? null : Number(formulaDraft.price));
-      updateField('periodicity', formulaDraft.periodicity);
-      updateField('subscriptionStart', formulaDraft.start);
-      updateField('subscriptionEnd', formulaDraft.end);
-      updateField('paymentMethod', formulaDraft.method);
+      updateField('price', Number(formulaDraft.price));
       setContacts(await getMembers());
+      if (selectedContact.gocardlessCustomerId || selectedContact.gocardlessMandateId) {
+        getMemberGocardlessPayments(selectedContact.id).then((p) => setMemberGcPayments(p));
+      }
       setEditingFormula(false);
+      if (res.skipped) alert('Formule mise à jour. GoCardless était déjà au bon montant, rien n\u2019a changé côté prélèvement.');
+      else if (res.gocardless) alert(`Formule mise à jour et GoCardless synchronisé (ancien abonnement annulé, nouveau créé).`);
+      else alert('Formule mise à jour.');
     } catch (err: any) {
       console.error(err);
-      alert(err?.message || "Impossible de modifier la formule.");
+      alert(err?.message || 'Impossible de changer la formule.');
     } finally { setSavingFormula(false); }
   };
 
@@ -1181,7 +1183,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {packStatus?.is_pack && (
                     <div className={`rounded-2xl p-4 border ${packStatus.remaining === 0 ? 'bg-red-50 border-red-100' : packStatus.remaining <= 3 ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> Carte 10 séances</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> {packStatus.total === 1 ? 'Séance unique' : `Carte ${packStatus.total} séances`}</span>
                         <span className={`text-sm font-black ${packStatus.remaining === 0 ? 'text-red-700' : packStatus.remaining <= 3 ? 'text-amber-700' : 'text-green-700'}`}>
                           {packStatus.remaining === 0 ? 'Épuisée — accès bloqué' : `${packStatus.remaining} séance${packStatus.remaining > 1 ? 's' : ''} restante${packStatus.remaining > 1 ? 's' : ''}`}
                         </span>
@@ -1340,40 +1342,50 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                     </div>
 
-                    {editingFormula && (
-                      <div className="p-6 bg-white border border-gray-100 rounded-[1.5rem] space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Formule</label>
-                            <input type="text" value={formulaDraft.label} onChange={(e) => setFormulaDraft({ ...formulaDraft, label: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Abonnement annuel" />
+                    {editingFormula && (() => {
+                      const RECURRING = [25.9, 29.9, 59.9];
+                      const recurring = (formulaOptions || [])
+                        .filter((p: any) => RECURRING.includes(Number(p.price)))
+                        .map((p: any) => ({ label: p.name as string, price: Number(p.price) }));
+                      const fallback = [
+                        { label: 'Abo famille/étudiant', price: 25.9 },
+                        { label: 'Abo classique', price: 29.9 },
+                        { label: 'Abo suivi et formation', price: 59.9 },
+                      ];
+                      const options = recurring.length ? recurring : fallback;
+                      const isPrelevement = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+                      return (
+                        <div className="p-5 bg-white border border-gray-100 rounded-2xl space-y-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nouvelle formule</label>
+                            <div className="grid grid-cols-1 gap-2">
+                              {options.map((o) => {
+                                const active = formulaDraft.label === o.label && Number(formulaDraft.price) === o.price;
+                                return (
+                                  <button key={o.label + o.price} type="button"
+                                    onClick={() => setFormulaDraft({ ...formulaDraft, label: o.label, price: String(o.price) })}
+                                    className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+                                    <span className="text-sm font-black text-gray-900">{o.label}</span>
+                                    <span className={`text-sm font-black ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2)} €</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarif (€)</label>
-                            <input type="number" inputMode="decimal" value={formulaDraft.price} onChange={(e) => setFormulaDraft({ ...formulaDraft, price: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. 45" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Périodicité</label>
-                            <input type="text" value={formulaDraft.periodicity} onChange={(e) => setFormulaDraft({ ...formulaDraft, periodicity: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Mensuel" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
-                            <input type="text" value={formulaDraft.method} onChange={(e) => setFormulaDraft({ ...formulaDraft, method: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Espèces" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Début</label>
-                            <input type="date" value={formulaDraft.start} onChange={(e) => setFormulaDraft({ ...formulaDraft, start: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fin</label>
-                            <input type="date" value={formulaDraft.end} onChange={(e) => setFormulaDraft({ ...formulaDraft, end: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" />
+                          {isPrelevement ? (
+                            <p className="text-[11px] font-bold text-amber-600 bg-amber-50 rounded-xl px-3 py-2 leading-relaxed">
+                              Ce membre est en prélèvement : GoCardless sera mis à jour automatiquement (ancien abonnement annulé, nouveau créé au montant de la formule, prélevé le 10).
+                            </p>
+                          ) : (
+                            <p className="text-[11px] font-bold text-gray-400 px-1">Ce membre n'est pas en prélèvement : seule la formule NoResa sera modifiée.</p>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : 'Appliquer la formule'}</button>
+                            <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Enregistrement…' : 'Enregistrer la formule'}</button>
-                          <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
                   {/* Sous-onglets finance */}

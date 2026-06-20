@@ -99,3 +99,26 @@ export async function getMemberGocardlessPayments(memberId: string): Promise<Goc
   if (error) { console.error('getMemberGocardlessPayments', error); return []; }
   return (data?.payments ?? []) as GocardlessPayment[];
 }
+
+export interface ChangeFormulaResult {
+  updated: boolean;
+  gocardless: boolean;
+  skipped: boolean;
+  cancelled: { id: string; amount: number }[];
+  created: { id: string; amount: number }[];
+  error?: string;
+}
+
+/** Change la formule d'un membre et synchronise GoCardless (annule l'ancien abo, crée le nouveau). */
+export async function changeFormula(memberId: string, label: string, price: number): Promise<ChangeFormulaResult> {
+  const { data, error } = await supabase.functions.invoke('gocardless-change-formula', {
+    body: { member_id: memberId, label, price },
+  });
+  if (error) {
+    // tente de récupérer le message d'erreur renvoyé par la fonction
+    let msg = error.message || 'Échec du changement de formule';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    return { updated: false, gocardless: false, skipped: false, cancelled: [], created: [], error: msg };
+  }
+  return data as ChangeFormulaResult;
+}

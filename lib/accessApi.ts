@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { getGymId } from './membersApi';
+import { getGymId, patchMember, generateKeypadCode, updateKeypadCode } from './membersApi';
 
 export type AccessAction = 'grant' | 'block' | 'unblock' | 'revoke';
 
@@ -142,4 +142,98 @@ export async function getPackStatus(memberId: string): Promise<PackStatus | null
   if (error) { console.error('getPackStatus', error); return null; }
   const row = Array.isArray(data) ? data[0] : data;
   return (row ?? null) as PackStatus | null;
+}
+
+// ---- Activation d'accès suite à une vente ponctuelle (1 mois / 10 séances / 1 séance) ----
+
+export type PurchaseKind = 'month' | 'pack10' | 'session1';
+
+/** Déduit le type d'accès d'un produit acheté (sinon null = produit hors accès). */
+export function purchaseKindForProduct(name: string, price: number): PurchaseKind | null {
+  const n = (name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (n.includes('seance')) return n.includes('10') ? 'pack10' : 'session1';
+  if (price === 45) return 'pack10';
+  if (price === 5) return 'session1';
+  if (price === 40 || n.includes('mois')) return 'month';
+  return null;
+}
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export interface PurchasedAccessMember {
+  id: string;
+  memberNumber?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  cardNumber?: string | null;
+  keypadCode?: string | null;
+}
+
+/**
+ * Active l'accès d'un membre suite à l'achat d'un produit ponctuel :
+ *  - 1 mois     : accès jusqu'à +1 mois (le contrôleur expire via EndTime).
+ *  - 10 séances : carnet de 10 (blocage auto à 10).
+ *  - 1 séance   : 1 entrée (blocage auto après 1).
+ * Génère le code clavier s'il n'en a pas, sinon réutilise l'existant. Ouvre l'accès (grant),
+ * ce qui réinitialise aussi le compteur de carnet.
+ * Retourne le type activé (ou null si le produit n'ouvre pas d'accès).
+ */
+export async function activatePurchasedAccess(
+  member: PurchasedAccessMember,
+  product: { name: string; price: number | string },
+  paymentMethod?: string,
+): Promise<PurchaseKind | null> {
+  const kind = purchaseKindForProduct(product.name, Number(product.price));
+  if (!kind || !member?.id) return null;
+
+  // Relit les infos d'accès réelles en base (badge + code), pour ne jamais les écraser
+  const { data: db } = await supabase.from('members')
+    .select('member_number, first_name, last_name, rfid_badge, keypad_code')
+    .eq('id', member.id).maybeSingle();
+  const memberNumber = db?.member_number ?? member.memberNumber ?? '';
+  const cardNumber = db?.rfid_badge ?? member.cardNumber ?? null;
+  const firstName = db?.first_name ?? member.firstName ?? '';
+  const lastName = db?.last_name ?? member.lastName ?? '';
+
+  // 1. Assure un code clavier : réutilise l'ancien, sinon en génère un
+  let code = (db?.keypad_code || member.keypadCode || '').trim();
+  if (!code) {
+    code = await generateKeypadCode();
+    await updateKeypadCode(member.id, code);
+  }
+
+  // 2. Met à jour la fiche selon le type acheté
+  const today = new Date();
+  const patch: Record<string, unknown> = {
+    subscription_label: product.name,
+    price: Number(product.price),
+    subscription_start: today.toISOString().split('T')[0],
+  };
+  if (paymentMethod) patch.payment_method_label = paymentMethod;
+
+  let endTime: string | undefined;
+  if (kind === 'month') {
+    const end = new Date(today);
+    end.setMonth(end.getMonth() + 1);
+    patch.subscription_end = end.toISOString().split('T')[0];
+    endTime = ymd(end); // date de fin appliquée au contrôleur (format AAAAMMJJ)
+  } else {
+    patch.subscription_end = null;
+  }
+  await patchMember(member.id, patch);
+
+  // 3. Ouvre l'accès (grant) — réinitialise le compteur de carnet, préserve le badge
+  await enqueueAccessCommand({
+    memberId: member.id,
+    pin: memberNumber ? String(memberNumber) : '',
+    cardNumber: cardNumber ?? undefined,
+    keypadCode: code || undefined,
+    name: `${firstName} ${lastName}`.trim() || null,
+    action: 'grant',
+    endTime: endTime ?? null,
+  });
+
+  return kind;
 }
