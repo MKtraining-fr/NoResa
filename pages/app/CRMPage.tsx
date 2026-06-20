@@ -1049,7 +1049,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               </div>
             )}
 
-            <div className="flex-grow overflow-y-auto p-10 space-y-12 pwa-hide-scrollbar">
+            <div className="flex-grow overflow-y-auto p-6 sm:p-8 space-y-6 pwa-hide-scrollbar">
 
               {isEditing ? (
                 <div className="max-w-2xl mx-auto space-y-6">
@@ -1272,9 +1272,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
               {/* VUE FINANCE (Spécifique Client) */}
               {detailTab === 'finance' && (activeTab === 'membres') && (
-                <div className="space-y-12">
+                <div className="space-y-5">
                   <div className="space-y-3">
-                    <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl shadow-indigo-100">
+                    <div className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-indigo-100">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement actuel</p>
@@ -1282,7 +1282,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             <Edit2 size={11} /> {editingFormula ? 'Fermer' : 'Changer de formule'}
                           </button>
                         </div>
-                        <h4 className="text-2xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
+                        <h4 className="text-xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
                         <p className="text-sm opacity-90">
                           {selectedContact.paymentMethod ? `Paiement : ${selectedContact.paymentMethod}` : 'Mode de paiement non renseigné'}
                           {selectedContact.periodicity ? ` • ${selectedContact.periodicity}` : ''}
@@ -1297,7 +1297,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-4xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
+                        <p className="text-3xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
                         <p className="text-[10px] font-black opacity-80 uppercase mt-1">
                           Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
                         </p>
@@ -1373,7 +1373,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   </div>
 
                   {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
-                    <div className="p-6 bg-white rounded-[2rem] border border-gray-100 space-y-4">
+                    <div className="p-4 bg-white rounded-2xl border border-gray-100 space-y-3">
                       <div className="flex items-center justify-between">
                         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
                         <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${
@@ -1408,7 +1408,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       )}
                     </div>
                   ) : (
-                    <div className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 space-y-4">
+                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
                       <div>
                         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
                         <p className="text-[11px] font-medium text-gray-400 mt-1">Aucun mandat de prélèvement pour l'instant. Si ce client a déjà un mandat GoCardless (voir le fichier de rapprochement), colle ses identifiants ici.</p>
@@ -1438,7 +1438,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     ) : (
                       <div className="space-y-3">
                         {memberContracts.map((c: any) => (
-                          <div key={c.id} className="p-5 border border-gray-100 rounded-[1.5rem] bg-white flex items-center justify-between gap-3">
+                          <div key={c.id} className="p-4 border border-gray-100 rounded-2xl bg-white flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-black text-gray-900">Contrat {c.contract_number || '—'}</p>
                               <p className="text-[11px] font-bold text-gray-400">
@@ -1475,7 +1475,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       <ShoppingBag size={14} /> <span>Historique des achats Boutique</span>
                     </h3>
                     {memberSales.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center text-center py-12 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
+                      <div className="flex flex-col items-center justify-center text-center py-10 px-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
                         <div className="bg-gray-100 p-3 rounded-2xl text-gray-400 mb-3"><ShoppingBag size={24} /></div>
                         <p className="text-sm font-black text-gray-700">Aucun achat enregistré</p>
                         <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les ventes rattachées à ce client apparaîtront ici.</p>
@@ -1483,7 +1483,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     ) : (
                       <div className="space-y-3">
                         {memberSales.map((s: any) => (
-                          <div key={s.id} className="p-5 border border-gray-100 rounded-[1.5rem] bg-white">
+                          <div key={s.id} className="p-4 border border-gray-100 rounded-2xl bg-white">
                             <div className="flex items-center justify-between mb-2">
                               <div>
                                 <p className="text-sm font-black text-gray-900">Facture {s.invoice_number || '—'}</p>
