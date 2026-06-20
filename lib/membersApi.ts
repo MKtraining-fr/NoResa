@@ -79,7 +79,8 @@ function rowToMember(r: any): Member {
     gocardlessMandateId: r.gocardless_mandate_id ?? undefined,
     gocardlessCustomerId: r.gocardless_customer_id ?? undefined,
     archivedAt: r.archived_at ?? undefined,
-  };
+    cardNumber: r.rfid_badge ?? undefined,
+  } as Member;
 }
 
 // --- API -------------------------------------------------------------------
@@ -93,7 +94,7 @@ export async function getMembers(): Promise<Member[]> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge'
     )
     .is('archived_at', null)
     .order('last_name', { ascending: true });
@@ -114,7 +115,7 @@ export async function getArchivedMembers(): Promise<Member[]> {
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, archived_at, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge'
     )
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false });
@@ -344,6 +345,18 @@ export async function generateCardNumber(maxTries = 20): Promise<string> {
   throw new Error("Impossible de générer un numéro de badge unique, réessayez.");
 }
 
+/** Attribue / modifie / efface le numéro de badge d'un membre (stocké dans rfid_badge + qr_code). */
+export async function updateCardNumber(id: string, card: string): Promise<void> {
+  const v = (card || '').trim();
+  if (v && (await isCardNumberTaken(v, id))) {
+    throw new Error(`Le numéro de badge ${v} est déjà attribué à un autre membre actif.`);
+  }
+  const { error } = await supabase.from('members')
+    .update({ rfid_badge: v || null, qr_code: v || null })
+    .eq('id', id);
+  if (error) { console.error('membersApi.updateCardNumber', error); throw error; }
+}
+
 /** Création express d'un client depuis la caisse (prénom + nom suffisent). */
 export async function createQuickMember(p: {
   firstName: string;
@@ -424,7 +437,7 @@ export async function searchMembers(query: string, limit = 8): Promise<Member[]>
       'id, first_name, last_name, email, phone, address, postal_code, city, ' +
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
-        'emergency_contact_name, emergency_contact_phone, notes'
+        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge'
     )
     .or(
       `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},member_number.ilike.${like}`

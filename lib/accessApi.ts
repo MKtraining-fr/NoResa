@@ -1,4 +1,31 @@
 import { supabase } from './supabaseClient';
+import { getGymId } from './membersApi';
+
+export type AccessAction = 'grant' | 'block' | 'unblock' | 'revoke';
+
+/**
+ * Dépose une commande d'accès dans la file ; le pont (PC salle) l'appliquera au contrôleur C3.
+ *   grant   : crée l'utilisateur + ses 2 accès
+ *   block   : retire les accès (badge refusé) sans supprimer
+ *   unblock : remet les accès
+ *   revoke  : supprime l'utilisateur du contrôleur
+ */
+export async function enqueueAccessCommand(p: {
+  memberId?: string; pin: string; cardNumber?: string | null;
+  name?: string | null; action: AccessAction; endTime?: string | null;
+}): Promise<void> {
+  const pin = (p.pin ?? '').toString().trim();
+  if (!pin) return; // pas de numéro d'adhérent -> rien à pousser
+  const gymId = await getGymId();
+  if (!gymId) throw new Error('gym_id introuvable');
+  const { error } = await supabase.from('access_commands').insert({
+    gym_id: gymId, member_id: p.memberId ?? null, pin,
+    card_number: p.cardNumber ?? null, name: p.name ?? null,
+    action: p.action, end_time: p.endTime ?? null,
+  });
+  if (error) { console.error('enqueueAccessCommand', error); throw error; }
+}
+
 
 // Valeur encodée dans le QR d'un membre = son numéro d'adhérent (= card number côté ZKAccess)
 export function memberQrValue(memberNumber?: string | null): string {

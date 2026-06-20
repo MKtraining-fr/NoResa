@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { getGymId, createMember, patchMember, uploadMemberPhoto, isCardNumberTaken } from './membersApi';
 import { startMandateSetup } from './gocardless';
+import { enqueueAccessCommand } from './accessApi';
 
 // --- Catalogue des formules (grille du contrat A.R.A.P.S) -------------------
 
@@ -262,6 +263,22 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   // Photo (optionnelle) — ne bloque pas l'inscription si l'upload échoue
   if (d.photo) {
     try { await uploadMemberPhoto(memberId, d.photo); } catch (e) { console.error('upload photo', e); }
+  }
+
+  // Accès : si un numéro de badge est renseigné, on pousse l'accès vers le contrôleur
+  // (via le pont). Ne bloque jamais l'inscription en cas d'échec.
+  if (d.cardNumber) {
+    try {
+      const { data: mrow } = await supabase.from('members')
+        .select('member_number').eq('id', memberId).maybeSingle();
+      const pin = mrow?.member_number ? String(mrow.member_number) : '';
+      if (pin) {
+        await enqueueAccessCommand({
+          memberId, pin, cardNumber: d.cardNumber,
+          name: `${d.firstName} ${d.lastName}`, action: 'grant',
+        });
+      }
+    } catch (e) { console.error('enqueue grant', e); }
   }
 
   const options: ContractOption[] = [

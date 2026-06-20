@@ -9,7 +9,8 @@ import {
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera,
   RotateCcw, Link2, Hash, FileText
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber } from '../../lib/membersApi';
+import { enqueueAccessCommand } from '../../lib/accessApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
@@ -86,6 +87,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [editingNumber, setEditingNumber] = useState(false);
   const [numberDraft, setNumberDraft] = useState('');
   const [savingNumber, setSavingNumber] = useState(false);
+  const [editingCard, setEditingCard] = useState(false);
+  const [cardDraft, setCardDraft] = useState('');
+  const [savingCard, setSavingCard] = useState(false);
 
   // Rattacher un mandat GoCardless existant
   const [linkMandateId, setLinkMandateId] = useState('');
@@ -183,6 +187,48 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       console.error(err);
       alert(err?.message || "Impossible de modifier le numéro.");
     } finally { setSavingNumber(false); }
+  };
+
+  // --- Édition du numéro de badge (carte) ---
+  const startEditCard = () => { setCardDraft(selectedContact?.cardNumber || ''); setEditingCard(true); };
+  const handleGenerateCard = async () => {
+    try { setCardDraft(await generateCardNumber()); }
+    catch (err: any) { alert(err?.message || 'Génération impossible.'); }
+  };
+  const handleSaveCard = async () => {
+    if (!selectedContact) return;
+    setSavingCard(true);
+    try {
+      await updateCardNumber(selectedContact.id, cardDraft);
+      updateField('cardNumber', cardDraft.trim());
+      setContacts(await getMembers());
+      setEditingCard(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible de modifier le numéro de badge.");
+    } finally { setSavingCard(false); }
+  };
+
+  // --- Accès contrôleur (via le pont) : bloquer / débloquer / (re)créer ---
+  const [accessBusy, setAccessBusy] = useState(false);
+  const sendAccess = async (action: 'grant' | 'block' | 'unblock' | 'revoke') => {
+    if (!selectedContact) return;
+    const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
+    if (!pin) { alert("Ce membre n'a pas de numéro d'adhérent."); return; }
+    setAccessBusy(true);
+    try {
+      await enqueueAccessCommand({
+        memberId: selectedContact.id, pin,
+        cardNumber: selectedContact.cardNumber || null,
+        name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
+        action,
+      });
+      const label = { grant: 'Création/activation', block: 'Blocage', unblock: 'Déblocage', revoke: 'Suppression' }[action];
+      alert(`${label} de l'accès demandé. Le pont l'appliquera sur le contrôleur dans quelques secondes.`);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible d'envoyer la commande d'accès.");
+    } finally { setAccessBusy(false); }
   };
 
   // --- Rattacher un mandat GoCardless existant ---
@@ -1102,6 +1148,61 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         <Edit2 size={14} /> Modifier
                       </button>
                     )}
+                  </div>
+
+                  {/* Numéro de badge / carte (contrôle d'accès) */}
+                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-red-50 text-red-600 p-2.5 rounded-xl"><CreditCard size={18} /></div>
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Numéro de badge</p>
+                        {editingCard ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="text"
+                              value={cardDraft}
+                              onChange={(e) => setCardDraft(e.target.value)}
+                              className="w-36 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-bold"
+                              placeholder="ex. 3616701"
+                            />
+                            <button type="button" onClick={handleGenerateCard} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-black text-xs uppercase hover:bg-gray-200">Générer</button>
+                            <button type="button" onClick={handleSaveCard} disabled={savingCard} className="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                              <Save size={14} /> {savingCard ? '…' : 'OK'}
+                            </button>
+                            <button type="button" onClick={() => setEditingCard(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <p className="text-2xl font-black text-gray-900">{selectedContact.cardNumber || '—'}</p>
+                        )}
+                      </div>
+                    </div>
+                    {!editingCard && (
+                      <button type="button" onClick={startEditCard} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
+                        <Edit2 size={14} /> Modifier
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Contrôle d'accès (commandes envoyées au contrôleur via le pont) */}
+                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 mb-3">
+                      <ShieldAlert size={14} /> <span>Contrôle d'accès</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy}
+                        className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black disabled:opacity-50">
+                        <UserCheck size={14} /> Activer l'accès
+                      </button>
+                      <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy}
+                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 disabled:opacity-50">
+                        <CheckCircle2 size={14} /> Débloquer
+                      </button>
+                      <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy}
+                        className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
+                        <X size={14} /> Bloquer
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-2">Les commandes sont appliquées sur le contrôleur par le pont, en quelques secondes.</p>
                   </div>
 
                   {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
