@@ -13,7 +13,7 @@ import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, c
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, type MemberVisit } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
-import { startMandateSetup } from '../../lib/gocardless';
+import { startMandateSetup, getMemberGocardlessPayments, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
 
@@ -41,6 +41,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [memberSales, setMemberSales] = useState<any[]>([]);
   const [memberContracts, setMemberContracts] = useState<any[]>([]);
   const [memberPayments, setMemberPayments] = useState<MemberPayment[]>([]);
+  const [memberGcPayments, setMemberGcPayments] = useState<GocardlessPayment[]>([]);
+  const [gcPaymentsLoading, setGcPaymentsLoading] = useState(false);
   const [memberVisits, setMemberVisits] = useState<MemberVisit[]>([]);
   const [visitCount, setVisitCount] = useState(0);
   const [visitsLoading, setVisitsLoading] = useState(false);
@@ -302,6 +304,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       getMemberSales(selectedContact.id).then((s) => { if (active) setMemberSales(s); });
       getMemberContracts(selectedContact.id).then((c) => { if (active) setMemberContracts(c); });
       getMemberPayments(selectedContact.id).then((p) => { if (active) setMemberPayments(p); });
+      if (selectedContact.gocardlessCustomerId || selectedContact.gocardlessMandateId) {
+        setGcPaymentsLoading(true); setMemberGcPayments([]);
+        getMemberGocardlessPayments(selectedContact.id).then((p) => { if (active) { setMemberGcPayments(p); setGcPaymentsLoading(false); } });
+      } else {
+        setMemberGcPayments([]); setGcPaymentsLoading(false);
+      }
       getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
       setVisitsLoading(true); setVisitsHasMore(true);
       getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
@@ -310,6 +318,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } else {
       setMemberSales([]); setMemberContracts([]); setMemberPayments([]);
       setMemberVisits([]); setVisitCount(0); setVisitsHasMore(true);
+      setMemberGcPayments([]); setGcPaymentsLoading(false);
     }
     return () => { active = false; };
   }, [selectedContact?.id]);
@@ -1406,6 +1415,36 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <ChevronRight size={14} /> <span>Ouvrir la fiche dans GoCardless</span>
                         </a>
                       )}
+
+                      {/* Prélèvements GoCardless (temps réel) */}
+                      <div className="pt-2 border-t border-gray-100">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Prélèvements</p>
+                        {gcPaymentsLoading ? (
+                          <p className="text-xs font-bold text-gray-400">Chargement des prélèvements…</p>
+                        ) : memberGcPayments.length === 0 ? (
+                          <p className="text-xs font-bold text-gray-400">Aucun prélèvement pour ce membre.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {memberGcPayments.map((gp) => {
+                              const st = (gp.status || '').toLowerCase();
+                              const green = st === 'paid_out' || st === 'confirmed';
+                              const red = st === 'failed' || st === 'charged_back' || st === 'customer_approval_denied';
+                              const gray = st === 'cancelled';
+                              const label = green ? 'Encaissé' : red ? 'Échec' : gray ? 'Annulé' : 'En cours';
+                              const when = gp.charge_date || gp.created_at;
+                              return (
+                                <div key={gp.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-black text-gray-900">{gp.amount != null ? `${gp.amount.toFixed(2)} €` : '—'}</p>
+                                    <p className="text-[11px] font-bold text-gray-400 truncate">{when ? new Date(when).toLocaleDateString('fr-FR') : '—'}{gp.description ? ` · ${gp.description}` : ''}</p>
+                                  </div>
+                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shrink-0 ${green ? 'bg-green-100 text-green-700' : red ? 'bg-red-100 text-red-700' : gray ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">

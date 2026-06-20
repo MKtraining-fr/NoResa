@@ -82,3 +82,20 @@ export async function getGocardlessStats(): Promise<GocardlessStats> {
   if ((data as any)?.error) throw new Error((data as any).error);
   return data as GocardlessStats;
 }
+
+export interface GocardlessPayment {
+  id: string;
+  amount: number | null;       // en euros
+  currency: string | null;
+  status: string | null;       // confirmed, paid_out, submitted, failed, cancelled...
+  charge_date: string | null;  // date de prélèvement
+  description: string | null;
+  created_at: string | null;
+}
+
+/** Récupère les prélèvements GoCardless d'un membre (temps réel via Edge Function sécurisée). */
+export async function getMemberGocardlessPayments(memberId: string): Promise<GocardlessPayment[]> {
+  const { data, error } = await supabase.functions.invoke('gocardless-payments', { body: { member_id: memberId } });
+  if (error) { console.error('getMemberGocardlessPayments', error); return []; }
+  return (data?.payments ?? []) as GocardlessPayment[];
+}
