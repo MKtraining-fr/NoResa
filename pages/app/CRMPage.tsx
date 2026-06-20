@@ -10,7 +10,7 @@ import {
   RotateCcw, Link2, Hash, FileText
 } from 'lucide-react';
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
-import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, type MemberVisit } from '../../lib/accessApi';
+import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup, getMemberGocardlessPayments, type GocardlessPayment } from '../../lib/gocardless';
@@ -47,6 +47,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [visitCount, setVisitCount] = useState(0);
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [visitsHasMore, setVisitsHasMore] = useState(true);
+  const [packStatus, setPackStatus] = useState<PackStatus | null>(null);
   const [editingFormula, setEditingFormula] = useState(false);
   const [formulaDraft, setFormulaDraft] = useState<{ label: string; price: string; periodicity: string; start: string; end: string; method: string }>({ label: '', price: '', periodicity: '', start: '', end: '', method: '' });
   const [savingFormula, setSavingFormula] = useState(false);
@@ -312,6 +313,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         setMemberGcPayments([]); setGcPaymentsLoading(false);
       }
       getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
+      getPackStatus(selectedContact.id).then((p) => { if (active) setPackStatus(p); });
       setVisitsLoading(true); setVisitsHasMore(true);
       getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
         if (active) { setMemberVisits(v); setVisitsHasMore(v.length === 15); setVisitsLoading(false); }
@@ -319,6 +321,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } else {
       setMemberSales([]); setMemberContracts([]); setMemberPayments([]);
       setMemberVisits([]); setVisitCount(0); setVisitsHasMore(true);
+      setPackStatus(null);
       setMemberGcPayments([]); setGcPaymentsLoading(false);
     }
     return () => { active = false; };
@@ -1174,6 +1177,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   </div>
 
+                  {/* Carte 10 séances : séances restantes */}
+                  {packStatus?.is_pack && (
+                    <div className={`rounded-2xl p-4 border ${packStatus.remaining === 0 ? 'bg-red-50 border-red-100' : packStatus.remaining <= 3 ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> Carte 10 séances</span>
+                        <span className={`text-sm font-black ${packStatus.remaining === 0 ? 'text-red-700' : packStatus.remaining <= 3 ? 'text-amber-700' : 'text-green-700'}`}>
+                          {packStatus.remaining === 0 ? 'Épuisée — accès bloqué' : `${packStatus.remaining} séance${packStatus.remaining > 1 ? 's' : ''} restante${packStatus.remaining > 1 ? 's' : ''}`}
+                        </span>
+                      </div>
+                      <div className="h-2.5 w-full bg-white/70 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${packStatus.remaining === 0 ? 'bg-red-500' : packStatus.remaining <= 3 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${Math.min(100, (packStatus.used / packStatus.total) * 100)}%` }} />
+                      </div>
+                      <p className="text-[11px] font-bold text-gray-400 mt-1.5">{packStatus.used} / {packStatus.total} séances utilisées</p>
+                    </div>
+                  )}
+
                   {/* Contrôle d'accès (compact) */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
@@ -1235,7 +1254,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
-                    <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
+                    <div className="flex items-center gap-2">
+                      {packStatus?.is_pack && (
+                        <span className={`text-[11px] font-black px-3 py-1.5 rounded-full ${packStatus.remaining === 0 ? 'bg-red-100 text-red-700' : packStatus.remaining <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                          {packStatus.remaining === 0 ? 'Carte épuisée' : `${packStatus.remaining}/${packStatus.total} restantes`}
+                        </span>
+                      )}
+                      <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
+                    </div>
                   </div>
 
                   {memberVisits.length === 0 && !visitsLoading ? (

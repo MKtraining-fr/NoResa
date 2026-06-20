@@ -127,3 +127,19 @@ export async function getMemberVisitCount(memberId: string, sinceIso?: string): 
   if (error) { console.error('getMemberVisitCount', error); return 0; }
   return count ?? 0;
 }
+
+export interface PackStatus {
+  is_pack: boolean;
+  total: number;
+  used: number;
+  remaining: number;
+  epoch: string | null;
+}
+
+/** Statut d'une carte 10 séances : séances utilisées / restantes (même logique que l'auto-blocage). */
+export async function getPackStatus(memberId: string): Promise<PackStatus | null> {
+  const { data, error } = await supabase.rpc('pack_sessions_status', { p_member: memberId });
+  if (error) { console.error('getPackStatus', error); return null; }
+  const row = Array.isArray(data) ? data[0] : data;
+  return (row ?? null) as PackStatus | null;
+}
