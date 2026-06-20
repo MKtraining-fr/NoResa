@@ -54,7 +54,7 @@ const AdminDashboard: React.FC = () => {
     getExpiringSubscriptions(30).then(setExpiring).catch(() => {});
   }, []);
 
-  const fmtEUR = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
+  const fmtEUR = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
   const cards = stats ? [
     { label: 'Membres actifs', value: String(stats.active_members), sub: `${stats.total_members} au total`, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -414,7 +414,7 @@ const AdminDashboard: React.FC = () => {
                       <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Formule d'abonnement</label>
                       <select value={addFormula} onChange={(e) => selectFormula(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
                         <option value="">— Choisir une formule —</option>
-                        {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2)} €)</option>)}
+                        {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2).replace('.', ',')} €)</option>)}
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-3">

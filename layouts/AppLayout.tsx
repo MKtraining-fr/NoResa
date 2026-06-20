@@ -105,7 +105,7 @@ const AppLayout: React.FC = () => {
             <div className="bg-indigo-500 p-1.5 rounded-lg shrink-0 shadow-lg border border-indigo-400/20">
               <Dumbbell className="text-white w-6 h-6" />
             </div>
-            {isSidebarOpen && <span className="text-xl font-bold text-white truncate">NoResa <span className="text-[10px] font-black tracking-widest text-indigo-400 uppercase bg-indigo-500/10 px-1.5 py-0.5 rounded ml-1">Pro</span></span>}
+            {isSidebarOpen && <span className="text-xl font-bold text-white truncate">NoResa <span className="text-[10px] font-semibold tracking-wide text-indigo-400 uppercase bg-indigo-500/10 px-1.5 py-0.5 rounded ml-1">Pro</span></span>}
           </div>
         </div>
 
@@ -140,7 +140,7 @@ const AppLayout: React.FC = () => {
                     <Link
                       key={sub}
                       to={`${item.path}/${sub.toLowerCase()}`}
-                      className={`block pl-6 pr-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                      className={`block pl-6 pr-4 py-2 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                         location.pathname.includes(sub.toLowerCase()) ? 'text-indigo-400' : 'text-slate-500 hover:text-indigo-300'
                       }`}
                     >
@@ -159,7 +159,7 @@ const AppLayout: React.FC = () => {
             className={`flex items-center space-x-3 w-full p-3 rounded-2xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all ${!isSidebarOpen && 'justify-center'}`}
           >
             <LogOut size={20} />
-            {isSidebarOpen && <span className="text-sm font-bold uppercase tracking-widest text-[10px]">Déconnexion</span>}
+            {isSidebarOpen && <span className="text-sm font-bold uppercase tracking-wide text-[10px]">Déconnexion</span>}
           </button>
         </div>
       </aside>
@@ -195,18 +195,18 @@ const AppLayout: React.FC = () => {
 
               {/* RÉSULTATS DE RECHERCHE */}
               {isSearchOpen && results && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 max-h-[500px] overflow-y-auto pwa-hide-scrollbar z-[100]">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 max-h-[500px] overflow-y-auto pwa-hide-scrollbar z-[100]">
                   
                   {/* Section Membres */}
                   {results.members.length > 0 && (
                     <div className="p-4 border-b border-gray-50">
-                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 px-2 flex items-center"><User size={10} className="mr-2" /> Membres</h4>
+                      <h4 className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-3 px-2 flex items-center"><User size={10} className="mr-2" /> Membres</h4>
                       <div className="space-y-1">
                         {results.members.map(m => (
                           <button key={m.id} onClick={() => handleResultClick('member', m.id)} className="w-full flex items-center p-2 hover:bg-indigo-50 rounded-xl transition-colors group text-left">
-                            <div className="w-8 h-8 rounded-lg mr-3 shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black uppercase shrink-0">{initials(m.firstName, m.lastName)}</div>
+                            <div className="w-8 h-8 rounded-lg mr-3 shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold uppercase shrink-0">{initials(m.firstName, m.lastName)}</div>
                             <div>
-                              <p className="text-xs font-black text-gray-900 group-hover:text-indigo-600">{m.firstName} {m.lastName}</p>
+                              <p className="text-xs font-semibold text-gray-900 group-hover:text-indigo-600">{m.firstName} {m.lastName}</p>
                               <p className="text-[10px] text-gray-400 font-bold">{m.memberNumber ? `N° ${m.memberNumber}` : ''}{m.memberNumber && (m.phone || m.email) ? ' • ' : ''}{m.phone || m.email || ''}</p>
                             </div>
                             <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-400 transition-all" />
@@ -219,13 +219,13 @@ const AppLayout: React.FC = () => {
                   {/* Section Prospects */}
                   {results.prospects.length > 0 && (
                     <div className="p-4 border-b border-gray-50">
-                      <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-3 px-2 flex items-center"><Target size={10} className="mr-2" /> Prospects</h4>
+                      <h4 className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide mb-3 px-2 flex items-center"><Target size={10} className="mr-2" /> Prospects</h4>
                       <div className="space-y-1">
                         {results.prospects.map(p => (
                           <button key={p.id} onClick={() => handleResultClick('prospect', p.id)} className="w-full flex items-center p-2 hover:bg-amber-50 rounded-xl transition-colors group text-left">
                             <img src={`https://picsum.photos/seed/${p.id}/40/40`} className="w-8 h-8 rounded-lg mr-3 shadow-sm" alt="" />
                             <div>
-                              <p className="text-xs font-black text-gray-900 group-hover:text-amber-600">{p.firstName} {p.lastName}</p>
+                              <p className="text-xs font-semibold text-gray-900 group-hover:text-amber-600">{p.firstName} {p.lastName}</p>
                               <p className="text-[10px] text-gray-400 font-bold">Relance automatique active</p>
                             </div>
                             <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-amber-400 transition-all" />
@@ -238,13 +238,13 @@ const AppLayout: React.FC = () => {
                   {/* Section Partenaires */}
                   {results.partners.length > 0 && (
                     <div className="p-4 border-b border-gray-50">
-                      <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 px-2 flex items-center"><Briefcase size={10} className="mr-2" /> Partenaires</h4>
+                      <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-3 px-2 flex items-center"><Briefcase size={10} className="mr-2" /> Partenaires</h4>
                       <div className="space-y-1">
                         {results.partners.map(p => (
                           <button key={p.id} onClick={() => handleResultClick('partner', p.id)} className="w-full flex items-center p-2 hover:bg-slate-50 rounded-xl transition-colors group text-left">
-                            <div className="w-8 h-8 bg-slate-100 rounded-lg mr-3 flex items-center justify-center text-slate-400 font-black text-[10px]">{p.company.substring(0, 2)}</div>
+                            <div className="w-8 h-8 bg-slate-100 rounded-lg mr-3 flex items-center justify-center text-slate-400 font-semibold text-[10px]">{p.company.substring(0, 2)}</div>
                             <div>
-                              <p className="text-xs font-black text-gray-900 group-hover:text-slate-600">{p.company}</p>
+                              <p className="text-xs font-semibold text-gray-900 group-hover:text-slate-600">{p.company}</p>
                               <p className="text-[10px] text-gray-400 font-bold">{p.category}</p>
                             </div>
                             <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-slate-400 transition-all" />
@@ -257,14 +257,14 @@ const AppLayout: React.FC = () => {
                   {/* Section Produits */}
                   {results.products.length > 0 && (
                     <div className="p-4">
-                      <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 px-2 flex items-center"><ShoppingBag size={10} className="mr-2" /> Boutique</h4>
+                      <h4 className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-3 px-2 flex items-center"><ShoppingBag size={10} className="mr-2" /> Boutique</h4>
                       <div className="space-y-1">
                         {results.products.map(p => (
                           <button key={p.id} onClick={() => handleResultClick('product', p.id)} className="w-full flex items-center p-2 hover:bg-indigo-50 rounded-xl transition-colors group text-left">
                             <img src={p.image} className="w-8 h-8 rounded-lg mr-3 object-cover shadow-sm" alt="" />
                             <div>
-                              <p className="text-xs font-black text-gray-900 group-hover:text-indigo-600">{p.name}</p>
-                              <p className="text-[10px] text-indigo-500 font-black">{p.price.toFixed(2)} €</p>
+                              <p className="text-xs font-semibold text-gray-900 group-hover:text-indigo-600">{p.name}</p>
+                              <p className="text-[10px] text-indigo-500 font-semibold">{p.price.toFixed(2).replace('.', ',')} €</p>
                             </div>
                             <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-400 transition-all" />
                           </button>
@@ -284,8 +284,8 @@ const AppLayout: React.FC = () => {
             </button>
             <div className="flex items-center space-x-4 border-l border-gray-100 pl-6 ml-2 group cursor-pointer" onClick={() => navigate('/app/parametres/mon-compte')}>
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-black text-gray-900 tracking-tight group-hover:text-indigo-600 transition-colors uppercase">Admin NoResa</p>
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-0.5">Super Manager</p>
+                <p className="text-xs font-semibold text-gray-900 tracking-tight group-hover:text-indigo-600 transition-colors uppercase">Admin NoResa</p>
+                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide mt-0.5">Super Manager</p>
               </div>
               <div className="relative">
                 <img 
@@ -300,7 +300,7 @@ const AppLayout: React.FC = () => {
         </header>
 
         {/* Dynamic Content */}
-        <main className="flex-grow overflow-y-auto p-8 bg-gray-50/50 pwa-hide-scrollbar">
+        <main className="flex-grow overflow-y-auto p-5 bg-gray-50/50 pwa-hide-scrollbar">
           <Outlet />
         </main>
       </div>

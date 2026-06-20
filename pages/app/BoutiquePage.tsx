@@ -314,33 +314,33 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       </div>
 
       <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
-        <button onClick={() => setActiveView('produits')} className={`px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all flex items-center ${activeView === 'produits' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><Package size={14} className="mr-2" />Produits</button>
-        <button onClick={() => setActiveView('ventes')} className={`px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all flex items-center ${activeView === 'ventes' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><TrendingUp size={14} className="mr-2" />Ventes</button>
-        <button onClick={() => setActiveView('fournisseurs')} className={`px-6 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all flex items-center ${activeView === 'fournisseurs' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><Truck size={14} className="mr-2" />Fournisseurs</button>
+        <button onClick={() => setActiveView('produits')} className={`px-6 py-2 rounded-xl text-sm font-semibold uppercase tracking-wide transition-all flex items-center ${activeView === 'produits' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><Package size={14} className="mr-2" />Produits</button>
+        <button onClick={() => setActiveView('ventes')} className={`px-6 py-2 rounded-xl text-sm font-semibold uppercase tracking-wide transition-all flex items-center ${activeView === 'ventes' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><TrendingUp size={14} className="mr-2" />Ventes</button>
+        <button onClick={() => setActiveView('fournisseurs')} className={`px-6 py-2 rounded-xl text-sm font-semibold uppercase tracking-wide transition-all flex items-center ${activeView === 'fournisseurs' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-700'}`}><Truck size={14} className="mr-2" />Fournisseurs</button>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[400px]">
         {activeView === 'produits' && (
-          <div className="p-8">
+          <div className="p-5">
             {lowStockProducts.length > 0 && (
-              <div className="mb-8 bg-red-50/70 border border-red-100 rounded-[2rem] p-6">
+              <div className="mb-8 bg-red-50/70 border border-red-100 rounded-2xl p-6">
                 <div className="flex items-center mb-4">
                   <div className="bg-red-100 text-red-600 p-2 rounded-xl mr-3"><AlertTriangle size={18} /></div>
-                  <h3 className="text-sm font-black text-red-700 uppercase tracking-widest">À réapprovisionner ({lowStockProducts.length})</h3>
+                  <h3 className="text-sm font-semibold text-red-700 uppercase tracking-wide">À réapprovisionner ({lowStockProducts.length})</h3>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {lowStockProducts.map(p => (
                     <span key={p.id} className="inline-flex items-center bg-white border border-red-100 rounded-xl px-3 py-1.5 text-xs font-bold text-gray-700">
                       {p.name}
-                      <span className={`ml-2 font-black ${p.stock <= 0 ? 'text-red-600' : 'text-amber-600'}`}>{p.stock}</span>
+                      <span className={`ml-2 font-semibold ${p.stock <= 0 ? 'text-red-600' : 'text-amber-600'}`}>{p.stock}</span>
                     </span>
                   ))}
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                {products.map(product => (
-                 <div key={product.id} className="group border border-gray-50 rounded-[2rem] overflow-hidden hover:shadow-2xl transition-all duration-500 bg-white relative">
+                 <div key={product.id} className="group border border-gray-50 rounded-2xl overflow-hidden hover:shadow-md transition-all duration-500 bg-white relative">
                     <div className="relative overflow-hidden aspect-square bg-gray-50 flex items-center justify-center">
                       {product.image ? (
                         <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" alt="" />
@@ -351,59 +351,59 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     </div>
                     <div className="p-6 space-y-4">
                        <div>
-                          <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">{product.category}</p>
-                          <h4 className="text-sm font-black text-gray-900 truncate">{product.name}</h4>
+                          <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">{product.category}</p>
+                          <h4 className="text-sm font-semibold text-gray-900 truncate">{product.name}</h4>
                        </div>
                        <div className="flex items-center justify-between">
-                          <p className="text-xl font-black text-gray-900">{product.price.toFixed(2)} €</p>
+                          <p className="text-xl font-semibold text-gray-900">{product.price.toFixed(2).replace('.', ',')} €</p>
                           <button onClick={() => openStockEdit(product)} title="Modifier le stock" className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 hover:ring-2 hover:ring-indigo-300 transition-all ${lowStock(product) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
                             {product.stock} en stock <Pencil size={10} />
                           </button>
                        </div>
-                       <button onClick={() => { setIsSelling(true); addToCart(product); }} className="w-full py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Vendre l'article</button>
+                       <button onClick={() => { setIsSelling(true); addToCart(product); }} className="w-full py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-semibold uppercase tracking-wide hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Vendre l'article</button>
                     </div>
                  </div>
                ))}
-               <button onClick={() => setIsAddProductModalOpen(true)} className="min-h-[300px] border-4 border-dashed border-gray-50 rounded-[2.5rem] flex flex-col items-center justify-center space-y-4 text-gray-300 hover:border-indigo-100 hover:text-indigo-400 transition-all group">
+               <button onClick={() => setIsAddProductModalOpen(true)} className="min-h-[300px] border-4 border-dashed border-gray-50 rounded-2xl flex flex-col items-center justify-center space-y-4 text-gray-300 hover:border-indigo-100 hover:text-indigo-400 transition-all group">
                   <div className="bg-gray-50 p-6 rounded-full group-hover:bg-indigo-50 transition-colors">
                     <Plus size={40} />
                   </div>
-                  <span className="text-sm font-black uppercase tracking-widest">Nouveau produit</span>
+                  <span className="text-sm font-semibold uppercase tracking-wide">Nouveau produit</span>
                </button>
             </div>
           </div>
         )}
 
         {activeView === 'ventes' && (
-          <div className="p-8">
+          <div className="p-5">
             {stats && (
               <div className="mb-8">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CA aujourd'hui</p>
-                    <p className="text-2xl font-black text-gray-900">{stats.ca_today.toFixed(2)} €</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">CA aujourd'hui</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.ca_today.toFixed(2).replace('.', ',')} €</p>
                   </div>
                   <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-5">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">CA ce mois</p>
-                    <p className="text-2xl font-black text-indigo-700">{stats.ca_month.toFixed(2)} €</p>
+                    <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-1">CA ce mois</p>
+                    <p className="text-2xl font-semibold text-indigo-700">{stats.ca_month.toFixed(2).replace('.', ',')} €</p>
                   </div>
                   <div className="bg-green-50/70 border border-green-100 rounded-2xl p-5">
-                    <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">Marge ce mois</p>
-                    <p className="text-2xl font-black text-green-700">{stats.margin_month.toFixed(2)} €</p>
+                    <p className="text-[10px] font-semibold text-green-500 uppercase tracking-wide mb-1">Marge ce mois</p>
+                    <p className="text-2xl font-semibold text-green-700">{stats.margin_month.toFixed(2).replace('.', ',')} €</p>
                   </div>
                   <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ventes ce mois</p>
-                    <p className="text-2xl font-black text-gray-900">{stats.sales_month}</p>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Ventes ce mois</p>
+                    <p className="text-2xl font-semibold text-gray-900">{stats.sales_month}</p>
                   </div>
                 </div>
                 {stats.top_products.length > 0 && (
                   <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Top produits</h4>
+                    <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Top produits</h4>
                     <div className="space-y-2">
                       {stats.top_products.map((t, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
-                          <span className="font-bold text-gray-700"><span className="text-gray-300 font-black mr-2">{i + 1}</span>{t.name}</span>
-                          <span className="font-black text-gray-500">{t.qty} vendus · {Number(t.revenue).toFixed(2)} €</span>
+                          <span className="font-bold text-gray-700"><span className="text-gray-300 font-semibold mr-2">{i + 1}</span>{t.name}</span>
+                          <span className="font-semibold text-gray-500">{t.qty} vendus · {Number(t.revenue).toFixed(2).replace('.', ',')} €</span>
                         </div>
                       ))}
                     </div>
@@ -412,10 +412,10 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
               </div>
             )}
             {sales.length === 0 ? (
-              <div className="p-10 flex flex-col items-center justify-center text-center space-y-6">
-                <div className="bg-indigo-50 p-8 rounded-full text-indigo-600"><TrendingUp size={48} /></div>
+              <div className="p-6 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-indigo-50 p-5 rounded-full text-indigo-600"><TrendingUp size={48} /></div>
                 <div>
-                  <h3 className="text-xl font-black">Historique des Ventes</h3>
+                  <h3 className="text-xl font-semibold">Historique des Ventes</h3>
                   <p className="text-gray-500 max-w-sm mt-2 font-medium">Aucune vente pour le moment. Lancez une vente pour la voir apparaître ici.</p>
                 </div>
               </div>
@@ -423,7 +423,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                    <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
                       <th className="py-3 px-3">Facture</th>
                       <th className="py-3 px-3">Date</th>
                       <th className="py-3 px-3">Client</th>
@@ -436,15 +436,15 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                   <tbody>
                     {sales.map((s: any) => (
                       <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors text-sm">
-                        <td className="py-3 px-3 font-black text-gray-900">{s.invoice_number || '—'}</td>
+                        <td className="py-3 px-3 font-semibold text-gray-900">{s.invoice_number || '—'}</td>
                         <td className="py-3 px-3 text-gray-500 font-medium">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : '—'}</td>
                         <td className="py-3 px-3 font-bold text-gray-700">{s.member ? `${s.member.first_name} ${s.member.last_name}` : 'Anonyme'}</td>
                         <td className="py-3 px-3 text-gray-500 font-medium">{s.payment_method || '—'}</td>
-                        <td className="py-3 px-3 text-right font-black text-indigo-600">{Number(s.total_ttc || 0).toFixed(2)} €</td>
+                        <td className="py-3 px-3 text-right font-semibold text-indigo-600">{Number(s.total_ttc || 0).toFixed(2).replace('.', ',')} €</td>
                         <td className="py-3 px-3 text-center">
                           {s.invoice_email_status === 'sent'
-                            ? <span className="text-[10px] font-black text-green-600 uppercase">Envoyée</span>
-                            : <span className="text-[10px] font-black text-gray-300 uppercase">—</span>}
+                            ? <span className="text-[10px] font-semibold text-green-600 uppercase">Envoyée</span>
+                            : <span className="text-[10px] font-semibold text-gray-300 uppercase">—</span>}
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center justify-end gap-2">
@@ -468,21 +468,21 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
         )}
 
         {activeView === 'fournisseurs' && (
-          <div className="p-8">
+          <div className="p-5">
             {suppliers.length === 0 ? (
-              <div className="p-10 flex flex-col items-center justify-center text-center space-y-6">
-                <div className="bg-indigo-50 p-8 rounded-full text-indigo-600"><Truck size={48} /></div>
-                <h3 className="text-xl font-black">Aucun fournisseur</h3>
+              <div className="p-6 flex flex-col items-center justify-center text-center space-y-6">
+                <div className="bg-indigo-50 p-5 rounded-full text-indigo-600"><Truck size={48} /></div>
+                <h3 className="text-xl font-semibold">Aucun fournisseur</h3>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {suppliers.map(s => (
-                  <div key={s.id} className="border border-gray-100 rounded-[2rem] p-6 bg-white hover:shadow-xl transition-all">
+                  <div key={s.id} className="border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-xl transition-all">
                     <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-black uppercase shrink-0">{initials(s.name, '')}</div>
+                      <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-semibold uppercase shrink-0">{initials(s.name, '')}</div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-black text-gray-900 truncate">{s.name}</h4>
-                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{s.supplier_type || 'fournisseur'}</p>
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">{s.name}</h4>
+                        <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">{s.supplier_type || 'fournisseur'}</p>
                       </div>
                     </div>
                     <div className="space-y-1.5 text-xs font-bold text-gray-500">
@@ -491,8 +491,8 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       {s.phone && <p className="flex items-center gap-2">{s.phone}</p>}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Produits</span>
-                      <span className="text-sm font-black text-gray-900">{s.productCount}</span>
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produits</span>
+                      <span className="text-sm font-semibold text-gray-900">{s.productCount}</span>
                     </div>
                   </div>
                 ))}
@@ -505,41 +505,41 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       {/* MODALE AJOUT PRODUIT */}
       {isAddProductModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 bg-indigo-600 text-white flex justify-between items-center relative overflow-hidden">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300">
+            <div className="p-5 bg-indigo-600 text-white flex justify-between items-center relative overflow-hidden">
                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
                <div className="flex items-center space-x-4 relative z-10">
                  <div className="bg-white/20 p-2.5 rounded-2xl shadow-inner"><Tag size={20} /></div>
                  <div>
-                   <h2 className="text-xl font-black">Nouveau produit</h2>
-                   <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest">Ajout au catalogue boutique</p>
+                   <h2 className="text-xl font-semibold">Nouveau produit</h2>
+                   <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-wide">Ajout au catalogue boutique</p>
                  </div>
                </div>
                <button onClick={() => setIsAddProductModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl relative z-10 transition-colors"><X size={24} /></button>
             </div>
-            <div className="p-10 space-y-8">
+            <div className="p-6 space-y-6">
                <div className="flex items-center space-x-8">
-                  <div className="w-24 h-24 bg-gray-50 border-4 border-dashed border-gray-100 rounded-[2rem] flex flex-col items-center justify-center text-gray-400 hover:border-indigo-100 hover:bg-indigo-50 transition-all cursor-pointer group">
+                  <div className="w-24 h-24 bg-gray-50 border-4 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-gray-400 hover:border-indigo-100 hover:bg-indigo-50 transition-all cursor-pointer group">
                      <Camera size={24} className="group-hover:scale-110 transition-transform" />
-                     <span className="text-[10px] font-black uppercase mt-2">PHOTO</span>
+                     <span className="text-[10px] font-semibold uppercase mt-2">PHOTO</span>
                   </div>
                   <div className="flex-grow space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom du produit</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom du produit</label>
                     <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Whey, Shaker, Gants..." />
                   </div>
                </div>
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prix de vente (€)</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prix de vente (€)</label>
                     <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="19.90" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock initial</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stock initial</label>
                     <input type="number" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="50" />
                   </div>
                </div>
                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Catégorie</label>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Catégorie</label>
                   <select className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
                     <option>Suppléments</option>
                     <option>Accessoires</option>
@@ -547,7 +547,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     <option>Vêtements</option>
                   </select>
                </div>
-               <button onClick={() => setIsAddProductModalOpen(false)} className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] uppercase tracking-widest text-xs">Ajouter à l'inventaire</button>
+               <button onClick={() => setIsAddProductModalOpen(false)} className="w-full py-5 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] uppercase tracking-wide text-xs">Ajouter à l'inventaire</button>
             </div>
           </div>
         </div>
@@ -556,14 +556,14 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       {/* POS INTERFACE */}
       {isSelling && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[850px] rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col md:flex-row border border-white/20">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[850px] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col md:flex-row border border-white/20">
             
             {/* Zone Produits POS */}
-            <div className="flex-grow p-10 overflow-y-auto bg-gray-50/50 pwa-hide-scrollbar flex flex-col">
+            <div className="flex-grow p-6 overflow-y-auto bg-gray-50/50 pwa-hide-scrollbar flex flex-col">
                <div className="flex items-center justify-between mb-10">
                   <div className="flex items-center space-x-4">
                     <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg"><ShoppingCart size={24} className="text-white" /></div>
-                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Terminal de Vente</h2>
+                    <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Terminal de Vente</h2>
                   </div>
                   <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
                </div>
@@ -586,17 +586,17 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     <button 
                       key={product.id} 
                       onClick={() => addToCart(product)} 
-                      className="flex flex-col text-left bg-white p-5 rounded-3xl border border-transparent hover:border-indigo-600 hover:shadow-xl transition-all group relative active:scale-95"
+                      className="flex flex-col text-left bg-white p-5 rounded-2xl border border-transparent hover:border-indigo-600 hover:shadow-xl transition-all group relative active:scale-95"
                     >
                        {product.image ? (
                          <img src={product.image} className="w-full h-32 rounded-2xl object-cover mb-4 shadow-sm" alt="" />
                        ) : (
                          <div className="w-full h-32 rounded-2xl mb-4 shadow-sm bg-gray-50 flex items-center justify-center"><Package size={36} className="text-gray-300" /></div>
                        )}
-                       <h4 className="text-xs font-black text-gray-900 truncate">{product.name}</h4>
+                       <h4 className="text-xs font-semibold text-gray-900 truncate">{product.name}</h4>
                        <div className="flex items-center justify-between mt-2">
-                         <p className="text-md font-black text-indigo-600">{product.price.toFixed(2)} €</p>
-                         <p className="text-[9px] font-black text-gray-300 uppercase">Stock: {product.stock}</p>
+                         <p className="text-md font-semibold text-indigo-600">{product.price.toFixed(2).replace('.', ',')} €</p>
+                         <p className="text-[9px] font-semibold text-gray-300 uppercase">Stock: {product.stock}</p>
                        </div>
                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                          <div className="bg-indigo-600 text-white p-1.5 rounded-xl shadow-lg"><Plus size={16} /></div>
@@ -608,17 +608,17 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
 
             {/* Zone Panier POS */}
             <div className="w-full md:w-[450px] bg-white border-l border-gray-100 flex flex-col shadow-inner">
-               <div className="flex-grow p-10 flex flex-col">
+               <div className="flex-grow p-6 flex flex-col">
                   
                   {/* Sélection du client */}
                   <div className="mb-10 relative" ref={memberSearchRef}>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Attribuer à un membre</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Attribuer à un membre</label>
                     <div className={`flex items-center space-x-3 p-4 rounded-2xl transition-all border ${selectedMember ? 'bg-indigo-50 border-indigo-100 ring-2 ring-indigo-500/10' : 'bg-gray-50 border-gray-50'}`}>
                       {selectedMember ? (
                         <>
-                          <div className="w-10 h-10 rounded-xl shadow-sm border border-white bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black uppercase">{initials(selectedMember.firstName, selectedMember.lastName)}</div>
+                          <div className="w-10 h-10 rounded-xl shadow-sm border border-white bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold uppercase">{initials(selectedMember.firstName, selectedMember.lastName)}</div>
                           <div className="flex-grow">
-                            <p className="text-xs font-black text-indigo-900">{selectedMember.firstName} {selectedMember.lastName}</p>
+                            <p className="text-xs font-semibold text-indigo-900">{selectedMember.firstName} {selectedMember.lastName}</p>
                             <p className="text-[10px] font-bold text-indigo-400">{selectedMember.memberNumber ? `N° ${selectedMember.memberNumber}` : (selectedMember.email || 'Client')}</p>
                           </div>
                           <button onClick={() => setSelectedMember(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
@@ -639,20 +639,20 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     </div>
                     
                     {isSearchingMember && !selectedMember && memberSearchTerm && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-50 z-10 overflow-hidden max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-50 z-10 overflow-hidden max-h-48 overflow-y-auto">
                         {memberResults.map(m => (
                           <button 
                             key={m.id} 
                             onClick={() => { setSelectedMember(m); setIsSearchingMember(false); }}
                             className="w-full p-4 flex items-center space-x-3 hover:bg-indigo-50 transition-colors text-left"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black uppercase">{initials(m.firstName, m.lastName)}</div>
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-semibold uppercase">{initials(m.firstName, m.lastName)}</div>
                             <span className="text-xs font-bold">{m.firstName} {m.lastName}{m.memberNumber ? ` · N° ${m.memberNumber}` : ''}</span>
                           </button>
                         ))}
                         {memberResults.length === 0 && !quickOpen && (
                           <div className="p-4 text-center">
-                            <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">Aucun membre trouvé</p>
+                            <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-wide">Aucun membre trouvé</p>
                             <button
                               onClick={() => {
                                 const parts = memberSearchTerm.trim().split(' ');
@@ -660,7 +660,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                                 setQuickLast(parts.slice(1).join(' ') || '');
                                 setQuickOpen(true);
                               }}
-                              className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center justify-center w-full hover:underline"
+                              className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide flex items-center justify-center w-full hover:underline"
                             >
                               <UserPlus size={12} className="mr-1" /> Créer une fiche rapide
                             </button>
@@ -668,15 +668,15 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                         )}
                         {quickOpen && (
                           <div className="p-4 space-y-2">
-                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Nouveau client</p>
+                            <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Nouveau client</p>
                             <div className="grid grid-cols-2 gap-2">
                               <input value={quickFirst} onChange={e => setQuickFirst(e.target.value)} placeholder="Prénom" className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
                               <input value={quickLast} onChange={e => setQuickLast(e.target.value)} placeholder="Nom" className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
                             </div>
                             <input value={quickEmail} onChange={e => setQuickEmail(e.target.value)} placeholder="Email (pour la facture)" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none" />
                             <div className="flex gap-2">
-                              <button onClick={handleQuickCreate} disabled={!quickFirst.trim() || !quickLast.trim() || creatingMember} className={`flex-grow py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors ${(!quickFirst.trim() || !quickLast.trim() || creatingMember) ? 'bg-gray-100 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{creatingMember ? 'Création…' : 'Créer & sélectionner'}</button>
-                              <button onClick={() => setQuickOpen(false)} className="px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-500 hover:bg-gray-200">Annuler</button>
+                              <button onClick={handleQuickCreate} disabled={!quickFirst.trim() || !quickLast.trim() || creatingMember} className={`flex-grow py-2 rounded-xl text-[10px] font-semibold uppercase tracking-wide transition-colors ${(!quickFirst.trim() || !quickLast.trim() || creatingMember) ? 'bg-gray-100 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{creatingMember ? 'Création…' : 'Créer & sélectionner'}</button>
+                              <button onClick={() => setQuickOpen(false)} className="px-3 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-wide bg-gray-100 text-gray-500 hover:bg-gray-200">Annuler</button>
                             </div>
                           </div>
                         )}
@@ -684,29 +684,29 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     )}
                   </div>
 
-                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-5">Articles dans le panier ({cart.reduce((s,i) => s + i.quantity, 0)})</h3>
+                  <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-5">Articles dans le panier ({cart.reduce((s,i) => s + i.quantity, 0)})</h3>
                   
                   <div className="flex-grow overflow-y-auto space-y-3 pwa-hide-scrollbar">
                     {cart.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full opacity-20 space-y-4">
                         <ShoppingBag size={64} strokeWidth={1} />
-                        <p className="text-sm font-black uppercase tracking-[0.2em]">Votre panier est vide</p>
+                        <p className="text-sm font-semibold uppercase tracking-wide">Votre panier est vide</p>
                       </div>
                     ) : (
                       cart.map(item => (
-                        <div key={item.product.id} className="flex items-center space-x-4 p-4 bg-gray-50/50 border border-gray-100 rounded-3xl animate-in slide-in-from-right-4 duration-300">
+                        <div key={item.product.id} className="flex items-center space-x-4 p-4 bg-gray-50/50 border border-gray-100 rounded-2xl animate-in slide-in-from-right-4 duration-300">
                           {item.product.image ? (
                             <img src={item.product.image} className="w-12 h-12 rounded-xl object-cover shadow-sm" alt="" />
                           ) : (
                             <div className="w-12 h-12 rounded-xl shadow-sm bg-white border border-gray-100 flex items-center justify-center"><Package size={20} className="text-gray-300" /></div>
                           )}
                           <div className="flex-grow">
-                            <p className="text-xs font-black text-gray-900 truncate w-32">{item.product.name}</p>
-                            <p className="text-xs font-black text-indigo-600 mt-0.5">{item.product.price.toFixed(2)} €</p>
+                            <p className="text-xs font-semibold text-gray-900 truncate w-32">{item.product.name}</p>
+                            <p className="text-xs font-semibold text-indigo-600 mt-0.5">{item.product.price.toFixed(2).replace('.', ',')} €</p>
                           </div>
                           <div className="flex items-center bg-white rounded-xl border border-gray-100 shadow-sm">
                             <button onClick={() => updateQuantity(item.product.id, -1)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><Minus size={12}/></button>
-                            <span className="text-xs font-black min-w-[20px] text-center">{item.quantity}</span>
+                            <span className="text-xs font-semibold min-w-[20px] text-center">{item.quantity}</span>
                             <button onClick={() => updateQuantity(item.product.id, 1)} className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"><Plus size={12}/></button>
                           </div>
                           <button onClick={() => setCart(prev => prev.filter(i => i.product.id !== item.product.id))} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16}/></button>
@@ -716,37 +716,37 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                   </div>
                </div>
 
-               <div className="p-10 border-t border-gray-50 bg-gray-50/20">
+               <div className="p-6 border-t border-gray-50 bg-gray-50/20">
                   <div className="space-y-3 mb-8">
-                    <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wide">
                        <span>Total HT</span>
-                       <span>{(cartTotal - cartTva).toFixed(2)} €</span>
+                       <span>{(cartTotal - cartTva).toFixed(2).replace('.', ',')} €</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wide">
                        <span>dont TVA</span>
-                       <span>{cartTva.toFixed(2)} €</span>
+                       <span>{cartTva.toFixed(2).replace('.', ',')} €</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                       <span className="text-sm font-black tracking-widest uppercase">Total à payer</span>
-                       <span className="text-4xl font-black text-indigo-600">{cartTotal.toFixed(2)} €</span>
+                       <span className="text-sm font-semibold tracking-wide uppercase">Total à payer</span>
+                       <span className="text-4xl font-semibold text-indigo-600">{cartTotal.toFixed(2).replace('.', ',')} €</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 mb-4">
                      <button onClick={() => setPaymentMethod('CB')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'CB' ? 'border-indigo-600 text-indigo-600 ring-2 ring-indigo-500/10' : 'border-gray-100 hover:border-indigo-600 hover:text-indigo-600'}`}>
                         <CreditCard size={20} className={`mb-2 ${paymentMethod === 'CB' ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600'}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">CB / Sans contact</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide">CB / Sans contact</span>
                      </button>
                      <button onClick={() => setPaymentMethod('Espèces')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'Espèces' ? 'border-green-600 text-green-600 ring-2 ring-green-500/10' : 'border-gray-100 hover:border-green-600 hover:text-green-600'}`}>
                         <Banknote size={20} className={`mb-2 ${paymentMethod === 'Espèces' ? 'text-green-600' : 'text-gray-400 group-hover:text-green-600'}`} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Espèces</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide">Espèces</span>
                      </button>
                   </div>
 
                   <button 
                     onClick={handleCheckout} 
                     disabled={cart.length === 0 || processing} 
-                    className={`w-full py-5 rounded-[2rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center space-x-3 active:scale-[0.98] ${
+                    className={`w-full py-5 rounded-2xl font-semibold text-sm uppercase tracking-wide shadow-xl transition-all flex items-center justify-center space-x-3 active:scale-[0.98] ${
                       cart.length === 0 || processing ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'
                     }`}
                   >
@@ -762,22 +762,22 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       {/* SUCCESS MODAL */}
       {saleStep === 'success' && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-indigo-600/90 backdrop-blur-2xl animate-in fade-in duration-700">
-           <div className="text-center text-white space-y-8 animate-in zoom-in duration-500">
-              <div className="bg-white/20 w-32 h-32 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl backdrop-blur-md relative overflow-hidden">
+           <div className="text-center text-white space-y-6 animate-in zoom-in duration-500">
+              <div className="bg-white/20 w-32 h-32 rounded-2xl flex items-center justify-center mx-auto shadow-xl backdrop-blur-md relative overflow-hidden">
                 <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                 <CheckCircle2 size={64} className="relative z-10" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-4xl font-black">Vente terminée !</h2>
-                <p className="text-indigo-100 font-bold opacity-80 uppercase tracking-widest text-xs">Paiement confirmé • Stock mis à jour</p>
+                <h2 className="text-4xl font-semibold">Vente terminée !</h2>
+                <p className="text-indigo-100 font-bold opacity-80 uppercase tracking-wide text-xs">Paiement confirmé • Stock mis à jour</p>
                 {saleResult && (
-                  <p className="text-white font-black text-lg pt-2">Facture {saleResult.invoice_number} — {saleResult.total_ttc?.toFixed(2)} €</p>
+                  <p className="text-white font-semibold text-lg pt-2">Facture {saleResult.invoice_number} — {saleResult.total_ttc?.toFixed(2).replace('.', ',')} €</p>
                 )}
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button
                   onClick={() => saleResult && handleViewInvoice(saleResult.sale_id, null)}
-                  className="w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl bg-white text-indigo-600 hover:bg-indigo-50 transition-colors"
+                  className="w-full sm:w-auto px-10 py-4 rounded-2xl font-semibold text-sm uppercase tracking-wide shadow-xl bg-white text-indigo-600 hover:bg-indigo-50 transition-colors"
                 >
                   Voir la facture (PDF)
                 </button>
@@ -785,11 +785,11 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                   onClick={handleSendInvoice}
                   disabled={!selectedMember?.email}
                   title={selectedMember?.email ? '' : "Aucun email client : rattachez un membre avec email pour envoyer la facture"}
-                  className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-colors ${selectedMember?.email ? 'bg-white text-indigo-600 hover:bg-indigo-50' : 'bg-white/30 text-white/60 cursor-not-allowed'}`}
+                  className={`w-full sm:w-auto px-10 py-4 rounded-2xl font-semibold text-sm uppercase tracking-wide shadow-xl transition-colors ${selectedMember?.email ? 'bg-white text-indigo-600 hover:bg-indigo-50' : 'bg-white/30 text-white/60 cursor-not-allowed'}`}
                 >
                   Envoyer la facture par email
                 </button>
-                <button onClick={resetSale} className="w-full sm:w-auto px-10 py-4 bg-indigo-500/50 border border-white/20 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-white/10 transition-colors">Terminer</button>
+                <button onClick={resetSale} className="w-full sm:w-auto px-10 py-4 bg-indigo-500/50 border border-white/20 text-white rounded-2xl font-semibold text-sm uppercase tracking-wide hover:bg-white/10 transition-colors">Terminer</button>
               </div>
               {accessMsg && <p className="text-white bg-white/15 rounded-2xl px-5 py-3 font-bold text-sm max-w-xl mx-auto">{accessMsg}</p>}
               {invoiceMsg && <p className="text-white/90 font-bold text-sm">{invoiceMsg}</p>}
@@ -800,21 +800,21 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       {/* MODALE STOCK */}
       {stockEdit && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setStockEdit(null)}>
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
             <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
-              <h2 className="text-lg font-black truncate pr-2">{stockEdit.name}</h2>
+              <h2 className="text-lg font-semibold truncate pr-2">{stockEdit.name}</h2>
               <button onClick={() => setStockEdit(null)} className="p-1.5 hover:bg-white/10 rounded-xl"><X size={20} /></button>
             </div>
-            <div className="p-8 space-y-5">
+            <div className="p-5 space-y-5">
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Stock actuel</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stock actuel</label>
                 <input type="number" value={stockValue} onChange={e => setStockValue(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Seuil d'alerte (stock bas)</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Seuil d'alerte (stock bas)</label>
                 <input type="number" value={alertValue} onChange={e => setAlertValue(e.target.value)} placeholder="par défaut : 3" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
               </div>
-              <button onClick={handleSaveStock} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-widest text-xs">Enregistrer</button>
+              <button onClick={handleSaveStock} className="w-full py-4 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-wide text-xs">Enregistrer</button>
             </div>
           </div>
         </div>

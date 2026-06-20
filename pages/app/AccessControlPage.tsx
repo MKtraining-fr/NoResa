@@ -40,7 +40,7 @@ const AccessControlPage: React.FC = () => {
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">Contrôle d'accès</h1>
+          <h1 className="text-3xl font-semibold text-gray-900">Contrôle d'accès</h1>
           <p className="text-sm text-gray-500 mt-1">Entrées du jour et alertes de passage.</p>
         </div>
         <button onClick={load} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">
@@ -50,19 +50,19 @@ const AccessControlPage: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="bg-white rounded-3xl border border-gray-100 p-6 flex items-center gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center"><DoorOpen className="text-indigo-600" size={26} /></div>
           <div>
-            <p className="text-3xl font-black text-gray-900">{entries.length}</p>
+            <p className="text-3xl font-semibold text-gray-900">{entries.length}</p>
             <p className="text-sm font-semibold text-gray-400">entrées aujourd'hui</p>
           </div>
         </div>
-        <div className="bg-white rounded-3xl border border-gray-100 p-6 flex items-center gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 flex items-center gap-4">
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${alerts.length ? 'bg-amber-50' : 'bg-green-50'}`}>
             {alerts.length ? <AlertTriangle className="text-amber-500" size={26} /> : <ShieldCheck className="text-green-600" size={26} />}
           </div>
           <div>
-            <p className="text-3xl font-black text-gray-900">{alerts.length}</p>
+            <p className="text-3xl font-semibold text-gray-900">{alerts.length}</p>
             <p className="text-sm font-semibold text-gray-400">alerte{alerts.length > 1 ? 's' : ''} à vérifier</p>
           </div>
         </div>
@@ -70,10 +70,10 @@ const AccessControlPage: React.FC = () => {
 
       {/* Alertes */}
       {alerts.length > 0 && (
-        <div className="bg-white rounded-3xl border border-amber-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
           <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex items-center gap-2">
             <AlertTriangle className="text-amber-500" size={18} />
-            <h2 className="font-black text-gray-900">Double passage à vérifier</h2>
+            <h2 className="font-semibold text-gray-900">Double passage à vérifier</h2>
           </div>
           <div className="divide-y divide-gray-100">
             {alerts.map((a) => (
@@ -103,15 +103,15 @@ const AccessControlPage: React.FC = () => {
       )}
 
       {/* Entrées du jour */}
-      <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
           <DoorOpen className="text-indigo-600" size={18} />
-          <h2 className="font-black text-gray-900">Entrées du jour</h2>
+          <h2 className="font-semibold text-gray-900">Entrées du jour</h2>
         </div>
         {loading && entries.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 font-semibold">Chargement…</div>
+          <div className="p-6 text-center text-gray-400 font-semibold">Chargement…</div>
         ) : entries.length === 0 ? (
-          <div className="p-10 text-center text-gray-400 font-semibold">Aucune entrée enregistrée aujourd'hui.</div>
+          <div className="p-6 text-center text-gray-400 font-semibold">Aucune entrée enregistrée aujourd'hui.</div>
         ) : (
           <div className="divide-y divide-gray-100">
             {entries.map((e) => {
@@ -119,13 +119,13 @@ const AccessControlPage: React.FC = () => {
               return (
                 <div key={e.id} className="px-6 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-black text-gray-900 tabular-nums w-12">{fmtTime(e.access_datetime)}</span>
+                    <span className="text-sm font-semibold text-gray-900 tabular-nums w-12">{fmtTime(e.access_datetime)}</span>
                     <div>
                       <p className="font-semibold text-gray-900">{memberName(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}</p>
                       {e.member?.member_number && <p className="text-xs text-gray-400">n° {e.member.member_number}</p>}
                     </div>
                   </div>
-                  <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${refused ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
+                  <span className={`text-[11px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-lg ${refused ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>
                     {refused ? 'Refusé' : 'Entré'}
                   </span>
                 </div>

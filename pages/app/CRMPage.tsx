@@ -353,7 +353,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
     const isPrelevement = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
     if (isPrelevement) {
-      const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${formulaDraft.price} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
+      const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${Number(formulaDraft.price).toFixed(2).replace('.', ',')} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
       if (!ok) return;
     }
     setSavingFormula(true);
@@ -607,7 +607,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         </button>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
         <div className="px-6 border-b border-gray-100 flex items-center overflow-x-auto pwa-hide-scrollbar">
           {['Membres', 'Prospects', 'Partenaires'].map((t) => (
             <button
@@ -636,7 +636,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trier</span>
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Trier</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -680,14 +680,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black uppercase shrink-0" aria-hidden="true">
+                      <div className="w-10 h-10 rounded-xl shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold uppercase shrink-0" aria-hidden="true">
                         {getInitials(member.firstName, member.lastName)}
                       </div>
                       <div>
                         <p className="text-sm font-bold text-gray-900">
                           {member.status === 'PARTNER' ? member.lastName : `${member.firstName} ${member.lastName}`}
                         </p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{member.email || 'Pas d\'email'}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{member.email || 'Pas d\'email'}</p>
                       </div>
                     </div>
                   </td>
@@ -698,7 +698,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <span className="text-sm font-bold text-gray-700">{member.phone || '—'}</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                       member.status === 'MEMBER_ACTIVE' || member.status === 'PARTNER' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                     }`}>
                       {member.status.replace('MEMBER_', '').replace('PROSPECT_', '')}
@@ -717,54 +717,54 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       {/* MODALE AJOUT UNIFIEE */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
             
-            <div className="p-8 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+            <div className="p-5 bg-indigo-600 text-white flex justify-between items-center shrink-0">
               <div className="flex items-center space-x-4">
                 <div className="bg-white/20 p-3 rounded-2xl shadow-inner">
                   <UserPlus size={28} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black">Ajouter un {activeTab.slice(0, -1)}</h2>
-                  <p className="text-indigo-100 text-xs font-bold uppercase tracking-widest mt-0.5">Enregistrement complet du profil</p>
+                  <h2 className="text-2xl font-semibold">Ajouter un {activeTab.slice(0, -1)}</h2>
+                  <p className="text-indigo-100 text-xs font-bold uppercase tracking-wide mt-0.5">Enregistrement complet du profil</p>
                 </div>
               </div>
               <button onClick={closeAddModal} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={24} /></button>
             </div>
 
             {mandateResult && (
-              <div className="p-10 space-y-6 text-center overflow-y-auto">
+              <div className="p-6 space-y-6 text-center overflow-y-auto">
                 <div className="mx-auto w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><CheckCircle2 size={32} /></div>
                 <div>
-                  <h3 className="text-xl font-black text-gray-900">Fiche créée{mandateResult.member_number ? ` (n° ${mandateResult.member_number})` : ''}</h3>
+                  <h3 className="text-xl font-semibold text-gray-900">Fiche créée{mandateResult.member_number ? ` (n° ${mandateResult.member_number})` : ''}</h3>
                   <p className="text-sm font-medium text-gray-500 mt-1">Dernière étape : le client signe son mandat de prélèvement (sur place ou via ce lien).</p>
                 </div>
                 <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left break-all text-xs font-bold text-gray-600">{mandateResult.authorisation_url}</div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <a href={mandateResult.authorisation_url} target="_blank" rel="noreferrer" className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition-colors">Ouvrir la signature</a>
-                  <button type="button" onClick={() => { try { navigator.clipboard?.writeText(mandateResult.authorisation_url); } catch (_) {} }} className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-gray-200 transition-colors">Copier le lien</button>
+                  <a href={mandateResult.authorisation_url} target="_blank" rel="noreferrer" className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-semibold text-sm uppercase tracking-wide hover:bg-indigo-700 transition-colors">Ouvrir la signature</a>
+                  <button type="button" onClick={() => { try { navigator.clipboard?.writeText(mandateResult.authorisation_url); } catch (_) {} }} className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold text-sm uppercase tracking-wide hover:bg-gray-200 transition-colors">Copier le lien</button>
                 </div>
                 <button type="button" onClick={closeAddModal} className="text-xs font-bold text-gray-400 hover:text-gray-600 underline">Terminer</button>
               </div>
             )}
 
             {!mandateResult && (
-            <form onSubmit={handleSaveAdd} className="flex-grow overflow-y-auto p-8 space-y-10 pwa-hide-scrollbar">
+            <form onSubmit={handleSaveAdd} className="flex-grow overflow-y-auto p-5 space-y-6 pwa-hide-scrollbar">
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                <div className="space-y-8">
-                  <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
+                <div className="space-y-6">
+                  <h3 className="text-xs font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
                     <User size={14} /> <span>1. Informations Générales</span>
                   </h3>
 
                   {activeTab !== 'partenaires' && (
                     <div className="flex items-center space-x-4">
-                      <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="w-20 h-20 rounded-3xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-all shrink-0">
+                      <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-all shrink-0">
                         {addPhotoPreview ? <img src={addPhotoPreview} alt="" className="w-full h-full object-cover" /> : <Camera size={22} className="text-gray-300" />}
                       </button>
                       <div>
-                        <p className="text-xs font-black text-gray-700">Photo du membre</p>
+                        <p className="text-xs font-semibold text-gray-700">Photo du membre</p>
                         <p className="text-[10px] font-bold text-gray-400">Importer un fichier ou prendre une photo (tablette/mobile)</p>
                       </div>
                       <input ref={addPhotoInputRef} type="file" accept="image/*" capture="user" onChange={handleAddPhoto} className="hidden" />
@@ -774,11 +774,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {activeTab === 'partenaires' ? (
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom de l'entreprise</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom de l'entreprise</label>
                         <input type="text" required value={partnerCompany} onChange={(e) => setPartnerCompany(e.target.value)} placeholder="FitSupply Ltd" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Catégorie</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Catégorie</label>
                         <select value={partnerCategory} onChange={(e) => setPartnerCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                           <option value="Équipementier">Équipementier</option>
                           <option value="Nutrition">Nutrition</option>
@@ -790,11 +790,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prénom</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prénom</label>
                         <input type="text" required value={addFirstName} onChange={(e) => setAddFirstName(e.target.value)} placeholder="Jean" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom</label>
                         <input type="text" required value={addLastName} onChange={(e) => setAddLastName(e.target.value)} placeholder="Dupont" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                     </div>
@@ -803,11 +803,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {activeTab !== 'partenaires' && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date de Naissance</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Date de Naissance</label>
                         <input type="date" required value={addDob} onChange={(e) => setAddDob(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Métier</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Métier</label>
                         <input type="text" value={addJob} onChange={(e) => setAddJob(e.target.value)} placeholder="Ingénieur, Chef..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                     </div>
@@ -815,13 +815,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                         <Mail size={10} /> <span>Email {activeTab === 'partenaires' ? 'de contact' : ''}</span>
                       </label>
                       <input type="email" required value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="contact@domaine.com" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                         <Phone size={10} /> <span>Téléphone</span>
                       </label>
                       <input type="tel" required value={addPhone} onChange={(e) => setAddPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
@@ -830,45 +830,45 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                         <MapPin size={10} /> <span>Adresse</span>
                       </label>
                       <input type="text" value={addAddress} onChange={(e) => setAddAddress(e.target.value)} placeholder="12 rue des Lilas" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Code postal</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Code postal</label>
                         <input type="text" value={addPostalCode} onChange={(e) => setAddPostalCode(e.target.value)} placeholder="11400" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                       <div className="col-span-2 space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ville</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Ville</label>
                         <input type="text" value={addCity} onChange={(e) => setAddCity(e.target.value)} placeholder="Castelnaudary" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-8">
-                  <h3 className="text-xs font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
+                <div className="space-y-6">
+                  <h3 className="text-xs font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
                     <Target size={14} /> <span>2. {activeTab === 'membres' ? 'Formule & Paiement' : 'Qualification & Suivi'}</span>
                   </h3>
 
                   {activeTab === 'membres' ? (
                     <div className="space-y-5">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Formule d'abonnement</label>
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Formule d'abonnement</label>
                         <select value={addFormula} onChange={(e) => selectFormula(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
                           <option value="">— Choisir une formule —</option>
-                          {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2)} €)</option>)}
+                          {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2).replace('.', ',')} €)</option>)}
                         </select>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prix (€)</label>
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prix (€)</label>
                           <input type="text" value={addPrice} onChange={(e) => setAddPrice(e.target.value)} placeholder="29.90" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Périodicité</label>
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Périodicité</label>
                           <select value={addPeriodicity} onChange={(e) => setAddPeriodicity(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                             <option>Mensuel</option>
                             <option>Trimestriel</option>
@@ -878,11 +878,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-5 bg-indigo-50 rounded-3xl border border-indigo-100">
+                      <div className="flex items-center justify-between p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
                         <div className="flex items-center space-x-3">
                           <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><CreditCard size={20} /></div>
                           <div>
-                            <p className="text-sm font-black text-indigo-900">Prélèvement GoCardless</p>
+                            <p className="text-sm font-semibold text-indigo-900">Prélèvement GoCardless</p>
                             <p className="text-[10px] font-bold text-indigo-400 uppercase">Génère un mandat à faire signer</p>
                           </div>
                         </div>
@@ -893,10 +893,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       {useMandate && <p className="text-[11px] font-bold text-gray-400 px-1">Un lien de signature sera généré : le client le signe sur place (tablette) ou via le lien. L'email est alors obligatoire.</p>}
 
                       {!useMandate && (
-                        <div className="space-y-3 p-5 bg-gray-50 rounded-3xl border border-gray-100">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paiement & période (sans prélèvement)</p>
+                        <div className="space-y-3 p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Paiement & période (sans prélèvement)</p>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
                             <select value={addPaymentMethod} onChange={(e) => setAddPaymentMethod(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
                               <option>Espèces</option>
                               <option>Carte bancaire</option>
@@ -907,11 +907,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Début</label>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Début</label>
                               <input type="date" value={addStartDate} onChange={(e) => onStartChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Durée</label>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Durée</label>
                               <select value={addDuration} onChange={(e) => onDurationChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                                 <option>1 mois</option>
                                 <option>3 mois</option>
@@ -921,7 +921,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fin</label>
+                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Fin</label>
                               <input type="date" value={addEndDate} onChange={(e) => setAddEndDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                             </div>
                           </div>
@@ -931,8 +931,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   ) : (
                     <>
-                      <div className="space-y-4 p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Étape de conversion</label>
+                      <div className="space-y-4 p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Étape de conversion</label>
                         <div className="grid grid-cols-1 gap-2">
                           {activeTab === 'prospects' ? (
                             ['PROSPECT_NEW', 'PROSPECT_FOLLOWUP', 'PROSPECT_TRIAL'].map(status => (
@@ -952,11 +952,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
 
                       {activeTab === 'prospects' && (
-                        <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-3xl border border-indigo-100">
+                        <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
                           <div className="flex items-center space-x-3">
                             <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><Activity size={20} /></div>
                             <div>
-                              <p className="text-sm font-black text-indigo-900">Séance d'essai</p>
+                              <p className="text-sm font-semibold text-indigo-900">Séance d'essai</p>
                               <p className="text-[10px] font-bold text-indigo-400 uppercase">A-t-il testé la salle ?</p>
                             </div>
                           </div>
@@ -968,10 +968,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </>
                   )}
 
-                  <div className="p-6 bg-red-50/50 rounded-3xl border border-red-100 space-y-4">
+                  <div className="p-6 bg-red-50/50 rounded-2xl border border-red-100 space-y-4">
                     <div className="flex items-center space-x-2 text-red-600">
                       <ShieldAlert size={16} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Notes & Informations complémentaires</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide">Notes & Informations complémentaires</span>
                     </div>
                     <div className="w-full">
                       <textarea rows={3} value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Commentaires ou objectifs du membre/prospect..." className="w-full bg-white border border-red-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-red-100"></textarea>
@@ -983,13 +983,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             )}
 
             {!mandateResult && (
-            <div className="p-8 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
+            <div className="p-5 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
                <button onClick={closeAddModal} className="px-6 py-4 text-gray-400 font-bold text-sm hover:text-gray-600">Annuler</button>
                {activeTab === 'membres' ? (
                  <button
                    onClick={handleInscribeMember}
                    disabled={submitting}
-                   className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-60"
+                   className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-60"
                  >
                    <Save size={18} />
                    <span>{submitting ? 'Création…' : (useMandate ? 'Inscrire + générer le mandat' : 'Inscrire le membre')}</span>
@@ -997,7 +997,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                ) : (
                  <button
                   onClick={handleSaveAdd}
-                  className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                  className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
                  >
                    <Save size={18} />
                    <span>Enregistrer le {activeTab.slice(0, -1)}</span>
@@ -1012,7 +1012,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       {/* MODALE DE DETAIL CONTACT ENRICHE (Consultation) */}
       {isDetailModalOpen && selectedContact && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
             
             <div className={`p-10 ${activeTab === 'membres' ? 'bg-indigo-600' : activeTab === 'prospects' ? 'bg-amber-500' : 'bg-slate-800'} text-white flex items-center justify-between shrink-0 relative overflow-hidden`}>
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
@@ -1021,7 +1021,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="w-24 h-24 rounded-[2rem] border-4 border-white/20 shadow-xl bg-white/20 flex items-center justify-center text-3xl font-black uppercase overflow-hidden group relative"
+                    className="w-24 h-24 rounded-2xl border-4 border-white/20 shadow-xl bg-white/20 flex items-center justify-center text-3xl font-semibold uppercase overflow-hidden group relative"
                     title="Ajouter ou changer la photo"
                   >
                     {photoUrl ? (
@@ -1034,14 +1034,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </span>
                   </button>
                   {photoUploading && (
-                    <span className="absolute inset-0 bg-black/50 rounded-[2rem] flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest">Envoi…</span>
+                    <span className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center text-white text-[10px] font-semibold uppercase tracking-wide">Envoi…</span>
                   )}
                   <input ref={photoInputRef} type="file" accept="image/*" capture="user" onChange={handlePhotoChange} className="hidden" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
+                  <h2 className="text-3xl font-semibold">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
                   <div className="flex items-center space-x-3 mt-2">
-                    <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest">
+                    <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide">
                       {activeTab === 'prospects' ? 'Prospect chaud' : activeTab === 'membres' ? (selectedContact.subscription || 'Membre Actif') : selectedContact.category}
                     </span>
                     {activeTab === 'membres' && (
@@ -1058,9 +1058,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             {/* Onglets de navigation interne à la fiche client */}
             {activeTab === 'membres' && (
               <div className="px-10 border-b border-gray-100 flex items-center bg-gray-50/50">
-                <button onClick={() => setDetailTab('profil')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-4 transition-all ${detailTab === 'profil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Profil</button>
-                <button onClick={() => setDetailTab('activite')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-4 transition-all ${detailTab === 'activite' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Visites & Cours</button>
-                <button onClick={() => setDetailTab('finance')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest border-b-4 transition-all ${detailTab === 'finance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Abonnement & Achats</button>
+                <button onClick={() => setDetailTab('profil')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'profil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Profil</button>
+                <button onClick={() => setDetailTab('activite')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'activite' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Visites & Cours</button>
+                <button onClick={() => setDetailTab('finance')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'finance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Abonnement & Achats</button>
               </div>
             )}
 
@@ -1068,54 +1068,54 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
               {isEditing ? (
                 <div className="max-w-2xl mx-auto space-y-6">
-                  <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] flex items-center space-x-2">
+                  <h3 className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
                     <Edit2 size={14} /> <span>Modifier la fiche</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prénom</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prénom</label>
                       <input type="text" value={selectedContact.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom</label>
                       <input type="text" value={selectedContact.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Email</label>
                       <input type="email" value={selectedContact.email || ''} onChange={(e) => updateField('email', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Téléphone</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Téléphone</label>
                       <input type="tel" value={selectedContact.phone || ''} onChange={(e) => updateField('phone', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Abonnement</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Abonnement</label>
                       <input type="text" value={selectedContact.subscription || ''} onChange={(e) => updateField('subscription', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarif (€)</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tarif (€)</label>
                       <input type="number" step="0.01" value={selectedContact.price ?? ''} onChange={(e) => updateField('price', e.target.value === '' ? undefined : Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Statut</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Statut</label>
                       <select value={selectedContact.status === 'MEMBER_ACTIVE' ? 'MEMBER_ACTIVE' : 'MEMBER_INACTIVE'} onChange={(e) => updateField('status', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
                         <option value="MEMBER_ACTIVE">Actif</option>
                         <option value="MEMBER_INACTIVE">Inactif</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
                       <input type="text" value={selectedContact.paymentMethod || ''} onChange={(e) => updateField('paymentMethod', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</label>
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Notes</label>
                     <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
                   </div>
                   <p className="text-[11px] font-bold text-gray-400">L'adresse et la photo (webcam) seront modifiables dans une prochaine étape.</p>
@@ -1124,12 +1124,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               <>
               {/* VUE PROFIL (Commune à tous) */}
               {detailTab === 'profil' && (
-                <div className="space-y-8">
+                <div className="space-y-6">
                   {/* Identifiants compacts : n° adhérent · badge · code clavier */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* N° adhérent */}
                     <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><Hash size={11} /> N° adhérent</p>
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Hash size={11} /> N° adhérent</p>
                       {editingNumber ? (
                         <div className="flex items-center gap-1">
                           <input type="text" value={numberDraft} onChange={(e) => setNumberDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. 338" />
@@ -1138,14 +1138,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-black text-gray-900">{selectedContact.memberNumber || '—'}</span>
+                          <span className="text-lg font-semibold text-gray-900">{selectedContact.memberNumber || '—'}</span>
                           <button type="button" onClick={startEditNumber} className="p-1 text-gray-300 hover:text-indigo-600 transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
                     </div>
                     {/* Badge */}
                     <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><CreditCard size={11} /> Badge</p>
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><CreditCard size={11} /> Badge</p>
                       {editingCard ? (
                         <div className="flex items-center gap-1">
                           <input type="text" value={cardDraft} onChange={(e) => setCardDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-bold" placeholder="ex. 3616701" />
@@ -1155,24 +1155,24 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-black text-gray-900">{selectedContact.cardNumber || '—'}</span>
+                          <span className="text-lg font-semibold text-gray-900">{selectedContact.cardNumber || '—'}</span>
                           <button type="button" onClick={startEditCard} className="p-1 text-gray-300 hover:text-red-600 transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
                     </div>
                     {/* Code clavier */}
                     <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><Hash size={11} /> Code clavier</p>
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Hash size={11} /> Code clavier</p>
                       {editingCode ? (
                         <div className="flex items-center gap-1">
-                          <input type="text" inputMode="numeric" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-widest" placeholder="6 chiffres" />
+                          <input type="text" inputMode="numeric" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-wide" placeholder="6 chiffres" />
                           <button type="button" onClick={handleGenerateCode} title="Générer" className="p-1.5 bg-gray-200 text-gray-600 rounded-lg"><RotateCcw size={13} /></button>
                           <button type="button" onClick={handleSaveCode} disabled={savingCode} className="p-1.5 bg-amber-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
                           <button type="button" onClick={() => setEditingCode(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-black text-gray-900 tracking-[0.15em]">{(selectedContact as any).keypadCode || '—'}</span>
+                          <span className="text-lg font-semibold text-gray-900 tracking-wide">{(selectedContact as any).keypadCode || '—'}</span>
                           <button type="button" onClick={startEditCode} className="p-1 text-gray-300 hover:text-amber-600 transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
@@ -1183,8 +1183,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {packStatus?.is_pack && (
                     <div className={`rounded-2xl p-4 border ${packStatus.remaining === 0 ? 'bg-red-50 border-red-100' : packStatus.remaining <= 3 ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> {packStatus.total === 1 ? 'Séance unique' : `Carte ${packStatus.total} séances`}</span>
-                        <span className={`text-sm font-black ${packStatus.remaining === 0 ? 'text-red-700' : packStatus.remaining <= 3 ? 'text-amber-700' : 'text-green-700'}`}>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> {packStatus.total === 1 ? 'Séance unique' : `Carte ${packStatus.total} séances`}</span>
+                        <span className={`text-sm font-semibold ${packStatus.remaining === 0 ? 'text-red-700' : packStatus.remaining <= 3 ? 'text-amber-700' : 'text-green-700'}`}>
                           {packStatus.remaining === 0 ? 'Épuisée — accès bloqué' : `${packStatus.remaining} séance${packStatus.remaining > 1 ? 's' : ''} restante${packStatus.remaining > 1 ? 's' : ''}`}
                         </span>
                       </div>
@@ -1197,47 +1197,47 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {/* Contrôle d'accès (compact) */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
-                    <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
-                    <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
-                    <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
+                    <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
+                    <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
+                    <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
                   </div>
 
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
-                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><User size={14} /> <span>Contact</span></h3>
+                      <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><User size={14} /> <span>Contact</span></h3>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Email</span>
-                        <span className="text-sm font-black text-gray-900 truncate ml-3">{selectedContact.email || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900 truncate ml-3">{selectedContact.email || '—'}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Téléphone</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.phone || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900">{selectedContact.phone || '—'}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Adresse</span>
-                        <span className="text-sm font-black text-gray-900 text-right ml-3">{selectedContact.address || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900 text-right ml-3">{selectedContact.address || '—'}</span>
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><Award size={14} /> <span>Abonnement</span></h3>
+                      <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><Award size={14} /> <span>Abonnement</span></h3>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Formule</span>
-                        <span className="text-sm font-black text-gray-900 text-right ml-3">{selectedContact.subscription || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900 text-right ml-3">{selectedContact.subscription || '—'}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Tarif</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900">{selectedContact.price != null ? `${Number(selectedContact.price).toFixed(2).replace('.', ',')} €` : '—'}</span>
                       </div>
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Inscription</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.joinDate || '—'}</span>
+                        <span className="text-sm font-semibold text-gray-900">{selectedContact.joinDate || '—'}</span>
                       </div>
                       {selectedContact.emergencyContact?.phone && (
                         <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 flex items-center justify-between">
-                          <span className="text-xs font-black text-red-600">Urgence</span>
-                          <span className="text-sm font-black text-red-900">{selectedContact.emergencyContact.phone}</span>
+                          <span className="text-xs font-semibold text-red-600">Urgence</span>
+                          <span className="text-sm font-semibold text-red-900">{selectedContact.emergencyContact.phone}</span>
                         </div>
                       )}
                       {selectedContact.notes && (
@@ -1255,21 +1255,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               {detailTab === 'activite' && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
+                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
                     <div className="flex items-center gap-2">
                       {packStatus?.is_pack && (
-                        <span className={`text-[11px] font-black px-3 py-1.5 rounded-full ${packStatus.remaining === 0 ? 'bg-red-100 text-red-700' : packStatus.remaining <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        <span className={`text-[11px] font-semibold px-3 py-1.5 rounded-full ${packStatus.remaining === 0 ? 'bg-red-100 text-red-700' : packStatus.remaining <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
                           {packStatus.remaining === 0 ? 'Carte épuisée' : `${packStatus.remaining}/${packStatus.total} restantes`}
                         </span>
                       )}
-                      <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
+                      <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
                     </div>
                   </div>
 
                   {memberVisits.length === 0 && !visitsLoading ? (
-                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
+                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
                       <div className="bg-gray-100 p-4 rounded-2xl text-gray-400 mb-4"><CalendarCheck size={28} /></div>
-                      <p className="text-sm font-black text-gray-700">Aucun passage enregistré</p>
+                      <p className="text-sm font-semibold text-gray-700">Aucun passage enregistré</p>
                       <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les passages au tripode et à la porte apparaîtront ici dès que le membre badgera (ou tapera son code).</p>
                     </div>
                   ) : (
@@ -1285,11 +1285,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                   {denied ? <X size={16} /> : <CheckCircle2 size={16} />}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-black text-gray-900 capitalize">{dt.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
+                                  <p className="text-sm font-semibold text-gray-900 capitalize">{dt.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
                                   <p className="text-[11px] font-bold text-gray-400">{dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{v.identification_method === 'qr_code' ? '' : ''}</p>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${denied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${denied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                                 {denied ? 'Refusé' : 'Entrée'}
                               </span>
                             </div>
@@ -1298,7 +1298,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                       {visitsHasMore && (
                         <div className="flex justify-center pt-2">
-                          <button type="button" onClick={loadMoreVisits} disabled={visitsLoading} className="flex items-center gap-2 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 disabled:opacity-50">
+                          <button type="button" onClick={loadMoreVisits} disabled={visitsLoading} className="flex items-center gap-2 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-gray-200 disabled:opacity-50">
                             <History size={14} /> {visitsLoading ? 'Chargement…' : 'Charger plus'}
                           </button>
                         </div>
@@ -1312,15 +1312,15 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               {detailTab === 'finance' && (activeTab === 'membres') && (
                 <div className="space-y-5">
                   <div className="space-y-3">
-                    <div className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-indigo-100">
+                    <div className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-indigo-100">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement actuel</p>
-                          <button type="button" onClick={editingFormula ? () => setEditingFormula(false) : startEditFormula} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">Abonnement actuel</p>
+                          <button type="button" onClick={editingFormula ? () => setEditingFormula(false) : startEditFormula} className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors">
                             <Edit2 size={11} /> {editingFormula ? 'Fermer' : 'Changer de formule'}
                           </button>
                         </div>
-                        <h4 className="text-xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
+                        <h4 className="text-xl font-semibold">{selectedContact.subscription || 'Non renseigné'}</h4>
                         <p className="text-sm opacity-90">
                           {selectedContact.paymentMethod ? `Paiement : ${selectedContact.paymentMethod}` : 'Mode de paiement non renseigné'}
                           {selectedContact.periodicity ? ` • ${selectedContact.periodicity}` : ''}
@@ -1335,8 +1335,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-3xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
-                        <p className="text-[10px] font-black opacity-80 uppercase mt-1">
+                        <p className="text-3xl font-semibold">{selectedContact.price != null ? `${Number(selectedContact.price).toFixed(2).replace('.', ',')} €` : '—'}</p>
+                        <p className="text-[10px] font-semibold opacity-80 uppercase mt-1">
                           Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
                         </p>
                       </div>
@@ -1357,7 +1357,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       return (
                         <div className="p-5 bg-white border border-gray-100 rounded-2xl space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nouvelle formule</label>
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nouvelle formule</label>
                             <div className="grid grid-cols-1 gap-2">
                               {options.map((o) => {
                                 const active = formulaDraft.label === o.label && Number(formulaDraft.price) === o.price;
@@ -1365,8 +1365,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                   <button key={o.label + o.price} type="button"
                                     onClick={() => setFormulaDraft({ ...formulaDraft, label: o.label, price: String(o.price) })}
                                     className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
-                                    <span className="text-sm font-black text-gray-900">{o.label}</span>
-                                    <span className={`text-sm font-black ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2)} €</span>
+                                    <span className="text-sm font-semibold text-gray-900">{o.label}</span>
+                                    <span className={`text-sm font-semibold ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2).replace('.', ',')} €</span>
                                   </button>
                                 );
                               })}
@@ -1380,7 +1380,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             <p className="text-[11px] font-bold text-gray-400 px-1">Ce membre n'est pas en prélèvement : seule la formule NoResa sera modifiée.</p>
                           )}
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : 'Appliquer la formule'}</button>
+                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : 'Appliquer la formule'}</button>
                             <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
                           </div>
                         </div>
@@ -1391,14 +1391,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {/* Sous-onglets finance */}
                   <div className="flex items-center gap-2 flex-wrap">
                     {([['paiements', 'Paiements'], ['contrats', 'Contrats'], ['ventes', 'Ventes']] as const).map(([key, label]) => (
-                      <button key={key} type="button" onClick={() => setFinanceTab(key)} className={`px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors ${financeTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{label}</button>
+                      <button key={key} type="button" onClick={() => setFinanceTab(key)} className={`px-4 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide transition-colors ${financeTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{label}</button>
                     ))}
                   </div>
 
                   {financeTab === 'paiements' && (<>
                   {/* Paiements */}
                   <div className="space-y-3">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
+                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
                     {memberPayments.length === 0 ? (
                       <p className="text-xs font-bold text-gray-400 px-1">Aucun paiement enregistré pour ce membre.</p>
                     ) : (
@@ -1409,16 +1409,16 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           return (
                             <div key={pay.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl gap-3">
                               <div className="min-w-0">
-                                <p className="text-sm font-black text-gray-900 capitalize truncate">{pay.payment_type || 'Paiement'}{pay.payment_method ? ` · ${pay.payment_method}` : ''}</p>
+                                <p className="text-sm font-semibold text-gray-900 capitalize truncate">{pay.payment_type || 'Paiement'}{pay.payment_method ? ` · ${pay.payment_method}` : ''}</p>
                                 <p className="text-[11px] font-bold text-gray-400">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}</p>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-base font-black text-gray-900">{pay.amount != null ? `${Number(pay.amount).toFixed(2)} €` : '—'}</span>
+                                <span className="text-base font-semibold text-gray-900">{pay.amount != null ? `${Number(pay.amount).toFixed(2).replace('.', ',')} €` : '—'}</span>
                                 {pay.status && (
-                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${ok ? 'bg-green-100 text-green-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{pay.status}</span>
+                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${ok ? 'bg-green-100 text-green-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{pay.status}</span>
                                 )}
                                 {pay.invoice_url && (
-                                  <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100"><FileText size={13} /> Reçu</a>
+                                  <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100"><FileText size={13} /> Reçu</a>
                                 )}
                               </div>
                             </div>
@@ -1431,8 +1431,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
                     <div className="p-4 bg-white rounded-2xl border border-gray-100 space-y-3">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
-                        <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${
+                        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
+                        <span className={`text-[10px] font-semibold uppercase px-3 py-1 rounded-full ${
                           selectedContact.gocardlessStatus === 'mandate_active' ? 'bg-green-100 text-green-700'
                           : selectedContact.gocardlessStatus === 'pending' ? 'bg-amber-100 text-amber-700'
                           : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'bg-blue-100 text-blue-700'
@@ -1449,23 +1449,23 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="bg-gray-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-black text-gray-400 uppercase">Mandat</p>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase">Mandat</p>
                           <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessMandateId || '—'}</p>
                         </div>
                         <div className="bg-gray-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-black text-gray-400 uppercase">Client GoCardless</p>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase">Client GoCardless</p>
                           <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessCustomerId || '—'}</p>
                         </div>
                       </div>
                       {selectedContact.gocardlessCustomerId && (
-                        <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-black text-indigo-600 hover:text-indigo-800">
+                        <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
                           <ChevronRight size={14} /> <span>Ouvrir la fiche dans GoCardless</span>
                         </a>
                       )}
 
                       {/* Prélèvements GoCardless (temps réel) */}
                       <div className="pt-2 border-t border-gray-100">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Prélèvements</p>
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Prélèvements</p>
                         {gcPaymentsLoading ? (
                           <p className="text-xs font-bold text-gray-400">Chargement des prélèvements…</p>
                         ) : memberGcPayments.length === 0 ? (
@@ -1482,10 +1482,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                               return (
                                 <div key={gp.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 gap-3">
                                   <div className="min-w-0">
-                                    <p className="text-sm font-black text-gray-900">{gp.amount != null ? `${gp.amount.toFixed(2)} €` : '—'}</p>
+                                    <p className="text-sm font-semibold text-gray-900">{gp.amount != null ? `${gp.amount.toFixed(2).replace('.', ',')} €` : '—'}</p>
                                     <p className="text-[11px] font-bold text-gray-400 truncate">{when ? new Date(when).toLocaleDateString('fr-FR') : '—'}{gp.description ? ` · ${gp.description}` : ''}</p>
                                   </div>
-                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full shrink-0 ${green ? 'bg-green-100 text-green-700' : red ? 'bg-red-100 text-red-700' : gray ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>{label}</span>
+                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full shrink-0 ${green ? 'bg-green-100 text-green-700' : red ? 'bg-red-100 text-red-700' : gray ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>{label}</span>
                                 </div>
                               );
                             })}
@@ -1496,20 +1496,20 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   ) : (
                     <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
                       <div>
-                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
+                        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
                         <p className="text-[11px] font-medium text-gray-400 mt-1">Aucun mandat de prélèvement pour l'instant. Si ce client a déjà un mandat GoCardless (voir le fichier de rapprochement), colle ses identifiants ici.</p>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] font-black text-gray-400 uppercase">mandate_id</label>
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase">mandate_id</label>
                           <input type="text" value={linkMandateId} onChange={(e) => setLinkMandateId(e.target.value)} placeholder="MD000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-gray-400 uppercase">customer_id (optionnel)</label>
+                          <label className="text-[10px] font-semibold text-gray-400 uppercase">customer_id (optionnel)</label>
                           <input type="text" value={linkCustomerId} onChange={(e) => setLinkCustomerId(e.target.value)} placeholder="CU000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
                         </div>
                       </div>
-                      <button type="button" onClick={handleLinkMandate} disabled={linkingMandate} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                      <button type="button" onClick={handleLinkMandate} disabled={linkingMandate} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-colors disabled:opacity-50">
                         <Link2 size={14} /> {linkingMandate ? 'Rattachement…' : 'Lier ce mandat'}
                       </button>
                     </div>
@@ -1518,7 +1518,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {financeTab === 'contrats' && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
+                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2">
                       <FileText size={14} /> <span>Contrat d'adhésion</span>
                     </h3>
                     {memberContracts.length === 0 ? (
@@ -1528,11 +1528,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         {memberContracts.map((c: any) => (
                           <div key={c.id} className="p-4 border border-gray-100 rounded-2xl bg-white flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-black text-gray-900">Contrat {c.contract_number || '—'}</p>
+                              <p className="text-sm font-semibold text-gray-900">Contrat {c.contract_number || '—'}</p>
                               <p className="text-[11px] font-bold text-gray-400">
                                 {(c.signed_at || c.created_at) ? new Date(c.signed_at || c.created_at).toLocaleDateString('fr-FR') : ''}
                                 {c.formula_label ? ' · ' + c.formula_label : ''}
-                                {c.total_due != null ? ' · ' + Number(c.total_due).toFixed(2) + ' €' : ''}
+                                {c.total_due != null ? ' · ' + Number(c.total_due).toFixed(2).replace('.', ',') + ' €' : ''}
                               </p>
                             </div>
                             {c.pdf_path ? (
@@ -1545,12 +1545,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                   } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
                                 }}
                                 title="Voir / télécharger le contrat signé (PDF)"
-                                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors shrink-0"
+                                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors shrink-0"
                               >
                                 <FileText size={14} /> Contrat
                               </button>
                             ) : (
-                              <span className="text-[11px] font-black text-amber-600 uppercase shrink-0">En cours</span>
+                              <span className="text-[11px] font-semibold text-amber-600 uppercase shrink-0">En cours</span>
                             )}
                           </div>
                         ))}
@@ -1561,13 +1561,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {financeTab === 'ventes' && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
+                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2">
                       <ShoppingBag size={14} /> <span>Historique des achats Boutique</span>
                     </h3>
                     {memberSales.length === 0 ? (
                       <div className="flex flex-col items-center justify-center text-center py-10 px-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
                         <div className="bg-gray-100 p-3 rounded-2xl text-gray-400 mb-3"><ShoppingBag size={24} /></div>
-                        <p className="text-sm font-black text-gray-700">Aucun achat enregistré</p>
+                        <p className="text-sm font-semibold text-gray-700">Aucun achat enregistré</p>
                         <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les ventes rattachées à ce client apparaîtront ici.</p>
                       </div>
                     ) : (
@@ -1576,11 +1576,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <div key={s.id} className="p-4 border border-gray-100 rounded-2xl bg-white">
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <p className="text-sm font-black text-gray-900">Facture {s.invoice_number || '—'}</p>
+                                <p className="text-sm font-semibold text-gray-900">Facture {s.invoice_number || '—'}</p>
                                 <p className="text-[11px] font-bold text-gray-400">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : ''} · {s.payment_method || '—'}</p>
                               </div>
                               <div className="flex items-center gap-3">
-                                <span className="text-lg font-black text-indigo-600">{Number(s.total_ttc || 0).toFixed(2)} €</span>
+                                <span className="text-lg font-semibold text-indigo-600">{Number(s.total_ttc || 0).toFixed(2).replace('.', ',')} €</span>
                                 <button
                                   onClick={async () => {
                                     try {
@@ -1590,7 +1590,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                     } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
                                   }}
                                   title="Voir / télécharger la facture PDF"
-                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors"
                                 >
                                   <FileText size={14} /> Facture
                                 </button>
@@ -1616,13 +1616,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             </div>
 
             {/* Footer de la modale */}
-            <div className="p-10 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
+            <div className="p-6 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
                {isEditing ? (
                  <>
                    <button onClick={cancelEditing} className="text-xs font-bold text-gray-400 hover:text-gray-600">Annuler</button>
                    <button
                      onClick={handleUpdateContact}
-                     className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                     className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
                    >
                      <Save size={18} />
                      <span>Enregistrer</span>
@@ -1643,7 +1643,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                    </button>
                    <div className="flex space-x-4">
                      <button onClick={() => setIsDetailModalOpen(false)} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
-                     <button onClick={startEditing} className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                     <button onClick={startEditing} className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
                        <Edit2 size={18} />
                        <span>Modifier la fiche</span>
                      </button>
@@ -1658,12 +1658,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       {/* MODALE ARCHIVÉS (corbeille) */}
       {showArchived && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden flex flex-col">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="bg-gray-100 text-gray-500 p-2.5 rounded-xl"><Trash2 size={18} /></div>
                 <div>
-                  <h3 className="text-lg font-black text-gray-900">Fiches archivées</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Fiches archivées</h3>
                   <p className="text-xs font-bold text-gray-400">{archivedContacts.length} fiche(s) · données conservées · restaurables</p>
                 </div>
               </div>
@@ -1672,7 +1672,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             <div className="overflow-y-auto p-4">
               {archivedContacts.length === 0 ? (
                 <div className="text-center py-16">
-                  <p className="text-sm font-black text-gray-700">Aucune fiche archivée</p>
+                  <p className="text-sm font-semibold text-gray-700">Aucune fiche archivée</p>
                   <p className="text-xs font-bold text-gray-400 mt-1">Les contacts archivés apparaîtront ici.</p>
                 </div>
               ) : (
@@ -1680,15 +1680,15 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {archivedContacts.map((m: any) => (
                     <div key={m.id} className="flex items-center justify-between gap-4 py-3 px-2">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-black uppercase shrink-0">{getInitials(m.firstName, m.lastName)}</div>
+                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-semibold uppercase shrink-0">{getInitials(m.firstName, m.lastName)}</div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate">{m.firstName} {m.lastName} {m.memberNumber ? <span className="text-gray-400 font-black">· n° {m.memberNumber}</span> : null}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest truncate">{m.email || 'Pas d\'email'}{m.archivedAt ? ` · archivé le ${String(m.archivedAt).split('T')[0]}` : ''}</p>
+                          <p className="text-sm font-bold text-gray-900 truncate">{m.firstName} {m.lastName} {m.memberNumber ? <span className="text-gray-400 font-semibold">· n° {m.memberNumber}</span> : null}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate">{m.email || 'Pas d\'email'}{m.archivedAt ? ` · archivé le ${String(m.archivedAt).split('T')[0]}` : ''}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button type="button" onClick={() => handleRestore(m.id)} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700"><RotateCcw size={14} /> Restaurer</button>
-                        <button type="button" onClick={() => handleHardDelete(m.id)} className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-red-100"><Trash2 size={14} /></button>
+                        <button type="button" onClick={() => handleRestore(m.id)} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-indigo-700"><RotateCcw size={14} /> Restaurer</button>
+                        <button type="button" onClick={() => handleHardDelete(m.id)} className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-100"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}

@@ -72,7 +72,7 @@ const InscriptionPage: React.FC = () => {
   const formula = useMemo<Formula | null>(() => FORMULAS.find((f) => f.key === formulaKey) || null, [formulaKey]);
   const chosenServices = SERVICES.filter((s) => services[s.key]);
   const total = (formula ? formula.price : 0) + BADGE.price + chosenServices.reduce((a, s) => a + s.price, 0);
-  const eur = (n: number) => `${(n || 0).toFixed(2)} €`;
+  const eur = (n: number) => `${(n || 0).toFixed(2).replace('.', ',')} €`;
 
   // Mode de règlement + période par défaut selon la formule
   useEffect(() => {
@@ -206,7 +206,7 @@ const InscriptionPage: React.FC = () => {
         <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
           <PartyPopper className="text-green-600" size={40} />
         </div>
-        <h1 className="text-3xl font-black text-gray-900">Inscription enregistrée !</h1>
+        <h1 className="text-3xl font-semibold text-gray-900">Inscription enregistrée !</h1>
         <p className="text-gray-500 mt-2">Contrat n° <b>{result.contractNumber}</b> généré et signé.</p>
         <p className="text-sm mt-1 text-gray-500">
           {g.emailed ? '✉️ Contrat envoyé par email à l\u2019adhérent.' : (g.email_reason || 'Email non envoyé.')}
@@ -244,7 +244,7 @@ const InscriptionPage: React.FC = () => {
           <UserPlus size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-gray-900">Nouvelle inscription</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Nouvelle inscription</h1>
           <p className="text-sm text-gray-500">Contrat d'adhésion A.R.A.P.S</p>
         </div>
       </div>
@@ -264,7 +264,7 @@ const InscriptionPage: React.FC = () => {
         ))}
       </div>
 
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
         {/* ÉTAPE 0 — Identité */}
         {step === 0 && (
           <div className="space-y-5">
@@ -333,7 +333,7 @@ const InscriptionPage: React.FC = () => {
                   {FORMULAS.filter((f) => f.group === grp).map((f) => (
                     <button key={f.key} onClick={() => setFormulaKey(f.key)} className={`text-left p-4 rounded-2xl border-2 transition ${formulaKey === f.key ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === f.key ? '#fdeaea' : undefined, borderColor: formulaKey === f.key ? RED : undefined }}>
                       <div className="font-bold text-gray-900 text-sm leading-snug">{f.label}</div>
-                      <div className="mt-1 font-black" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
+                      <div className="mt-1 font-semibold" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
                     </button>
                   ))}
                 </div>
@@ -391,7 +391,7 @@ const InscriptionPage: React.FC = () => {
         {/* ÉTAPE 2 — Récap */}
         {step === 2 && (
           <div className="space-y-5">
-            <h2 className="text-lg font-black text-gray-900">Récapitulatif</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Récapitulatif</h2>
             <div className="rounded-2xl border border-gray-100 divide-y">
               <Row k="Adhérent" v={`${civility} ${firstName} ${lastName}`} />
               {(address || city) && <Row k="Adresse" v={[address, [postalCode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ')} />}
@@ -401,7 +401,7 @@ const InscriptionPage: React.FC = () => {
               <Row k="Règlement formule" v={formulaPaymentMethod} />
               <Row k="Badge obligatoire" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />
               {chosenServices.map((s) => <Row key={s.key} k={s.label} v={eur(s.price)} />)}
-              <div className="flex justify-between px-4 py-3 font-black text-base" style={{ color: RED }}>
+              <div className="flex justify-between px-4 py-3 font-semibold text-base" style={{ color: RED }}>
                 <span>TOTAL À L'INSCRIPTION</span><span>{eur(total)}</span>
               </div>
             </div>
@@ -420,7 +420,7 @@ const InscriptionPage: React.FC = () => {
         {/* ÉTAPE 3 — Signature */}
         {step === 3 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-black text-gray-900">Signature de l'adhérent</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Signature de l'adhérent</h2>
             <p className="text-sm text-gray-500">Signez ci-dessous avec le doigt, précédé de la mention « lu et approuvé ».</p>
             <div className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 overflow-hidden">
               <canvas
