@@ -52,6 +52,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [savingFormula, setSavingFormula] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [detailTab, setDetailTab] = useState<'profil' | 'activite' | 'finance'>('profil');
+  const [financeTab, setFinanceTab] = useState<'paiements' | 'contrats' | 'ventes'>('paiements');
   
   // State database & search
   const [contacts, setContacts] = useState<Member[]>([]);
@@ -1349,6 +1350,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     )}
                   </div>
 
+                  {/* Sous-onglets finance */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {([['paiements', 'Paiements'], ['contrats', 'Contrats'], ['ventes', 'Ventes']] as const).map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => setFinanceTab(key)} className={`px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest transition-colors ${financeTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{label}</button>
+                    ))}
+                  </div>
+
+                  {financeTab === 'paiements' && (<>
                   {/* Paiements */}
                   <div className="space-y-3">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
@@ -1467,7 +1476,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </button>
                     </div>
                   )}
+                  </>)}
 
+                  {financeTab === 'contrats' && (
                   <div className="space-y-4">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
                       <FileText size={14} /> <span>Contrat d'adhésion</span>
@@ -1508,7 +1519,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                     )}
                   </div>
+                  )}
 
+                  {financeTab === 'ventes' && (
                   <div className="space-y-4">
                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
                       <ShoppingBag size={14} /> <span>Historique des achats Boutique</span>
@@ -1557,6 +1570,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
               )}
               </>
