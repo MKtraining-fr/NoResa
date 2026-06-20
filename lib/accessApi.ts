@@ -84,3 +84,46 @@ export async function reviewAlert(id: string, status: 'reviewed' | 'dismissed', 
   const { error } = await supabase.from('access_alerts').update({ status, note: note ?? null }).eq('id', id);
   if (error) { console.error('reviewAlert', error); throw error; }
 }
+
+export interface MemberVisit {
+  id: string;
+  access_datetime: string;
+  status: string;            // authorized | denied
+  access_type: string;       // entry | exit
+  identification_method: string | null;
+  card_number: string | null;
+}
+
+/**
+ * Passages d'un membre (les plus récents d'abord).
+ * Pagination : passe `before` = access_datetime du dernier élément déjà affiché.
+ */
+export async function getMemberVisits(
+  memberId: string,
+  opts: { limit?: number; before?: string } = {}
+): Promise<MemberVisit[]> {
+  const limit = opts.limit ?? 15;
+  let q = supabase
+    .from('access_logs')
+    .select('id, access_datetime, status, access_type, identification_method, card_number')
+    .eq('member_id', memberId)
+    .order('access_datetime', { ascending: false })
+    .limit(limit);
+  if (opts.before) q = q.lt('access_datetime', opts.before);
+  const { data, error } = await q;
+  if (error) { console.error('getMemberVisits', error); return []; }
+  return (data ?? []) as MemberVisit[];
+}
+
+/** Nombre de passages autorisés d'un membre depuis une date (par défaut : début du mois courant). */
+export async function getMemberVisitCount(memberId: string, sinceIso?: string): Promise<number> {
+  const since = sinceIso ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const { count, error } = await supabase
+    .from('access_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('member_id', memberId)
+    .eq('status', 'authorized')
+    .gte('access_datetime', since);
+  if (error) { console.error('getMemberVisitCount', error); return 0; }
+  return count ?? 0;
+}

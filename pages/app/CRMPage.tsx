@@ -10,7 +10,8 @@ import {
   RotateCcw, Link2, Hash, FileText
 } from 'lucide-react';
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
-import { enqueueAccessCommand } from '../../lib/accessApi';
+import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, type MemberVisit } from '../../lib/accessApi';
+import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
@@ -39,6 +40,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [photoUploading, setPhotoUploading] = useState(false);
   const [memberSales, setMemberSales] = useState<any[]>([]);
   const [memberContracts, setMemberContracts] = useState<any[]>([]);
+  const [memberPayments, setMemberPayments] = useState<MemberPayment[]>([]);
+  const [memberVisits, setMemberVisits] = useState<MemberVisit[]>([]);
+  const [visitCount, setVisitCount] = useState(0);
+  const [visitsLoading, setVisitsLoading] = useState(false);
+  const [visitsHasMore, setVisitsHasMore] = useState(true);
+  const [editingFormula, setEditingFormula] = useState(false);
+  const [formulaDraft, setFormulaDraft] = useState<{ label: string; price: string; periodicity: string; start: string; end: string; method: string }>({ label: '', price: '', periodicity: '', start: '', end: '', method: '' });
+  const [savingFormula, setSavingFormula] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [detailTab, setDetailTab] = useState<'profil' | 'activite' | 'finance'>('profil');
   
@@ -131,6 +140,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
   // --- Édition d'une fiche depuis la fenêtre de détail ---
   const startEditing = () => {
+    setDetailTab('profil');
     setEditBackup({ ...selectedContact });
     setIsEditing(true);
   };
@@ -291,12 +301,65 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (selectedContact?.id) {
       getMemberSales(selectedContact.id).then((s) => { if (active) setMemberSales(s); });
       getMemberContracts(selectedContact.id).then((c) => { if (active) setMemberContracts(c); });
+      getMemberPayments(selectedContact.id).then((p) => { if (active) setMemberPayments(p); });
+      getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
+      setVisitsLoading(true); setVisitsHasMore(true);
+      getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
+        if (active) { setMemberVisits(v); setVisitsHasMore(v.length === 15); setVisitsLoading(false); }
+      });
     } else {
-      setMemberSales([]);
-      setMemberContracts([]);
+      setMemberSales([]); setMemberContracts([]); setMemberPayments([]);
+      setMemberVisits([]); setVisitCount(0); setVisitsHasMore(true);
     }
     return () => { active = false; };
   }, [selectedContact?.id]);
+
+  const loadMoreVisits = async () => {
+    if (!selectedContact?.id || visitsLoading || memberVisits.length === 0) return;
+    setVisitsLoading(true);
+    const before = memberVisits[memberVisits.length - 1].access_datetime;
+    const more = await getMemberVisits(selectedContact.id, { limit: 15, before });
+    setMemberVisits((prev) => [...prev, ...more]);
+    setVisitsHasMore(more.length === 15);
+    setVisitsLoading(false);
+  };
+
+  const startEditFormula = () => {
+    setFormulaDraft({
+      label: selectedContact?.subscription || '',
+      price: selectedContact?.price != null ? String(selectedContact.price) : '',
+      periodicity: selectedContact?.periodicity || '',
+      start: selectedContact?.subscriptionStart || '',
+      end: selectedContact?.subscriptionEnd || '',
+      method: selectedContact?.paymentMethod || '',
+    });
+    setEditingFormula(true);
+  };
+  const handleSaveFormula = async () => {
+    if (!selectedContact?.id) return;
+    setSavingFormula(true);
+    try {
+      await patchMember(selectedContact.id, {
+        subscription_label: formulaDraft.label || null,
+        price: formulaDraft.price === '' ? null : Number(formulaDraft.price),
+        periodicity: formulaDraft.periodicity || null,
+        subscription_start: formulaDraft.start || null,
+        subscription_end: formulaDraft.end || null,
+        payment_method_label: formulaDraft.method || null,
+      });
+      updateField('subscription', formulaDraft.label);
+      updateField('price', formulaDraft.price === '' ? null : Number(formulaDraft.price));
+      updateField('periodicity', formulaDraft.periodicity);
+      updateField('subscriptionStart', formulaDraft.start);
+      updateField('subscriptionEnd', formulaDraft.end);
+      updateField('paymentMethod', formulaDraft.method);
+      setContacts(await getMembers());
+      setEditingFormula(false);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible de modifier la formule.");
+    } finally { setSavingFormula(false); }
+  };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -969,7 +1032,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     {activeTab === 'membres' && (
                       <span className="flex items-center text-[10px] font-bold">
                         <Zap size={10} className="mr-1" /> N° adhérent {selectedContact.memberNumber || '—'}
-                        <button type="button" onClick={() => { setDetailTab('finance'); startEditNumber(); }} title="Modifier le numéro d'adhérent" className="ml-2 inline-flex items-center justify-center p-1 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"><Edit2 size={11} /></button>
                       </span>
                     )}
                   </div>
@@ -1047,52 +1109,108 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               <>
               {/* VUE PROFIL (Commune à tous) */}
               {detailTab === 'profil' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <div className="space-y-8">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
-                      <User size={14} /> <span>Informations de contact</span>
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Email</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.email}</span>
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Téléphone</span>
-                        <span className="text-sm font-black text-gray-900">{selectedContact.phone || 'Non renseigné'}</span>
-                      </div>
-                      <div className="flex flex-col p-4 bg-gray-50 rounded-2xl space-y-2">
-                        <span className="text-xs font-bold text-gray-400">Adresse postale</span>
-                        <span className="text-sm font-black text-gray-900 leading-relaxed">{selectedContact.address || 'Non renseignée'}</span>
-                      </div>
+                <div className="space-y-8">
+                  {/* Identifiants compacts : n° adhérent · badge · code clavier */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* N° adhérent */}
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><Hash size={11} /> N° adhérent</p>
+                      {editingNumber ? (
+                        <div className="flex items-center gap-1">
+                          <input type="text" value={numberDraft} onChange={(e) => setNumberDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. 338" />
+                          <button type="button" onClick={handleSaveNumber} disabled={savingNumber} className="p-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingNumber(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-black text-gray-900">{selectedContact.memberNumber || '—'}</span>
+                          <button type="button" onClick={startEditNumber} className="p-1 text-gray-300 hover:text-indigo-600 transition-colors"><Edit2 size={13} /></button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Badge */}
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><CreditCard size={11} /> Badge</p>
+                      {editingCard ? (
+                        <div className="flex items-center gap-1">
+                          <input type="text" value={cardDraft} onChange={(e) => setCardDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-bold" placeholder="ex. 3616701" />
+                          <button type="button" onClick={handleGenerateCard} title="Générer" className="p-1.5 bg-gray-200 text-gray-600 rounded-lg"><RotateCcw size={13} /></button>
+                          <button type="button" onClick={handleSaveCard} disabled={savingCard} className="p-1.5 bg-red-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingCard(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-black text-gray-900">{selectedContact.cardNumber || '—'}</span>
+                          <button type="button" onClick={startEditCard} className="p-1 text-gray-300 hover:text-red-600 transition-colors"><Edit2 size={13} /></button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Code clavier */}
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1"><Hash size={11} /> Code clavier</p>
+                      {editingCode ? (
+                        <div className="flex items-center gap-1">
+                          <input type="text" inputMode="numeric" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-widest" placeholder="6 chiffres" />
+                          <button type="button" onClick={handleGenerateCode} title="Générer" className="p-1.5 bg-gray-200 text-gray-600 rounded-lg"><RotateCcw size={13} /></button>
+                          <button type="button" onClick={handleSaveCode} disabled={savingCode} className="p-1.5 bg-amber-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingCode(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-black text-gray-900 tracking-[0.15em]">{(selectedContact as any).keypadCode || '—'}</span>
+                          <button type="button" onClick={startEditCode} className="p-1 text-gray-300 hover:text-amber-600 transition-colors"><Edit2 size={13} /></button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="space-y-8">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2">
-                      <ShieldAlert size={14} /> <span>Abonnement & Divers</span>
-                    </h3>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Abonnement</span>
-                        <span className="text-sm font-black text-gray-900 text-right">{selectedContact.subscription || 'Non renseigné'}</span>
+                  {/* Contrôle d'accès (compact) */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
+                    <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
+                    <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
+                    <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
+                  </div>
+
+                  {/* Contact + abonnement résumé */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><User size={14} /> <span>Contact</span></h3>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-400">Email</span>
+                        <span className="text-sm font-black text-gray-900 truncate ml-3">{selectedContact.email || '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-400">Téléphone</span>
+                        <span className="text-sm font-black text-gray-900">{selectedContact.phone || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-400">Adresse</span>
+                        <span className="text-sm font-black text-gray-900 text-right ml-3">{selectedContact.address || '—'}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><Award size={14} /> <span>Abonnement</span></h3>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-400">Formule</span>
+                        <span className="text-sm font-black text-gray-900 text-right ml-3">{selectedContact.subscription || '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
                         <span className="text-xs font-bold text-gray-400">Tarif</span>
                         <span className="text-sm font-black text-gray-900">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
-                        <span className="text-xs font-bold text-gray-400">Date d'inscription</span>
+                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                        <span className="text-xs font-bold text-gray-400">Inscription</span>
                         <span className="text-sm font-black text-gray-900">{selectedContact.joinDate || '—'}</span>
                       </div>
                       {selectedContact.emergencyContact?.phone && (
-                        <div className="p-4 bg-red-50/50 rounded-2xl border border-red-100 flex items-center justify-between">
-                          <span className="text-xs font-black text-red-600">Urgence : {selectedContact.emergencyContact.name || 'Contact'}</span>
+                        <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 flex items-center justify-between">
+                          <span className="text-xs font-black text-red-600">Urgence</span>
                           <span className="text-sm font-black text-red-900">{selectedContact.emergencyContact.phone}</span>
                         </div>
                       )}
                       {selectedContact.notes && (
-                        <div className="flex flex-col p-4 bg-amber-50/60 rounded-2xl border border-amber-100 space-y-2">
+                        <div className="flex flex-col p-3 bg-amber-50/60 rounded-xl border border-amber-100 space-y-1">
                           <span className="text-xs font-bold text-amber-600">Notes</span>
                           <span className="text-sm font-bold text-gray-800 leading-relaxed">{selectedContact.notes}</span>
                         </div>
@@ -1104,162 +1222,154 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
               {/* VUE ACTIVITE (Spécifique Client) */}
               {detailTab === 'activite' && (
-                <div className="space-y-6">
-                  <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
-                    <div className="bg-gray-100 p-4 rounded-2xl text-gray-400 mb-4"><CalendarCheck size={28} /></div>
-                    <p className="text-sm font-black text-gray-700">Aucune visite enregistrée pour l'instant</p>
-                    <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les visites et réservations apparaîtront ici une fois le contrôle d'accès et le planning connectés à la base.</p>
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
+                    <span className="text-[11px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
                   </div>
+
+                  {memberVisits.length === 0 && !visitsLoading ? (
+                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-[2rem] bg-gray-50/50">
+                      <div className="bg-gray-100 p-4 rounded-2xl text-gray-400 mb-4"><CalendarCheck size={28} /></div>
+                      <p className="text-sm font-black text-gray-700">Aucun passage enregistré</p>
+                      <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les passages au tripode et à la porte apparaîtront ici dès que le membre badgera (ou tapera son code).</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        {memberVisits.map((v) => {
+                          const dt = new Date(v.access_datetime);
+                          const denied = v.status === 'denied';
+                          return (
+                            <div key={v.id} className="flex items-center justify-between p-3.5 bg-white border border-gray-100 rounded-2xl">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-xl ${denied ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                  {denied ? <X size={16} /> : <CheckCircle2 size={16} />}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-black text-gray-900 capitalize">{dt.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
+                                  <p className="text-[11px] font-bold text-gray-400">{dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{v.identification_method === 'qr_code' ? '' : ''}</p>
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${denied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {denied ? 'Refusé' : 'Entrée'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {visitsHasMore && (
+                        <div className="flex justify-center pt-2">
+                          <button type="button" onClick={loadMoreVisits} disabled={visitsLoading} className="flex items-center gap-2 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 disabled:opacity-50">
+                            <History size={14} /> {visitsLoading ? 'Chargement…' : 'Charger plus'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
 
               {/* VUE FINANCE (Spécifique Client) */}
               {detailTab === 'finance' && (activeTab === 'membres') && (
                 <div className="space-y-12">
-                  <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl shadow-indigo-100">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement actuel</p>
-                      <h4 className="text-2xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
-                      <p className="text-sm opacity-90">
-                        {selectedContact.paymentMethod ? `Paiement : ${selectedContact.paymentMethod}` : 'Mode de paiement non renseigné'}
-                        {selectedContact.periodicity ? ` • ${selectedContact.periodicity}` : ''}
-                      </p>
-                      {selectedContact.paidBy && (
-                        <p className="text-xs opacity-75">Réglé par : {selectedContact.paidBy}</p>
-                      )}
-                      {(selectedContact.subscriptionStart || selectedContact.subscriptionEnd) && (
-                        <p className="text-xs opacity-90 font-bold mt-1">
-                          Période : {selectedContact.subscriptionStart || '—'} → {selectedContact.subscriptionEnd || '—'}
+                  <div className="space-y-3">
+                    <div className="p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] text-white flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl shadow-indigo-100">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Abonnement actuel</p>
+                          <button type="button" onClick={editingFormula ? () => setEditingFormula(false) : startEditFormula} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors">
+                            <Edit2 size={11} /> {editingFormula ? 'Fermer' : 'Changer de formule'}
+                          </button>
+                        </div>
+                        <h4 className="text-2xl font-black">{selectedContact.subscription || 'Non renseigné'}</h4>
+                        <p className="text-sm opacity-90">
+                          {selectedContact.paymentMethod ? `Paiement : ${selectedContact.paymentMethod}` : 'Mode de paiement non renseigné'}
+                          {selectedContact.periodicity ? ` • ${selectedContact.periodicity}` : ''}
                         </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-4xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
-                      <p className="text-[10px] font-black opacity-80 uppercase mt-1">
-                        Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Numéro d'adhérent (modifiable) */}
-                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl"><Hash size={18} /></div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Numéro d'adhérent</p>
-                        {editingNumber ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="text"
-                              value={numberDraft}
-                              onChange={(e) => setNumberDraft(e.target.value)}
-                              className="w-28 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
-                              placeholder="ex. 338"
-                            />
-                            <button type="button" onClick={handleSaveNumber} disabled={savingNumber} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50">
-                              <Save size={14} /> {savingNumber ? '…' : 'OK'}
-                            </button>
-                            <button type="button" onClick={() => setEditingNumber(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
-                          </div>
-                        ) : (
-                          <p className="text-2xl font-black text-gray-900">{selectedContact.memberNumber || '—'}</p>
+                        {selectedContact.paidBy && (
+                          <p className="text-xs opacity-75">Réglé par : {selectedContact.paidBy}</p>
+                        )}
+                        {(selectedContact.subscriptionStart || selectedContact.subscriptionEnd) && (
+                          <p className="text-xs opacity-90 font-bold mt-1">
+                            Période : {selectedContact.subscriptionStart || '—'} → {selectedContact.subscriptionEnd || '—'}
+                          </p>
                         )}
                       </div>
+                      <div className="text-right">
+                        <p className="text-4xl font-black">{selectedContact.price != null ? `${selectedContact.price} €` : '—'}</p>
+                        <p className="text-[10px] font-black opacity-80 uppercase mt-1">
+                          Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
+                        </p>
+                      </div>
                     </div>
-                    {!editingNumber && (
-                      <button type="button" onClick={startEditNumber} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
-                        <Edit2 size={14} /> Modifier
-                      </button>
+
+                    {editingFormula && (
+                      <div className="p-6 bg-white border border-gray-100 rounded-[1.5rem] space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Formule</label>
+                            <input type="text" value={formulaDraft.label} onChange={(e) => setFormulaDraft({ ...formulaDraft, label: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Abonnement annuel" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarif (€)</label>
+                            <input type="number" inputMode="decimal" value={formulaDraft.price} onChange={(e) => setFormulaDraft({ ...formulaDraft, price: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. 45" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Périodicité</label>
+                            <input type="text" value={formulaDraft.periodicity} onChange={(e) => setFormulaDraft({ ...formulaDraft, periodicity: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Mensuel" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mode de paiement</label>
+                            <input type="text" value={formulaDraft.method} onChange={(e) => setFormulaDraft({ ...formulaDraft, method: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. Espèces" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Début</label>
+                            <input type="date" value={formulaDraft.start} onChange={(e) => setFormulaDraft({ ...formulaDraft, start: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fin</label>
+                            <input type="date" value={formulaDraft.end} onChange={(e) => setFormulaDraft({ ...formulaDraft, end: e.target.value })} className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Enregistrement…' : 'Enregistrer la formule'}</button>
+                          <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  {/* Numéro de badge / carte (contrôle d'accès) */}
-                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-red-50 text-red-600 p-2.5 rounded-xl"><CreditCard size={18} /></div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Numéro de badge</p>
-                        {editingCard ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="text"
-                              value={cardDraft}
-                              onChange={(e) => setCardDraft(e.target.value)}
-                              className="w-36 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-bold"
-                              placeholder="ex. 3616701"
-                            />
-                            <button type="button" onClick={handleGenerateCard} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-black text-xs uppercase hover:bg-gray-200">Générer</button>
-                            <button type="button" onClick={handleSaveCard} disabled={savingCard} className="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
-                              <Save size={14} /> {savingCard ? '…' : 'OK'}
-                            </button>
-                            <button type="button" onClick={() => setEditingCard(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
-                          </div>
-                        ) : (
-                          <p className="text-2xl font-black text-gray-900">{selectedContact.cardNumber || '—'}</p>
-                        )}
+                  {/* Paiements */}
+                  <div className="space-y-3">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
+                    {memberPayments.length === 0 ? (
+                      <p className="text-xs font-bold text-gray-400 px-1">Aucun paiement enregistré pour ce membre.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {memberPayments.map((pay) => {
+                          const ok = (pay.status || '').toLowerCase() === 'paid' || (pay.status || '').toLowerCase() === 'completed' || (pay.status || '').toLowerCase() === 'confirmed';
+                          const failed = (pay.status || '').toLowerCase() === 'failed' || (pay.status || '').toLowerCase() === 'cancelled';
+                          return (
+                            <div key={pay.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl gap-3">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-gray-900 capitalize truncate">{pay.payment_type || 'Paiement'}{pay.payment_method ? ` · ${pay.payment_method}` : ''}</p>
+                                <p className="text-[11px] font-bold text-gray-400">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}</p>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-base font-black text-gray-900">{pay.amount != null ? `${Number(pay.amount).toFixed(2)} €` : '—'}</span>
+                                {pay.status && (
+                                  <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full ${ok ? 'bg-green-100 text-green-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{pay.status}</span>
+                                )}
+                                {pay.invoice_url && (
+                                  <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-100"><FileText size={13} /> Reçu</a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                    {!editingCard && (
-                      <button type="button" onClick={startEditCard} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
-                        <Edit2 size={14} /> Modifier
-                      </button>
                     )}
-                  </div>
-
-                  {/* Code clavier (6 chiffres) — tapé au clavier du tripode, écrit dans Password côté contrôleur */}
-                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><Hash size={18} /></div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Code clavier</p>
-                        {editingCode ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={codeDraft}
-                              onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                              className="w-32 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-widest"
-                              placeholder="6 chiffres"
-                            />
-                            <button type="button" onClick={handleGenerateCode} className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl font-black text-xs uppercase hover:bg-gray-200">Générer</button>
-                            <button type="button" onClick={handleSaveCode} disabled={savingCode} className="flex items-center gap-1 bg-amber-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-amber-700 disabled:opacity-50">
-                              <Save size={14} /> {savingCode ? '…' : 'OK'}
-                            </button>
-                            <button type="button" onClick={() => setEditingCode(false)} className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl font-black text-xs uppercase hover:bg-gray-200"><X size={14} /></button>
-                          </div>
-                        ) : (
-                          <p className="text-2xl font-black text-gray-900 tracking-[0.2em]">{(selectedContact as any).keypadCode || '—'}</p>
-                        )}
-                      </div>
-                    </div>
-                    {!editingCode && (
-                      <button type="button" onClick={startEditCode} className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">
-                        <Edit2 size={14} /> Modifier
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Contrôle d'accès (commandes envoyées au contrôleur via le pont) */}
-                  <div className="p-6 bg-white rounded-[2rem] border border-gray-100">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 mb-3">
-                      <ShieldAlert size={14} /> <span>Contrôle d'accès</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy}
-                        className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-black disabled:opacity-50">
-                        <UserCheck size={14} /> Activer l'accès
-                      </button>
-                      <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy}
-                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-green-700 disabled:opacity-50">
-                        <CheckCircle2 size={14} /> Débloquer
-                      </button>
-                      <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy}
-                        className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-700 disabled:opacity-50">
-                        <X size={14} /> Bloquer
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-gray-400 mt-2">Les commandes sont appliquées sur le contrôleur par le pont, en quelques secondes.</p>
                   </div>
 
                   {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
