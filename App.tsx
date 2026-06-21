@@ -29,12 +29,15 @@ const SurveillancePage = lazy(() => import('./pages/app/SurveillancePage'));
 const AccessControlPage = lazy(() => import('./pages/app/AccessControlPage'));
 const InscriptionPage = lazy(() => import('./pages/app/InscriptionPage'));
 
-const MemberDashboard = lazy(() => import('./pages/member/MemberDashboard'));
+const MemberHome = lazy(() => import('./pages/member/MemberHome'));
 const MemberReservations = lazy(() => import('./pages/member/MemberReservations'));
 const MemberSubscription = lazy(() => import('./pages/member/MemberSubscription'));
 const MemberProfile = lazy(() => import('./pages/member/MemberProfile'));
 const MemberNotifications = lazy(() => import('./pages/member/MemberNotifications'));
 const MemberMessages = lazy(() => import('./pages/member/MemberMessages'));
+const MemberDossier = lazy(() => import('./pages/member/MemberDossier'));
+const MemberInfos = lazy(() => import('./pages/member/MemberInfos'));
+const MemberParrainage = lazy(() => import('./pages/member/MemberParrainage'));
 
 // Écran d'attente pendant le chargement d'une page
 const PageLoader: React.FC = () => (
@@ -112,12 +115,15 @@ const App: React.FC = () => {
 
           {/* Member Space Routes */}
           <Route path="/membre" element={<ProtectedRoute space="member"><MemberLayout /></ProtectedRoute>}>
-            <Route index element={<MemberDashboard />} />
+            <Route index element={<MemberHome />} />
             <Route path="reservations" element={<MemberReservations />} />
             <Route path="mon-abonnement" element={<MemberSubscription />} />
             <Route path="profil" element={<MemberProfile />} />
             <Route path="notifications" element={<MemberNotifications />} />
             <Route path="messagerie" element={<MemberMessages />} />
+            <Route path="dossier" element={<MemberDossier />} />
+            <Route path="infos" element={<MemberInfos />} />
+            <Route path="parrainage" element={<MemberParrainage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
