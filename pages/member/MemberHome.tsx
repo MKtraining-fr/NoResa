@@ -10,6 +10,7 @@ import {
   getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus,
   type MyMember, type HourOccupancy, type MyGym, type MyPackStatus,
 } from '../../lib/memberSelfApi';
+import { startInstantPayment } from '../../lib/gocardless';
 
 /**
  * Accueil de l'espace adhérent : pass d'accès QR, solde de carnet + recharge,
@@ -194,44 +195,51 @@ const RachatCard: React.FC<{ pack: MyPackStatus; onRecharge: () => void }> = ({ 
 
 const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const PRODUCTS = [
-    { key: 'pack10', label: 'Pack de 10 séances', sub: '10 entrées', price: '45,00 €' },
+    { key: 'carnet', label: 'Pack de 10 séances', sub: '10 entrées (cumulées avec ton solde)', price: '45,00 €' },
     { key: 'mois', label: '1 mois', sub: 'Accès illimité 30 jours', price: '40,00 €' },
     { key: 'seance', label: 'Séance à l’unité', sub: '1 entrée', price: '5,00 €' },
-  ];
-  const [key, setKey] = useState('pack10');
-  const [sent, setSent] = useState(false);
+  ] as const;
+  const [key, setKey] = useState<'carnet' | 'mois' | 'seance'>('carnet');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const pay = async () => {
+    setBusy(true); setErr('');
+    try {
+      const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
+      const { authorisation_url } = await startInstantPayment(key, redirect);
+      const w = window.open(authorisation_url, '_blank');
+      if (!w) window.location.href = authorisation_url;
+      onClose();
+    } catch (e: any) {
+      setErr(e?.message || 'Paiement indisponible pour le moment.');
+      setBusy(false);
+    }
+  };
+
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-white rounded-t-[30px] px-5 pt-5 pb-7 animate-in slide-in-from-bottom duration-300">
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-        {!sent ? (
-          <>
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand">Recharger</p>
-            <p className="font-black text-xl text-gray-900 mt-0.5">Choisis ton produit</p>
-            <div className="mt-3.5 flex flex-col gap-2">
-              {PRODUCTS.map((p) => {
-                const a = key === p.key;
-                return (
-                  <button key={p.key} onClick={() => setKey(p.key)} className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 bg-white border-2 ${a ? 'border-brand' : 'border-gray-100'}`}>
-                    <div className="flex-1 text-left"><p className="font-extrabold text-[14px] text-gray-900">{p.label}</p><p className="text-[11px] text-gray-400 font-semibold">{p.sub}</p></div>
-                    <span className="font-black text-[16px] text-brand whitespace-nowrap">{p.price}</span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${a ? 'border-brand' : 'border-gray-300'}`}>{a && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <button onClick={() => setSent(true)} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px]">Continuer</button>
-            <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">Paiement en ligne (prélèvement) bientôt disponible.</p>
-          </>
-        ) : (
-          <div className="text-center py-2">
-            <div className="w-[70px] h-[70px] rounded-full bg-brand-soft flex items-center justify-center mx-auto text-brand"><Plus size={34} strokeWidth={2.2} /></div>
-            <p className="font-black text-[20px] text-gray-900 mt-4">Recharge à venir</p>
-            <p className="text-[13px] text-gray-500 font-medium mt-1.5 px-4">Le paiement en ligne arrive très bientôt. En attendant, passe à l'accueil ou écris-nous pour recharger.</p>
-            <Link to="/membre/messagerie" onClick={onClose} className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px]"><MessageCircle size={16} /> Prévenir l'équipe</Link>
-            <button onClick={onClose} className="mt-2 w-full bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold text-[14px]">Fermer</button>
-          </div>
-        )}
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand">Recharger</p>
+        <p className="font-black text-xl text-gray-900 mt-0.5">Choisis ton produit</p>
+        <div className="mt-3.5 flex flex-col gap-2">
+          {PRODUCTS.map((p) => {
+            const a = key === p.key;
+            return (
+              <button key={p.key} onClick={() => setKey(p.key)} className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 bg-white border-2 ${a ? 'border-brand' : 'border-gray-100'}`}>
+                <div className="flex-1 text-left"><p className="font-extrabold text-[14px] text-gray-900">{p.label}</p><p className="text-[11px] text-gray-400 font-semibold">{p.sub}</p></div>
+                <span className="font-black text-[16px] text-brand whitespace-nowrap">{p.price}</span>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${a ? 'border-brand' : 'border-gray-300'}`}>{a && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}</div>
+              </button>
+            );
+          })}
+        </div>
+        {err && <p className="text-[11px] text-red-600 font-semibold mt-3 text-center">{err}</p>}
+        <button onClick={pay} disabled={busy} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px] disabled:opacity-60">
+          {busy ? 'Connexion à ta banque…' : 'Payer & valider'}
+        </button>
+        <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">Paiement instantané via ta banque (open banking) · accès débloqué en quelques minutes.</p>
       </div>
     </div>
   );
