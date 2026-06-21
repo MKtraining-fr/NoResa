@@ -1,40 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2, Mail } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 /**
- * Auto-inscription publique d'un prospect (formule avec engagement, prélèvement).
- * Appelle l'Edge Function `prospect-register` puis redirige vers la signature
- * du mandat SEPA. L'adhérent reçoit ensuite l'e-mail d'activation (mot de passe).
+ * Auto-inscription publique — création d'un PROFIL uniquement.
+ * Pas de formule ni de mandat : une fois le mot de passe créé (e-mail) et
+ * connecté, l'adhérent achète sa première séance. Les abonnements avec
+ * engagement se souscrivent en salle.
  */
-
-const FORMULAS = [
-  { key: 'classique', label: 'Formule classique', sub: 'Accès illimité · engagement 12 mois', price: '29,90 €/mois' },
-  { key: 'famille', label: 'Famille / Étudiant', sub: 'Tarif réduit · engagement 12 mois', price: '25,90 €/mois' },
-  { key: 'suivi', label: 'Suivi + Formation', sub: 'Accompagnement coaching · engagement 12 mois', price: '59,90 €/mois' },
-];
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prospect-register`;
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-// Clé publique Turnstile (anti-robot). Si absente, le widget ne s'affiche pas
-// et la vérification serveur reste inactive (tant que le secret n'est pas posé).
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+// Turnstile ne fonctionne pas en WebView native : on ne l'affiche que sur le web.
+const USE_TURNSTILE = !!TURNSTILE_SITE_KEY && !Capacitor.isNativePlatform();
 
 const RegisterMemberPage: React.FC = () => {
   const navigate = useNavigate();
   const [f, setF] = useState({
-    civility: 'M.', firstName: '', lastName: '', birthDate: '', nationality: '',
-    email: '', phone: '', address: '', postalCode: '', city: '', profession: '',
-    formulaKey: 'classique', consentCga: false, consentMedical: false,
+    firstName: '', lastName: '', email: '', phone: '',
+    address: '', postalCode: '', city: '',
+    consentCga: false, consentMedical: false,
   });
   const set = (k: string, v: any) => setF((s) => ({ ...s, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
   const [token, setToken] = useState('');
   const widgetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return;
+    if (!USE_TURNSTILE) return;
     const render = () => {
       const ts = (window as any).turnstile;
       if (ts && widgetRef.current && !widgetRef.current.hasChildNodes()) {
@@ -53,18 +50,17 @@ const RegisterMemberPage: React.FC = () => {
     if (!f.firstName.trim() || !f.lastName.trim()) { setErr('Prénom et nom obligatoires.'); return; }
     if (!/^\S+@\S+\.\S+$/.test(f.email)) { setErr('E-mail invalide.'); return; }
     if (!f.consentCga || !f.consentMedical) { setErr('Merci de cocher les deux déclarations.'); return; }
-    if (TURNSTILE_SITE_KEY && !token) { setErr('Merci de valider le test anti-robot.'); return; }
+    if (USE_TURNSTILE && !token) { setErr('Merci de valider le test anti-robot.'); return; }
     setBusy(true);
     try {
       const res = await fetch(FN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': ANON, 'Authorization': `Bearer ${ANON}` },
-        body: JSON.stringify({ ...f, turnstileToken: token, redirectUrl: `${window.location.origin}${window.location.pathname}#/membre` }),
+        body: JSON.stringify({ ...f, turnstileToken: token }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || "L'inscription a échoué.");
-      // Redirection vers la signature du mandat SEPA
-      window.location.href = j.authorisation_url;
+      setDone(true);
     } catch (e: any) {
       setErr(e?.message || "Inscription indisponible pour le moment.");
       setBusy(false);
@@ -76,49 +72,44 @@ const RegisterMemberPage: React.FC = () => {
       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
   );
 
+  if (done) {
+    return (
+      <div className="min-h-screen bg-slate-50 font-sans flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-100 p-7 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-50 text-green-600 flex items-center justify-center mx-auto"><CheckCircle2 size={36} /></div>
+          <h1 className="text-2xl font-extrabold text-gray-900 mt-4">Compte créé 🎉</h1>
+          <p className="text-gray-500 mt-2 text-sm leading-relaxed">
+            Un e-mail vient de t'être envoyé pour <b>créer ton mot de passe</b>. Une fois connecté,
+            tu pourras prendre ta première séance directement depuis l'app.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2 text-[12px] font-bold text-gray-400">
+            <Mail size={15} /> Pense à vérifier tes spams
+          </div>
+          <button onClick={() => navigate('/connexion')} className="mt-6 w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl">Aller à la connexion</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans px-4 py-8">
       <div className="max-w-md mx-auto">
         <button onClick={() => navigate('/connexion')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-4"><ArrowLeft size={16} /> Connexion</button>
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl shadow-xl mb-4"><ShieldCheck className="text-white w-7 h-7" /></div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Je m'inscris</h1>
-          <p className="text-gray-500 mt-1 text-sm">Quelques infos, puis vous signez votre mandat et recevez votre accès.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">Créer mon compte</h1>
+          <p className="text-gray-500 mt-1 text-sm">Quelques infos pour créer ton profil. Tu prendras ta première séance une fois connecté.</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-5 space-y-5">
           {err && <div className="p-3.5 bg-red-50 border border-red-100 text-red-600 rounded-2xl flex items-center gap-2 text-sm font-medium"><AlertCircle size={16} className="shrink-0" /><span>{err}</span></div>}
 
-          {/* Formule */}
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Ma formule</p>
-            <div className="space-y-2">
-              {FORMULAS.map((o) => {
-                const a = f.formulaKey === o.key;
-                return (
-                  <button key={o.key} type="button" onClick={() => set('formulaKey', o.key)} className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 border-2 text-left ${a ? 'border-indigo-600 bg-indigo-50/40' : 'border-gray-100'}`}>
-                    <div className="flex-1"><p className="font-extrabold text-sm text-gray-900">{o.label}</p><p className="text-[11px] text-gray-400 font-semibold">{o.sub}</p></div>
-                    <span className="font-black text-indigo-600 text-sm whitespace-nowrap">{o.price}</span>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${a ? 'border-indigo-600' : 'border-gray-300'}`}>{a && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Identité */}
           <div className="space-y-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Mes informations</p>
-            <div className="flex gap-2">
-              <select value={f.civility} onChange={(e) => set('civility', e.target.value)} className="bg-slate-50 border border-slate-100 rounded-2xl px-3 py-3 text-sm font-medium outline-none">
-                <option>M.</option><option>Mme</option>
-              </select>
-              <div className="flex-1">{input('firstName', 'Prénom')}</div>
-            </div>
-            {input('lastName', 'Nom')}
             <div className="grid grid-cols-2 gap-2">
-              <input type="date" value={f.birthDate} onChange={(e) => set('birthDate', e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none" />
-              {input('nationality', 'Nationalité')}
+              {input('firstName', 'Prénom')}
+              {input('lastName', 'Nom')}
             </div>
             {input('email', 'E-mail', 'email')}
             {input('phone', 'Téléphone', 'tel')}
@@ -127,7 +118,6 @@ const RegisterMemberPage: React.FC = () => {
               {input('postalCode', 'Code postal')}
               {input('city', 'Ville')}
             </div>
-            {input('profession', 'Profession (facultatif)')}
           </div>
 
           {/* Déclarations */}
@@ -135,7 +125,7 @@ const RegisterMemberPage: React.FC = () => {
             <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Déclarations</p>
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input type="checkbox" checked={f.consentCga} onChange={(e) => set('consentCga', e.target.checked)} className="mt-0.5 w-4 h-4 rounded text-indigo-600" />
-              <span className="text-xs text-gray-600 font-medium">J'ai pris connaissance des Conditions générales d'adhésion et du Règlement intérieur.</span>
+              <span className="text-xs text-gray-600 font-medium">J'ai pris connaissance des Conditions générales et du Règlement intérieur.</span>
             </label>
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input type="checkbox" checked={f.consentMedical} onChange={(e) => set('consentMedical', e.target.checked)} className="mt-0.5 w-4 h-4 rounded text-indigo-600" />
@@ -143,12 +133,12 @@ const RegisterMemberPage: React.FC = () => {
             </label>
           </div>
 
-          {TURNSTILE_SITE_KEY && <div ref={widgetRef} className="flex justify-center" />}
+          {USE_TURNSTILE && <div ref={widgetRef} className="flex justify-center" />}
           <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
             {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-            <span>{busy ? 'Création…' : 'M\'inscrire & signer mon mandat'}</span>
+            <span>{busy ? 'Création…' : 'Créer mon compte'}</span>
           </button>
-          <p className="text-center text-[10.5px] text-gray-400 font-semibold">Paiement par prélèvement SEPA · vous signez votre mandat à l'étape suivante.</p>
+          <p className="text-center text-[10.5px] text-gray-400 font-semibold">Tu recevras un e-mail pour créer ton mot de passe.</p>
         </div>
       </div>
     </div>
