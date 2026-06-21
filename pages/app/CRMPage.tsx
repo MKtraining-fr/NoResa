@@ -7,9 +7,10 @@ import {
   User, ChevronRight, CheckCircle2, Clock, Trash2,
   ShieldAlert, HeartPulse, ImageIcon, Briefcase as JobIcon,
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera,
-  RotateCcw, Link2, Hash, FileText
+  RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
 } from 'lucide-react';
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
+import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
@@ -133,6 +134,27 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       .then(ps => setFormulaOptions(ps.filter(p => p.category === 'Abonnements & Séances')))
       .catch(() => {});
   }, []);
+
+  // Groupes / sous-groupes (pour les menus de la fiche)
+  const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
+  const [savingGroup, setSavingGroup] = useState(false);
+  useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
+
+  const saveGroupField = async (field: 'group_name' | 'subgroup_name', value: string) => {
+    if (!selectedContact) return;
+    setSavingGroup(true);
+    // maj optimiste (camelCase côté UI) ; changer de groupe vide le sous-groupe
+    setSelectedContact((prev: any) => ({
+      ...prev,
+      ...(field === 'group_name' ? { groupName: value || undefined, subgroupName: undefined } : { subgroupName: value || undefined }),
+    }));
+    try {
+      const patch: any = { [field]: value || null };
+      if (field === 'group_name') patch.subgroup_name = null;
+      await patchMember(selectedContact.id, patch);
+      setContacts(await getMembers());
+    } catch (e) { console.error('saveGroupField', e); } finally { setSavingGroup(false); }
+  };
 
   const openContactDetails = (contact: any) => {
     setSelectedContact({ ...contact });
@@ -1176,6 +1198,39 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <button type="button" onClick={startEditCode} className="p-1 text-gray-300 hover:text-amber-600 transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Groupe / sous-groupe */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Layers size={11} /> Groupe</p>
+                      <select
+                        value={(selectedContact as any).groupName || ''}
+                        onChange={(e) => saveGroupField('group_name', e.target.value)}
+                        disabled={savingGroup}
+                        className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold disabled:opacity-50"
+                      >
+                        <option value="">— Aucun —</option>
+                        {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><CornerDownRight size={11} /> Sous-groupe</p>
+                      {(() => {
+                        const subs = groupTree.find((g) => g.name === (selectedContact as any).groupName)?.subgroups ?? [];
+                        return (
+                          <select
+                            value={(selectedContact as any).subgroupName || ''}
+                            onChange={(e) => saveGroupField('subgroup_name', e.target.value)}
+                            disabled={savingGroup || !(selectedContact as any).groupName || subs.length === 0}
+                            className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold disabled:opacity-50"
+                          >
+                            <option value="">{!(selectedContact as any).groupName ? '— Choisir un groupe —' : subs.length === 0 ? '— Aucun sous-groupe —' : '— Aucun —'}</option>
+                            {subs.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                          </select>
+                        );
+                      })()}
                     </div>
                   </div>
 

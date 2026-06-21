@@ -9,6 +9,7 @@ import {
   submitInscription, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
 import { generateCardNumber } from '../../lib/membersApi';
+import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
 const RED = '#C81E1E';
@@ -32,6 +33,12 @@ const InscriptionPage: React.FC = () => {
   const [company, setCompany] = useState('');
   const [cardNumber, setCardNumber] = useState('');
   const [genningCard, setGenningCard] = useState(false);
+  // Groupe / sous-groupe (étiquette interne, invisible pour l'adhérent)
+  const [groupName, setGroupName] = useState('');
+  const [subgroupName, setSubgroupName] = useState('');
+  const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
+  useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
+  const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
 
   const handleGenerateCard = async () => {
     setGenningCard(true);
@@ -164,6 +171,8 @@ const InscriptionPage: React.FC = () => {
         profession: profession || undefined, company: company || undefined,
         photo,
         cardNumber: cardNumber.trim() || undefined,
+        groupName: groupName || undefined,
+        subgroupName: subgroupName || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
@@ -186,6 +195,7 @@ const InscriptionPage: React.FC = () => {
     setProfession(''); setCompany(''); setFormulaKey(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
+    setGroupName(''); setSubgroupName('');
   };
 
   const openContract = async () => {
@@ -309,6 +319,22 @@ const InscriptionPage: React.FC = () => {
             <div className="grid sm:grid-cols-2 gap-4">
               <div><span className={label}>Profession</span><input className={field} value={profession} onChange={(e) => setProfession(e.target.value)} /></div>
               <div><span className={label}>Entreprise</span><input className={field} value={company} onChange={(e) => setCompany(e.target.value)} /></div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <span className={label}>Groupe</span>
+                <select className={field} value={groupName} onChange={(e) => { setGroupName(e.target.value); setSubgroupName(''); }}>
+                  <option value="">— Aucun —</option>
+                  {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <span className={label}>Sous-groupe</span>
+                <select className={field} value={subgroupName} onChange={(e) => setSubgroupName(e.target.value)} disabled={!groupName || subOptions.length === 0}>
+                  <option value="">{!groupName ? '— Choisir un groupe —' : subOptions.length === 0 ? '— Aucun sous-groupe —' : '— Aucun —'}</option>
+                  {subOptions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              </div>
             </div>
             <div>
               <span className={label}>Numéro de badge</span>

@@ -274,6 +274,8 @@ export interface NewMemberInput {
   subscriptionEnd?: string;
   cardNumber?: string;   // numéro de badge / carte (lu par le contrôleur ZKTeco), stocké dans rfid_badge + qr_code
   keypadCode?: string;   // code clavier 6 chiffres (stocké dans keypad_code, écrit dans Password côté contrôleur)
+  groupName?: string;
+  subgroupName?: string;
   notes?: string;
 }
 
@@ -306,6 +308,8 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       rfid_badge: p.cardNumber || null,
       qr_code: p.cardNumber || null,
       keypad_code: p.keypadCode || null,
+      group_name: p.groupName || null,
+      subgroup_name: p.subgroupName || null,
       notes: p.notes || null,
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],

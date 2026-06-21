@@ -170,6 +170,9 @@ export interface InscriptionData {
   company?: string;
   photo?: File | null;
   cardNumber?: string;        // numéro de badge (saisi manuellement pour l'instant)
+  // Groupe / sous-groupe (étiquette interne, invisible pour l'adhérent)
+  groupName?: string;
+  subgroupName?: string;
   // Période (utile pour les contrats à courte durée)
   subscriptionStart?: string;   // 'YYYY-MM-DD'
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
@@ -245,6 +248,8 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       rfid_badge: d.cardNumber || null,
       qr_code: d.cardNumber || null,
       keypad_code: keypadCode || null,
+      group_name: d.groupName || null,
+      subgroup_name: d.subgroupName || null,
     });
   } else {
     const m = await createMember({
@@ -263,6 +268,8 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       subscriptionEnd: d.subscriptionEnd,
       cardNumber: d.cardNumber,
       keypadCode: keypadCode || undefined,
+      groupName: d.groupName,
+      subgroupName: d.subgroupName,
     });
     memberId = m.id;
   }
