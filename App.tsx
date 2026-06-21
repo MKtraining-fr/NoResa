@@ -34,6 +34,7 @@ const MemberReservations = lazy(() => import('./pages/member/MemberReservations'
 const MemberSubscription = lazy(() => import('./pages/member/MemberSubscription'));
 const MemberProfile = lazy(() => import('./pages/member/MemberProfile'));
 const MemberNotifications = lazy(() => import('./pages/member/MemberNotifications'));
+const MemberMessages = lazy(() => import('./pages/member/MemberMessages'));
 
 // Écran d'attente pendant le chargement d'une page
 const PageLoader: React.FC = () => (
@@ -114,6 +115,7 @@ const App: React.FC = () => {
             <Route path="mon-abonnement" element={<MemberSubscription />} />
             <Route path="profil" element={<MemberProfile />} />
             <Route path="notifications" element={<MemberNotifications />} />
+            <Route path="messagerie" element={<MemberMessages />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
