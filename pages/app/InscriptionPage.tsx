@@ -78,7 +78,9 @@ const InscriptionPage: React.FC = () => {
 
   const formula = useMemo<Formula | null>(() => FORMULAS.find((f) => f.key === formulaKey) || null, [formulaKey]);
   const chosenServices = SERVICES.filter((s) => services[s.key]);
-  const total = (formula ? formula.price : 0) + BADGE.price + chosenServices.reduce((a, s) => a + s.price, 0);
+  // Le badge n'est requis que pour un abonnement (formule "Engagement"). Pas d'abonnement = pas de badge.
+  const needsBadge = formula?.group === 'Engagement';
+  const total = (formula ? formula.price : 0) + (needsBadge ? BADGE.price : 0) + chosenServices.reduce((a, s) => a + s.price, 0);
   const eur = (n: number) => `${(n || 0).toFixed(2).replace('.', ',')} €`;
 
   // Mode de règlement + période par défaut selon la formule
@@ -145,7 +147,7 @@ const InscriptionPage: React.FC = () => {
   // --- Navigation entre étapes ----------------------------------------------
   const canNext = () => {
     if (step === 0) return firstName.trim() && lastName.trim();
-    if (step === 1) return !!formula && !!formulaPaymentMethod && !!badgePaymentMethod;
+    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod);
     if (step === 2) return consentCga && consentMedical;
     return true;
   };
@@ -170,7 +172,7 @@ const InscriptionPage: React.FC = () => {
         phone: phone || undefined, email: email.trim() || undefined,
         profession: profession || undefined, company: company || undefined,
         photo,
-        cardNumber: cardNumber.trim() || undefined,
+        cardNumber: needsBadge ? (cardNumber.trim() || undefined) : undefined,
         groupName: groupName || undefined,
         subgroupName: subgroupName || undefined,
         subscriptionStart: subStart || undefined,
@@ -336,16 +338,6 @@ const InscriptionPage: React.FC = () => {
                 </select>
               </div>
             </div>
-            <div>
-              <span className={label}>Numéro de badge</span>
-              <div className="flex gap-2">
-                <input className={field} value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ex. 3616701" />
-                <button type="button" onClick={handleGenerateCard} disabled={genningCard} className="shrink-0 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-                  {genningCard ? '…' : 'Générer'}
-                </button>
-              </div>
-              <p className="text-[11px] text-gray-400 mt-1">Saisis le numéro imprimé sur le badge. La génération automatique sera activée avec les QR codes.</p>
-            </div>
           </div>
         )}
 
@@ -390,15 +382,29 @@ const InscriptionPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-              <div className="flex items-center gap-2 font-bold text-gray-900"><BadgeCheck size={18} style={{ color: RED }} /> Badge (obligatoire) — {eur(BADGE.price)}</div>
-              <span className={`${label} mt-3`}>Règlement du badge</span>
-              <div className="flex flex-wrap gap-2">
-                {['Espèces', 'CB', 'Prélèvement'].map((m) => (
-                  <button key={m} onClick={() => setBadgePaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${badgePaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: badgePaymentMethod === m ? RED : undefined }}>{m}</button>
-                ))}
+            {needsBadge && (
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
+                <div className="flex items-center gap-2 font-bold text-gray-900"><BadgeCheck size={18} style={{ color: RED }} /> Badge (obligatoire) — {eur(BADGE.price)}</div>
+                <div>
+                  <span className={label}>Numéro de badge</span>
+                  <div className="flex gap-2">
+                    <input className={field} value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ex. 3616701" />
+                    <button type="button" onClick={handleGenerateCard} disabled={genningCard} className="shrink-0 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                      {genningCard ? '…' : 'Générer'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">Saisis le numéro imprimé sur le badge.</p>
+                </div>
+                <div>
+                  <span className={label}>Règlement du badge</span>
+                  <div className="flex flex-wrap gap-2">
+                    {['Espèces', 'CB', 'Prélèvement'].map((m) => (
+                      <button key={m} onClick={() => setBadgePaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${badgePaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: badgePaymentMethod === m ? RED : undefined }}>{m}</button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
             <div>
               <span className={label}>Services complémentaires (optionnel)</span>
@@ -425,7 +431,7 @@ const InscriptionPage: React.FC = () => {
               {phone && <Row k="Téléphone" v={phone} />}
               <Row k="Formule" v={`${formula?.label || '—'} (${eur(formula?.price || 0)}${formula?.recurring ? '/mois' : ''})`} />
               <Row k="Règlement formule" v={formulaPaymentMethod} />
-              <Row k="Badge obligatoire" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />
+              {needsBadge && <Row k="Badge obligatoire" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />}
               {chosenServices.map((s) => <Row key={s.key} k={s.label} v={eur(s.price)} />)}
               <div className="flex justify-between px-4 py-3 font-semibold text-base" style={{ color: RED }}>
                 <span>TOTAL À L'INSCRIPTION</span><span>{eur(total)}</span>

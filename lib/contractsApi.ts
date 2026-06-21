@@ -295,8 +295,9 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     } catch (e) { console.error('enqueue grant', e); }
   }
 
+  const needsBadge = d.formula.group === 'Engagement';
   const options: ContractOption[] = [
-    { label: BADGE.label, price: BADGE.price, payment: d.badgePaymentMethod },
+    ...(needsBadge ? [{ label: BADGE.label, price: BADGE.price, payment: d.badgePaymentMethod }] : []),
     ...d.services.map((s) => ({ label: s.label, price: s.price })),
   ];
 
