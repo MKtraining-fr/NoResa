@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, processLock } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -14,21 +14,27 @@ if (!url || !anonKey) {
 const isNative = Capacitor.isNativePlatform();
 
 /**
- * Verrou « no-op » sur mobile : le verrou par défaut de Supabase s'appuie sur
- * le Web Locks API (navigator.locks), qui peut se bloquer dans la WebView au
- * retour d'arrière-plan → getSession() ne répond jamais (chargement infini).
- *
- * Stockage : on garde le localStorage par défaut (synchrone). Il persiste dans
- * la WebView Android entre deux lancements — contrairement à un stockage
- * asynchrone (Preferences) qui ralentit/fige chaque requête dans la webview.
+ * Filet de sécurité réseau : dans la WebView mobile, une requête peut se figer
+ * (jamais de réponse) → page bloquée sur les skeletons. On abandonne après 15 s
+ * pour que l'UI sorte toujours du chargement (état vide au pire).
  */
-const noopLock = async <R,>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn();
+const fetchWithTimeout: typeof fetch = (input: any, init: RequestInit = {}) => {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  const ext = init.signal;
+  if (ext) ext.addEventListener('abort', () => ctrl.abort(), { once: true });
+  return fetch(input, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+};
 
 export const supabase = createClient(url, anonKey, {
+  global: { fetch: fetchWithTimeout },
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: !isNative,                 // pas de session dans l'URL en natif
-    ...(isNative ? { lock: noopLock as any } : {}),
+    // processLock : sérialise les rafraîchissements de token (évite les refresh
+    // concurrents qui invalident le refresh-token), SANS navigator.locks (qui
+    // deadlocke dans la WebView). Storage = localStorage par défaut (persiste).
+    ...(isNative ? { lock: processLock } : {}),
   },
 });
