@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck } from 'lucide-react';
 
 /**
  * Auto-inscription publique d'un prospect (formule avec engagement, prélèvement).
@@ -16,6 +16,9 @@ const FORMULAS = [
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prospect-register`;
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+// Clé publique Turnstile (anti-robot). Si absente, le widget ne s'affiche pas
+// et la vérification serveur reste inactive (tant que le secret n'est pas posé).
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
 const RegisterMemberPage: React.FC = () => {
   const navigate = useNavigate();
@@ -27,18 +30,36 @@ const RegisterMemberPage: React.FC = () => {
   const set = (k: string, v: any) => setF((s) => ({ ...s, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [token, setToken] = useState('');
+  const widgetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return;
+    const render = () => {
+      const ts = (window as any).turnstile;
+      if (ts && widgetRef.current && !widgetRef.current.hasChildNodes()) {
+        ts.render(widgetRef.current, { sitekey: TURNSTILE_SITE_KEY, callback: setToken, 'expired-callback': () => setToken('') });
+      }
+    };
+    if ((window as any).turnstile) { render(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    s.async = true; s.defer = true; s.onload = render;
+    document.head.appendChild(s);
+  }, []);
 
   const submit = async () => {
     setErr('');
     if (!f.firstName.trim() || !f.lastName.trim()) { setErr('Prénom et nom obligatoires.'); return; }
     if (!/^\S+@\S+\.\S+$/.test(f.email)) { setErr('E-mail invalide.'); return; }
     if (!f.consentCga || !f.consentMedical) { setErr('Merci de cocher les deux déclarations.'); return; }
+    if (TURNSTILE_SITE_KEY && !token) { setErr('Merci de valider le test anti-robot.'); return; }
     setBusy(true);
     try {
       const res = await fetch(FN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': ANON, 'Authorization': `Bearer ${ANON}` },
-        body: JSON.stringify({ ...f, redirectUrl: `${window.location.origin}${window.location.pathname}#/membre` }),
+        body: JSON.stringify({ ...f, turnstileToken: token, redirectUrl: `${window.location.origin}${window.location.pathname}#/membre` }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || "L'inscription a échoué.");
@@ -122,6 +143,7 @@ const RegisterMemberPage: React.FC = () => {
             </label>
           </div>
 
+          {TURNSTILE_SITE_KEY && <div ref={widgetRef} className="flex justify-center" />}
           <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
             {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
             <span>{busy ? 'Création…' : 'M\'inscrire & signer mon mandat'}</span>
