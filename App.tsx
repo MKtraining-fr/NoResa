@@ -1,5 +1,10 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+
+// Sur l'app native (Android/iOS), on ouvre directement sur l'espace adhérent :
+// si une session existe → accueil membre, sinon ProtectedRoute renvoie vers /connexion.
+const isNativeApp = Capacitor.isNativePlatform();
 
 // Layouts + garde d'accès : chargés normalement (nécessaires à la structure des routes)
 import PublicLayout from './layouts/PublicLayout';
@@ -56,7 +61,7 @@ const App: React.FC = () => {
         <Routes>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={isNativeApp ? <Navigate to="/membre" replace /> : <HomePage />} />
             <Route path="/fonctionnalites" element={<FeaturesPage />} />
             <Route path="/tarifs" element={<PricingPage />} />
             <Route path="/contact" element={<ContactPage />} />
