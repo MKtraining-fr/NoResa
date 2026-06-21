@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   QrCode, FileText, MapPin, Gift, Megaphone, X, Maximize2,
-  Package, Calendar, Plus, Check, ChevronRight, MessageCircle,
+  Package, Calendar, Plus, ChevronRight, MessageCircle,
+  Dumbbell, TrendingUp, BookOpen,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -269,6 +270,16 @@ const PartnerCard: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
   </button>
 );
 
+const Feature: React.FC<{ icon: React.ElementType; title: string; sub: string }> = ({ icon: Icon, title, sub }) => (
+  <div className="flex items-start gap-3">
+    <div className="w-[34px] h-[34px] rounded-[11px] bg-indigo-400/15 flex items-center justify-center shrink-0 text-indigo-300"><Icon size={17} /></div>
+    <div>
+      <p className="font-extrabold text-[13.5px] text-white">{title}</p>
+      <p className="text-[11.5px] text-slate-400 font-medium mt-0.5">{sub}</p>
+    </div>
+  </div>
+);
+
 const PartnerModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div onClick={onClose} className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
     <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-t-[30px] px-5 pt-5 pb-7 relative overflow-hidden animate-in slide-in-from-bottom duration-300"
@@ -283,6 +294,11 @@ const PartnerModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
         <div className="mt-4 rounded-[18px] px-4 py-3.5 flex items-center gap-3.5" style={{ background: 'linear-gradient(135deg,#7C7CF0,#5B4FE0)' }}>
           <span className="font-black text-[28px] text-white shrink-0">-50%</span>
           <span className="text-[12.5px] text-white font-medium leading-snug">sur ton abonnement MuscleFlow, <b className="font-extrabold">offert</b> grâce à ton abonnement La Salle 💪</span>
+        </div>
+        <div className="mt-4 flex flex-col gap-3.5">
+          <Feature icon={Dumbbell} title="Programmes personnalisés" sub="Des séances adaptées à ton niveau et tes objectifs" />
+          <Feature icon={TrendingUp} title="Suivi de progression" sub="Charges, séries, records — visualise tes progrès" />
+          <Feature icon={BookOpen} title="Bibliothèque d'exercices" sub="Vidéos et conseils technique pour chaque mouvement" />
         </div>
         <div className="flex gap-2.5 mt-5">
           <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-2 bg-white rounded-2xl py-3 active:scale-95 transition-transform">
