@@ -52,24 +52,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUserId(session.user.id);
-        await loadProfile(session.user.id);
-      }
-      setLoading(false);
-    });
+    let done = false;
+    const finish = () => { if (!done) { done = true; setLoading(false); } };
+    // Filet de sécurité : ne JAMAIS rester bloqué sur "Chargement…" (ex. webview
+    // mobile au retour d'arrière-plan). Au pire on bascule en "non connecté".
+    const timer = setTimeout(finish, 6000);
+
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (session?.user) {
+          setUserId(session.user.id);
+          try { await loadProfile(session.user.id); } catch (e) { console.error('loadProfile', e); }
+        }
+      })
+      .catch((e) => console.error('getSession', e))
+      .finally(finish);
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       if (session?.user) {
         setUserId(session.user.id);
-        await loadProfile(session.user.id);
+        try { await loadProfile(session.user.id); } catch (e) { console.error('loadProfile', e); }
       } else {
         setUserId(null);
         setProfile(null);
       }
+      finish();
     });
-    return () => sub.subscription.unsubscribe();
+    return () => { clearTimeout(timer); sub.subscription.unsubscribe(); };
   }, []);
 
   const signIn = async (email: string, password: string) => {
