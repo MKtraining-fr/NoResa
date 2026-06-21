@@ -39,20 +39,68 @@ export interface AccessEntry {
   card_number: string | null;
   qr_code: string | null;
   device_sn: string | null;
-  member: { first_name: string | null; last_name: string | null; member_number: string | null } | null;
+  member_id: string | null;
+  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null } | null;
 }
+
+const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path)';
 
 /** Entrées du jour (passages enregistrés depuis minuit), plus récentes d'abord. */
 export async function getTodayEntries(): Promise<AccessEntry[]> {
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const { data, error } = await supabase
     .from('access_logs')
-    .select('id, access_datetime, status, card_number, qr_code, device_sn, member:members(first_name, last_name, member_number)')
+    .select(ENTRY_SELECT)
     .gte('access_datetime', start.toISOString())
     .order('access_datetime', { ascending: false })
     .limit(500);
   if (error) { console.error('getTodayEntries', error); return []; }
   return (data ?? []) as any;
+}
+
+/** Passages entre deux dates ISO (incluses), plus récents d'abord. */
+export async function getEntriesBetween(fromIso: string, toIso: string, limit = 1000): Promise<AccessEntry[]> {
+  const { data, error } = await supabase
+    .from('access_logs')
+    .select(ENTRY_SELECT)
+    .gte('access_datetime', fromIso)
+    .lte('access_datetime', toIso)
+    .order('access_datetime', { ascending: false })
+    .limit(limit);
+  if (error) { console.error('getEntriesBetween', error); return []; }
+  return (data ?? []) as any;
+}
+
+/**
+ * Affluence en temps réel : nombre de personnes actuellement présentes.
+ * Règle : une entrée autorisée compte pour 90 min ; un même membre (ou badge) n'est compté qu'une fois.
+ */
+export async function getPresentCount(windowMinutes = 90): Promise<number> {
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const { data, error } = await supabase
+    .from('access_logs')
+    .select('member_id, card_number')
+    .eq('status', 'authorized')
+    .eq('access_type', 'entry')
+    .gte('access_datetime', since)
+    .limit(1000);
+  if (error) { console.error('getPresentCount', error); return 0; }
+  const seen = new Set<string>();
+  for (const r of (data ?? []) as any[]) {
+    seen.add(r.member_id ? `m:${r.member_id}` : `c:${r.card_number ?? Math.random()}`);
+  }
+  return seen.size;
+}
+
+/** Résout en une fois les URL (signées) d'un lot de chemins de photos. */
+export async function resolvePhotoUrls(paths: (string | null | undefined)[]): Promise<Record<string, string>> {
+  const unique = Array.from(new Set(paths.filter((p): p is string => !!p)));
+  if (unique.length === 0) return {};
+  const { data, error } = await supabase.storage.from('member-photos').createSignedUrls(unique, 3600);
+  const map: Record<string, string> = {};
+  if (error) { console.error('resolvePhotoUrls', error); return map; }
+  (data ?? []).forEach((d: any) => { if (d?.path && d?.signedUrl) map[d.path] = d.signedUrl; });
+  return map;
 }
 
 export interface AccessAlert {
