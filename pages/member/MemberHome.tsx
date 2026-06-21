@@ -111,10 +111,10 @@ const MemberHome: React.FC = () => {
         </p>
       </button>
 
-      {/* Carnet de séances (si forfait rechargeable) */}
-      {pack?.isPack && (
-        <RachatCard pack={pack} onRecharge={() => setRechargeOpen(true)} />
-      )}
+      {/* Carnet de séances (détenteurs) — sinon CTA « première séance » */}
+      {pack?.isPack
+        ? <RachatCard pack={pack} onRecharge={() => setRechargeOpen(true)} />
+        : <FirstSeanceCard onBuy={() => setRechargeOpen(true)} />}
 
       {/* App partenaire MuscleFlow */}
       <PartnerCard onOpen={() => setPartnerOpen(true)} />
@@ -194,6 +194,21 @@ const RachatCard: React.FC<{ pack: MyPackStatus; onRecharge: () => void }> = ({ 
     </div>
   );
 };
+
+const FirstSeanceCard: React.FC<{ onBuy: () => void }> = ({ onBuy }) => (
+  <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
+    <div className="flex items-center gap-2.5 mb-3">
+      <div className="w-10 h-10 rounded-xl bg-brand-soft flex items-center justify-center text-brand shrink-0"><Calendar size={19} /></div>
+      <div>
+        <p className="font-extrabold text-[14.5px] text-gray-900">Prendre une séance</p>
+        <p className="text-[11px] text-gray-400 font-semibold">Séance, carnet ou mois · paiement instantané</p>
+      </div>
+    </div>
+    <button onClick={onBuy} className="w-full bg-gray-900 text-white py-3 rounded-2xl font-extrabold text-[13.5px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+      <Plus size={16} strokeWidth={2.4} /> Choisir &amp; payer
+    </button>
+  </div>
+);
 
 const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const PRODUCTS = [
