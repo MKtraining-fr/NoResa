@@ -5,6 +5,7 @@ import {
   AccessEntry, AccessAlert,
 } from '../../lib/accessApi';
 import { getGroupTree, getMemberIdsInGroup, GroupNode } from '../../lib/groupsApi';
+import MemberProfileModal from './MemberProfileModal';
 
 const fmtTime = (s: string) => new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
@@ -27,6 +28,7 @@ const AccessControlPage: React.FC = () => {
   const [photos, setPhotos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
 
   // Recherche : un jour + plage horaire optionnelle
   const [date, setDate] = useState(todayStr());
@@ -173,7 +175,7 @@ const AccessControlPage: React.FC = () => {
             return (
               <div
                 key={e.id}
-                onClick={e.member_id ? () => { window.location.hash = `#/app/crm?member=${e.member_id}`; } : undefined}
+                onClick={e.member_id ? () => setProfileMemberId(e.member_id) : undefined}
                 title={e.member_id ? 'Voir la fiche' : undefined}
                 className={`bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center text-center transition-colors ${e.member_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm' : 'hover:border-gray-300'}`}
               >
@@ -233,6 +235,11 @@ const AccessControlPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Fiche profil (par-dessus le contrôle d'accès) */}
+      {profileMemberId && (
+        <MemberProfileModal memberId={profileMemberId} onClose={() => setProfileMemberId(null)} />
       )}
     </div>
   );

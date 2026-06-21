@@ -110,6 +110,23 @@ export async function getMembers(): Promise<Member[]> {
 }
 
 /** Membres archivés (corbeille). Données conservées intégralement. */
+export async function getMemberById(id: string): Promise<Member | null> {
+  const { data, error } = await supabase
+    .from('members')
+    .select(
+      'id, first_name, last_name, email, phone, address, postal_code, city, ' +
+        'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
+        'subscription_start, subscription_end, ' +
+        'member_number, status, join_date, created_at, photo_path, ' +
+        'emergency_contact_name, emergency_contact_phone, notes, ' +
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name'
+    )
+    .eq('id', id)
+    .single();
+  if (error) { console.error('getMemberById', error); return null; }
+  return data ? rowToMember(data) : null;
+}
+
 export async function getArchivedMembers(): Promise<Member[]> {
   const { data, error } = await supabase
     .from('members')
