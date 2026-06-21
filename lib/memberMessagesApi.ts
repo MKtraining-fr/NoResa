@@ -96,3 +96,16 @@ export async function getOpeningHours(): Promise<DayHours[]> {
   if (error) { console.error('getOpeningHours', error); return defaultOpeningHours(); }
   return Array.isArray(data) && data.length === 7 ? (data as DayHours[]) : defaultOpeningHours();
 }
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  cta: boolean;
+}
+
+export async function getMemberFaq(): Promise<FaqItem[]> {
+  const { data, error } = await supabase.rpc('my_gym_faq');
+  if (error) { console.error('getMemberFaq', error); return []; }
+  return Array.isArray(data) ? (data as FaqItem[]) : [];
+}

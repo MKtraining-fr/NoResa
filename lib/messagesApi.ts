@@ -112,3 +112,28 @@ export async function saveOpeningHours(hours: DayHours[]): Promise<void> {
   const { error } = await supabase.from('gyms').update({ opening_hours: hours }).eq('id', gymId);
   if (error) { console.error('saveOpeningHours', error); throw error; }
 }
+
+// ----- FAQ éditable -----
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  cta: boolean;       // affiche « Écrire à l'équipe » sous la réponse
+}
+
+export async function getMemberFaq(): Promise<FaqItem[]> {
+  const gymId = await getGymId();
+  if (!gymId) return [];
+  const { data, error } = await supabase.from('gyms').select('member_faq').eq('id', gymId).single();
+  if (error) { console.error('getMemberFaq', error); return []; }
+  const f = data?.member_faq as FaqItem[] | null;
+  return Array.isArray(f) ? f : [];
+}
+
+export async function saveMemberFaq(items: FaqItem[]): Promise<void> {
+  const gymId = await getGymId();
+  if (!gymId) throw new Error('gym_id introuvable');
+  const { error } = await supabase.from('gyms').update({ member_faq: items }).eq('id', gymId);
+  if (error) { console.error('saveMemberFaq', error); throw error; }
+}

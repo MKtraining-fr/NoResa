@@ -1,63 +1,21 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  Send, MessageSquare, Clock, CreditCard, DoorOpen, FileText, CalendarCheck, Tag, ChevronDown, LifeBuoy,
-} from 'lucide-react';
+import { Send, MessageSquare, Clock, ChevronDown, LifeBuoy, HelpCircle } from 'lucide-react';
 import {
   getMyMember, getMyMessages, sendClientMessage, markStaffMessagesRead,
-  getOpeningHours, isOpenNow, nextOpening, dayLabel,
-  MyMember, ClientMessage, DayHours,
+  getOpeningHours, isOpenNow, nextOpening, dayLabel, getMemberFaq,
+  MyMember, ClientMessage, DayHours, FaqItem as DbFaqItem,
 } from '../../lib/memberMessagesApi';
 
 const fmtTime = (s: string) => new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-/* ──────────────────────────────────────────────────────────────────────────
-   ⬇️  AIDE RAPIDE (FAQ) — MODIFIE LIBREMENT ICI
-   - `q` = libellé du bouton / question
-   - `a` = réponse affichée (laisse vide pour l'item "Parler à un humain")
-   - `dynamic: 'hours'` = la réponse est générée depuis tes horaires d'ouverture
-   - `cta: true` = affiche le bouton "Écrire à l'équipe" sous la réponse
-   Adapte surtout les TARIFS et la RÉSILIATION à ta salle.
-   ────────────────────────────────────────────────────────────────────────── */
-type FaqItem = { id: string; icon: React.ComponentType<{ size?: number }>; q: string; a?: string; dynamic?: 'hours'; cta?: boolean };
-
-const FAQ: FaqItem[] = [
-  {
-    id: 'horaires', icon: Clock, q: 'Horaires d\'ouverture', dynamic: 'hours',
-  },
-  {
-    id: 'tarifs', icon: Tag, q: 'Tarifs & formules',
-    a: 'Nos formules : abonnement classique, formule famille/étudiant, suivi & formation, ainsi que des carnets de séances et un pass 1 mois. Pour le détail des tarifs et la formule la plus adaptée, écrivez-nous, on vous conseille.',
-    cta: true,
-  },
-  {
-    id: 'abonnement', icon: CreditCard, q: 'Mon abonnement & paiements',
-    a: 'Retrouvez votre abonnement et vos paiements dans l\'onglet « Abonnement ». Pour changer de formule ou mettre à jour votre prélèvement, écrivez-nous ici.',
-    cta: true,
-  },
-  {
-    id: 'acces', icon: DoorOpen, q: 'Accès à la salle (badge / code)',
-    a: 'Vous entrez avec votre badge ou votre code clavier personnel. Badge perdu, code oublié ou accès qui ne fonctionne pas ? Écrivez-nous, on règle ça vite.',
-    cta: true,
-  },
-  {
-    id: 'reservation', icon: CalendarCheck, q: 'Réserver un cours',
-    a: 'Vos cours se réservent dans l\'onglet « Réservations ». Une place se libère ? Réservez tant qu\'il en reste. Pour annuler, faites-le au plus tôt pour laisser la place à un autre adhérent.',
-  },
-  {
-    id: 'resiliation', icon: FileText, q: 'Résiliation',
-    a: 'Pour toute demande de résiliation ou de suspension, envoyez-nous un message ici en précisant votre nom et la raison. On vous indique la marche à suivre selon votre formule.',
-    cta: true,
-  },
-  {
-    id: 'humain', icon: MessageSquare, q: 'Parler à un humain', cta: true,
-    a: 'Écrivez votre message ci-dessous : l\'équipe de la salle vous répond directement ici.',
-  },
-];
+// Item d'affichage de l'aide rapide (horaires = dynamique, humain = action)
+type FaqView = { id: string; icon: React.ComponentType<{ size?: number }>; q: string; a?: string; dynamic?: 'hours'; cta?: boolean };
 
 const MemberMessages: React.FC = () => {
   const [member, setMember] = useState<MyMember | null>(null);
   const [messages, setMessages] = useState<ClientMessage[]>([]);
   const [hours, setHours] = useState<DayHours[]>([]);
+  const [faqItems, setFaqItems] = useState<DbFaqItem[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,6 +34,7 @@ const MemberMessages: React.FC = () => {
       const m = await getMyMember();
       setMember(m);
       setHours(await getOpeningHours());
+      setFaqItems(await getMemberFaq());
       if (m) await load(m.id);
       setLoading(false);
     })();
@@ -108,7 +67,14 @@ const MemberMessages: React.FC = () => {
     } catch { setDraft(body); } finally { setSending(false); }
   };
 
-  const renderAnswer = (item: FaqItem) => {
+  // Aide rapide = Horaires (auto) + FAQ éditable (base) + Parler à un humain (auto)
+  const faqList: FaqView[] = [
+    { id: 'horaires', icon: Clock, q: 'Horaires d\'ouverture', dynamic: 'hours' },
+    ...faqItems.map((it) => ({ id: it.id, icon: HelpCircle, q: it.question, a: it.answer, cta: it.cta })),
+    { id: 'humain', icon: MessageSquare, q: 'Parler à un humain', cta: true, a: 'Écrivez votre message ci-dessous : l\'équipe de la salle vous répond directement ici.' },
+  ];
+
+  const renderAnswer = (item: FaqView) => {
     if (item.dynamic === 'hours') {
       return (
         <div className="space-y-1">
@@ -127,7 +93,7 @@ const MemberMessages: React.FC = () => {
         </div>
       );
     }
-    return <p className="text-sm text-gray-600 leading-relaxed">{item.a}</p>;
+    return <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{item.a}</p>;
   };
 
   return (
@@ -144,7 +110,7 @@ const MemberMessages: React.FC = () => {
           <p className="text-sm font-semibold text-gray-900">Aide rapide</p>
         </div>
         <div className="p-2">
-          {FAQ.map((item) => {
+          {faqList.map((item) => {
             const isOpenItem = openFaq === item.id;
             return (
               <div key={item.id} className="border-b border-gray-50 last:border-0">

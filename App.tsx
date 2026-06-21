@@ -104,6 +104,7 @@ const App: React.FC = () => {
             <Route path="messagerie" element={<MessageriePage />} />
             <Route path="parametres" element={<SettingsPage />} />
             <Route path="parametres/groupes" element={<SettingsPage section="groupes" />} />
+            <Route path="parametres/faq" element={<SettingsPage section="faq" />} />
             <Route path="parametres/salle" element={<SettingsPage section="salle" />} />
             <Route path="parametres/mon-compte" element={<SettingsPage section="compte" />} />
           </Route>

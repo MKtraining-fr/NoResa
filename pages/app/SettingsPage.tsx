@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers } from 'lucide-react';
+import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers, HelpCircle } from 'lucide-react';
 import { getGyms, updateGym, ExtendedGym } from '../../utils/storage';
 import GroupsSettingsPage from './GroupsSettingsPage';
+import FaqSettingsPage from './FaqSettingsPage';
 
 interface SettingsPageProps {
   section?: string;
@@ -136,8 +137,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{activeSection === 'groupes' ? 'Groupes' : activeSection === 'compte' ? 'Mon compte' : 'Configuration'}</h1>
-          <p className="text-sm text-gray-500">{activeSection === 'groupes' ? 'Organisez vos pratiquants en groupes et sous-groupes.' : 'Personnalisez votre établissement et votre site vitrine public.'}</p>
+          <h1 className="text-xl font-semibold text-gray-900">{activeSection === 'groupes' ? 'Groupes' : activeSection === 'faq' ? 'Aide rapide (FAQ)' : activeSection === 'compte' ? 'Mon compte' : 'Configuration'}</h1>
+          <p className="text-sm text-gray-500">{activeSection === 'groupes' ? 'Organisez vos pratiquants en groupes et sous-groupes.' : activeSection === 'faq' ? 'Les questions/réponses affichées aux adhérents dans la messagerie.' : 'Personnalisez votre établissement et votre site vitrine public.'}</p>
         </div>
         {activeSection === 'salle' && (
           <div className="flex items-center space-x-3">
@@ -198,11 +199,20 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
           <Layers size={16} />
           <span>Groupes</span>
         </button>
+        <button
+          onClick={() => setActiveSection('faq')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeSection === 'faq' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
+        >
+          <HelpCircle size={16} />
+          <span>FAQ</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
         {activeSection === 'groupes' ? (
           <GroupsSettingsPage embedded />
+        ) : activeSection === 'faq' ? (
+          <FaqSettingsPage embedded />
         ) : activeSection === 'salle' ? (
           <>
             {/* Gym Selector & Base Info Card */}
