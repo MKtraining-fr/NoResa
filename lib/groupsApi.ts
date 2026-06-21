@@ -60,7 +60,15 @@ export async function renameGroup(id: string, name: string, parentId: string | n
   await supabase.from('members').update({ [col]: clean }).eq(col, oldName);
 }
 
-/** Supprime un groupe (et ses sous-groupes en cascade) ou un sous-groupe. */
+/** Ids des pratiquants d'un groupe (et éventuellement d'un sous-groupe précis). */
+export async function getMemberIdsInGroup(groupName: string, subgroupName?: string): Promise<string[]> {
+  if (!groupName) return [];
+  let q = supabase.from('members').select('id').eq('group_name', groupName).is('archived_at', null);
+  if (subgroupName) q = q.eq('subgroup_name', subgroupName);
+  const { data, error } = await q;
+  if (error) { console.error('getMemberIdsInGroup', error); return []; }
+  return (data ?? []).map((r: any) => r.id);
+}
 export async function deleteGroup(id: string): Promise<void> {
   const { error } = await supabase.from('member_groups').delete().eq('id', id);
   if (error) { console.error('deleteGroup', error); throw error; }
