@@ -97,7 +97,7 @@ const LoginPage: React.FC = () => {
 
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500 font-medium">
-              Pas encore inscrit ? <a href="#" className="text-indigo-600 font-bold hover:underline">Contactez votre salle</a>
+              Pas encore inscrit ? <button type="button" onClick={() => navigate('/inscription')} className="text-indigo-600 font-bold hover:underline">S'inscrire</button>
             </p>
           </div>
         </div>
