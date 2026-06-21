@@ -9,7 +9,9 @@ Le web (Cloudflare) et le mobile partagent le même code ; seule la base des che
 
 ## Prérequis (sur ta machine)
 
-- **Android Studio** (inclut le SDK Android) + **JDK 17**.
+- **Android Studio** (inclut le SDK Android **et un JDK 21** dans son dossier `jbr/`).
+- **JDK 21 obligatoire** : Capacitor 8 ne compile pas avec le JDK 17. Le plus simple
+  est de réutiliser celui d'Android Studio (voir ci-dessous), sans rien installer.
 - Les dépendances npm déjà installées (`npm install`).
 
 ## Générer / mettre à jour l'app
@@ -25,12 +27,20 @@ Dans Android Studio :
 - **Lancer sur un appareil/émulateur** : bouton ▶︎ Run.
 - **Générer un APK** : menu *Build → Build Bundle(s) / APK(s) → Build APK(s)*.
 
-Ou en ligne de commande (APK de debug) :
+Ou en ligne de commande (PowerShell, APK de debug) :
 
-```bash
-cd android
-./gradlew assembleDebug
-# APK généré : android/app/build/outputs/apk/debug/app-debug.apk
+```powershell
+# Pointer Gradle sur le JDK 21 embarqué dans Android Studio (sinon erreur "invalid source release: 21")
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+cd C:\Pro\Noresa\android
+.\gradlew.bat assembleDebug
+# APK généré : android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Pour rendre le JDK 21 permanent (à faire une fois, puis rouvrir PowerShell) :
+
+```powershell
+[Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Android\Android Studio\jbr", "User")
 ```
 
 Pour un **APK de release** (à publier), il faut d'abord configurer une clé de signature
