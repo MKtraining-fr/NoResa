@@ -150,6 +150,17 @@ export async function getMyInvoices(): Promise<MyInvoice[]> {
   }));
 }
 
+// --- Carnet de séances (solde) ---------------------------------------------
+
+export interface MyPackStatus { isPack: boolean; total: number; used: number; remaining: number }
+
+export async function getMyPackStatus(): Promise<MyPackStatus> {
+  const { data, error } = await supabase.rpc('my_pack_status');
+  const r = Array.isArray(data) ? data[0] : data;
+  if (error || !r) return { isPack: false, total: 0, used: 0, remaining: 0 };
+  return { isPack: !!r.is_pack, total: r.total ?? 0, used: r.used ?? 0, remaining: r.remaining ?? 0 };
+}
+
 /** URL signée (1 h) pour ouvrir un PDF privé (contrats / invoices). */
 export async function signedPdfUrl(bucket: 'contracts' | 'invoices', path: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
