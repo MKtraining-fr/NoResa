@@ -34,11 +34,13 @@ const MemberReservations: React.FC = () => {
   }, [anchor]);
 
   const reload = useCallback(async () => {
-    const [s, b] = await Promise.all([
-      listSessions(weekStart, addDays(weekStart, 7)),
-      myBookings(),
-    ]);
-    setSessions(s); setMine(b); setLoading(false);
+    try {
+      const [s, b] = await Promise.all([
+        listSessions(weekStart, addDays(weekStart, 7)),
+        myBookings(),
+      ]);
+      setSessions(s); setMine(b);
+    } finally { setLoading(false); }
   }, [weekStart]);
 
   useEffect(() => { setLoading(true); reload(); }, [reload]);

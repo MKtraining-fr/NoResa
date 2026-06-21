@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Couleur de marque par défaut (surchargée à l'exécution par BrandContext). */
+:root {
+  --brand: #4f46e5;
+  --brand-dark: #4338ca;
+  --brand-soft: #eef2ff;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+.pwa-hide-scrollbar::-webkit-scrollbar { display: none; }
+.pwa-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

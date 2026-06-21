@@ -14,10 +14,15 @@ export interface MyMember {
   firstName: string;
   lastName: string;
   email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  postalCode: string | null;
   subscriptionLabel: string | null;
   status: string | null;
   subscriptionStart: string | null;
   subscriptionEnd: string | null;
+  joinDate: string | null;
   qrCode: string;
   photoPath: string | null;
   referralCode: string | null;
@@ -34,14 +39,29 @@ export async function getMyMember(): Promise<MyMember | null> {
     firstName: r.first_name ?? '',
     lastName: r.last_name ?? '',
     email: r.email ?? null,
+    phone: r.phone ?? null,
+    address: r.address ?? null,
+    city: r.city ?? null,
+    postalCode: r.postal_code ?? null,
     subscriptionLabel: r.subscription_label ?? null,
     status: r.status ?? null,
     subscriptionStart: r.subscription_start ?? null,
     subscriptionEnd: r.subscription_end ?? null,
+    joinDate: r.join_date ?? null,
     qrCode: (r.qr_code ?? r.member_number ?? '').toString().trim(),
     photoPath: r.photo_path ?? null,
     referralCode: r.referral_code ?? null,
   };
+}
+
+/** Mise à jour des coordonnées de l'adhérent (téléphone/adresse). */
+export async function updateMyProfile(p: {
+  phone: string; address: string; city: string; postalCode: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc('update_my_member', {
+    p_phone: p.phone, p_address: p.address, p_city: p.city, p_postal_code: p.postalCode,
+  });
+  if (error) { console.error('memberSelfApi.updateMyProfile', error); throw error; }
 }
 
 // --- Affluence en direct ----------------------------------------------------

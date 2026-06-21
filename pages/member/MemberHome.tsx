@@ -45,10 +45,12 @@ const MemberHome: React.FC = () => {
 
   useEffect(() => {
     (async () => {
-      const [m, o, g, p] = await Promise.all([
-        getMyMember(), getHourlyOccupancy(), getMyGym(), getMyPackStatus(),
-      ]);
-      setMember(m); setOcc(o); setGym(g); setPack(p); setLoading(false);
+      try {
+        const [m, o, g, p] = await Promise.all([
+          getMyMember(), getHourlyOccupancy(), getMyGym(), getMyPackStatus(),
+        ]);
+        setMember(m); setOcc(o); setGym(g); setPack(p);
+      } finally { setLoading(false); }
     })();
   }, []);
 

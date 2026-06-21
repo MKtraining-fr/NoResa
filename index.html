@@ -4,26 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NoResa | Gestion & Réservation de Salles de Sport</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      // Couleur de marque dynamique (espace adhérent white-label) : les classes
-      // bg-brand / text-brand / bg-brand-soft suivent la variable CSS --brand,
-      // posée à l'exécution par BrandContext selon la salle de l'adhérent.
-      tailwind.config = {
-        theme: { extend: { colors: {
-          brand: 'var(--brand, #4f46e5)',
-          'brand-dark': 'var(--brand-dark, #4338ca)',
-          'brand-soft': 'var(--brand-soft, #eef2ff)',
-        } } }
-      };
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-      body { font-family: 'Inter', sans-serif; }
-      :root { --brand: #4f46e5; --brand-dark: #4338ca; --brand-soft: #eef2ff; }
-      .pwa-hide-scrollbar::-webkit-scrollbar { display: none; }
-      .pwa-hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
   <script type="importmap">
 {
   "imports": {
