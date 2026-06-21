@@ -321,5 +321,13 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   });
 
   const generate = await generateContract(contractId, d.signatureDataUrl, true);
+
+  // Inscription AVEC engagement -> crée le compte adhérent + e-mail d'activation
+  // (lien de création de mot de passe pour accéder à l'app). Best-effort.
+  if (d.formula.engagement && d.email) {
+    try { await supabase.functions.invoke('member-welcome', { body: { member_id: memberId } }); }
+    catch (e) { console.error('member-welcome', e); }
+  }
+
   return { memberId, contractId, contractNumber, authorisationUrl, keypadCode, generate };
 }

@@ -1,10 +1,24 @@
-import React, { Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
+import { supabase } from './lib/supabaseClient';
 
 // Sur l'app native (Android/iOS), on ouvre directement sur l'espace adhérent :
 // si une session existe → accueil membre, sinon ProtectedRoute renvoie vers /connexion.
 const isNativeApp = Capacitor.isNativePlatform();
+
+// Lien e-mail « créer mon mot de passe » : dès qu'une session de récupération est
+// détectée, on route vers la page dédiée.
+const RecoveryHandler: React.FC = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') navigate('/definir-mot-de-passe', { replace: true });
+    });
+    return () => data.subscription.unsubscribe();
+  }, [navigate]);
+  return null;
+};
 
 // Layouts + garde d'accès : chargés normalement (nécessaires à la structure des routes)
 import PublicLayout from './layouts/PublicLayout';
@@ -18,6 +32,7 @@ const FeaturesPage = lazy(() => import('./pages/public/FeaturesPage'));
 const PricingPage = lazy(() => import('./pages/public/PricingPage'));
 const ContactPage = lazy(() => import('./pages/public/ContactPage'));
 const LoginPage = lazy(() => import('./pages/public/LoginPage'));
+const SetPasswordPage = lazy(() => import('./pages/public/SetPasswordPage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -58,8 +73,10 @@ const PageLoader: React.FC = () => (
 const App: React.FC = () => {
   return (
     <HashRouter>
+      <RecoveryHandler />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={isNativeApp ? <Navigate to="/membre" replace /> : <HomePage />} />
