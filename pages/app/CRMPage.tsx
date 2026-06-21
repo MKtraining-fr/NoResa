@@ -138,6 +138,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   // Groupes / sous-groupes (pour les menus de la fiche)
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
   const [savingGroup, setSavingGroup] = useState(false);
+  const [filterGroup, setFilterGroup] = useState('');
+  const [filterSubgroup, setFilterSubgroup] = useState('');
   useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
 
   const saveGroupField = async (field: 'group_name' | 'subgroup_name', value: string) => {
@@ -163,6 +165,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     setDetailTab('profil');
     setPhotoUrl(null);
   };
+
+  // Ouverture directe d'une fiche depuis une autre page (ex. Contrôle d'accès) via #/app/crm?member=<id>
+  const deepLinkedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const m = window.location.hash.match(/[?&]member=([^&]+)/);
+    if (!m || contacts.length === 0) return;
+    const id = decodeURIComponent(m[1]);
+    if (deepLinkedRef.current === id) return;
+    const found = contacts.find((c) => c.id === id);
+    if (found) {
+      deepLinkedRef.current = id;
+      openContactDetails(found);
+      window.history.replaceState(null, '', window.location.hash.split('?')[0]);
+    }
+  }, [contacts]);
 
   // --- Édition d'une fiche depuis la fenêtre de détail ---
   const startEditing = () => {
@@ -592,6 +609,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       );
     }
 
+    if (filterGroup) {
+      filtered = filtered.filter(m =>
+        (m as any).groupName === filterGroup &&
+        (!filterSubgroup || (m as any).subgroupName === filterSubgroup)
+      );
+    }
+
     const num = (m: any) => parseInt(m.memberNumber || '0', 10) || 0;
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
@@ -657,7 +681,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium"
             />
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <Layers size={15} className="text-gray-400" />
+            <select
+              value={filterGroup}
+              onChange={(e) => { setFilterGroup(e.target.value); setFilterSubgroup(''); }}
+              className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium text-gray-700"
+            >
+              <option value="">Tous les groupes</option>
+              {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+            </select>
+            {filterGroup && (groupTree.find((g) => g.name === filterGroup)?.subgroups.length ?? 0) > 0 && (
+              <select
+                value={filterSubgroup}
+                onChange={(e) => setFilterSubgroup(e.target.value)}
+                className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium text-gray-700"
+              >
+                <option value="">Tous les sous-groupes</option>
+                {(groupTree.find((g) => g.name === filterGroup)?.subgroups ?? []).map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            )}
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Trier</span>
             <select
               value={sortBy}

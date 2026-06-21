@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar } from 'lucide-react';
+import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight } from 'lucide-react';
 import {
   getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls,
   AccessEntry, AccessAlert,
 } from '../../lib/accessApi';
+import { getGroupTree, getMemberIdsInGroup, GroupNode } from '../../lib/groupsApi';
 
 const fmtTime = (s: string) => new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
@@ -32,6 +33,13 @@ const AccessControlPage: React.FC = () => {
   const [fromTime, setFromTime] = useState('');
   const [toTime, setToTime] = useState('');
 
+  // Filtre par groupe / sous-groupe
+  const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
+  const [groupName, setGroupName] = useState('');
+  const [subgroupName, setSubgroupName] = useState('');
+  useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
+  const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
+
   const range = useMemo(() => {
     const d = date || todayStr();
     const from = new Date(`${d}T${fromTime || '00:00'}:00`);
@@ -40,15 +48,18 @@ const AccessControlPage: React.FC = () => {
   }, [date, fromTime, toTime]);
 
   const load = useCallback(async () => {
+    // Si un groupe est sélectionné, on restreint aux membres de ce groupe/sous-groupe
+    let memberIds: string[] | undefined;
+    if (groupName) memberIds = await getMemberIdsInGroup(groupName, subgroupName || undefined);
     const [e, p, a] = await Promise.all([
-      getEntriesBetween(range.from, range.to),
+      getEntriesBetween(range.from, range.to, { memberIds }),
       getPresentCount(90),
       getAccessAlerts('open'),
     ]);
     setEntries(e); setPresent(p); setAlerts(a); setLoading(false);
     const map = await resolvePhotoUrls(e.map((x) => x.member?.photo_path));
     setPhotos(map);
-  }, [range.from, range.to]);
+  }, [range.from, range.to, groupName, subgroupName]);
 
   useEffect(() => {
     setLoading(true);
@@ -125,6 +136,23 @@ const AccessControlPage: React.FC = () => {
           <span className="text-xs text-gray-400">à</span>
           <input type="time" value={toTime} onChange={(e) => setToTime(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
         </div>
+        <span className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+        <div className="flex items-center gap-1.5">
+          <Layers size={14} className="text-gray-400" />
+          <select value={groupName} onChange={(e) => { setGroupName(e.target.value); setSubgroupName(''); }} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20">
+            <option value="">Tous les groupes</option>
+            {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+          </select>
+          {groupName && subOptions.length > 0 && (
+            <>
+              <CornerDownRight size={13} className="text-gray-300" />
+              <select value={subgroupName} onChange={(e) => setSubgroupName(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <option value="">Tous les sous-groupes</option>
+                {subOptions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+            </>
+          )}
+        </div>
         {!isToday && (
           <button onClick={resetToday} className="ml-auto text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1">Aujourd'hui</button>
         )}
@@ -143,7 +171,12 @@ const AccessControlPage: React.FC = () => {
             const refused = e.status === 'denied';
             const url = e.member?.photo_path ? photos[e.member.photo_path] : undefined;
             return (
-              <div key={e.id} className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center text-center hover:border-gray-300 transition-colors">
+              <div
+                key={e.id}
+                onClick={e.member_id ? () => { window.location.hash = `#/app/crm?member=${e.member_id}`; } : undefined}
+                title={e.member_id ? 'Voir la fiche' : undefined}
+                className={`bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center text-center transition-colors ${e.member_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm' : 'hover:border-gray-300'}`}
+              >
                 <div className={`relative ${refused ? 'ring-2 ring-red-200 rounded-full' : ''}`}>
                   {url ? (
                     <img src={url} alt="" className="w-12 h-12 rounded-full object-cover" />
