@@ -81,6 +81,8 @@ function rowToMember(r: any): Member {
     archivedAt: r.archived_at ?? undefined,
     cardNumber: r.rfid_badge ?? undefined,
     keypadCode: r.keypad_code ?? undefined,
+    groupName: r.group_name ?? undefined,
+    subgroupName: r.subgroup_name ?? undefined,
   } as Member;
 }
 
@@ -95,7 +97,7 @@ export async function getMembers(): Promise<Member[]> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name'
     )
     .is('archived_at', null)
     .order('last_name', { ascending: true });
@@ -116,7 +118,7 @@ export async function getArchivedMembers(): Promise<Member[]> {
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, archived_at, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name'
     )
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false });
@@ -308,7 +310,7 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],
     })
-    .select('id, first_name, last_name, email, phone, address, postal_code, city, member_number, status, join_date, created_at, photo_path, subscription_label, price, payment_method_label, periodicity, subscription_start, subscription_end')
+    .select('id, first_name, last_name, email, phone, address, postal_code, city, member_number, status, join_date, created_at, photo_path, subscription_label, price, payment_method_label, periodicity, subscription_start, subscription_end, group_name, subgroup_name')
     .single();
   if (error) { console.error('membersApi.createMember', error); throw error; }
   return rowToMember(data);
@@ -475,7 +477,7 @@ export async function searchMembers(query: string, limit = 8): Promise<Member[]>
       'id, first_name, last_name, email, phone, address, postal_code, city, ' +
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
-        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code'
+        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code, group_name, subgroup_name'
     )
     .or(
       `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},member_number.ilike.${like}`

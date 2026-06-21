@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail } from 'lucide-react';
+import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers } from 'lucide-react';
 import { getGyms, updateGym, ExtendedGym } from '../../utils/storage';
+import GroupsSettingsPage from './GroupsSettingsPage';
 
 interface SettingsPageProps {
   section?: string;
@@ -132,32 +133,34 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Configuration</h1>
-          <p className="text-xs text-gray-500 font-bold">Personnalisez votre établissement, paramétrez vos services et éditez en direct votre site vitrine public.</p>
+          <h1 className="text-xl font-semibold text-gray-900">{activeSection === 'groupes' ? 'Groupes' : activeSection === 'compte' ? 'Mon compte' : 'Configuration'}</h1>
+          <p className="text-sm text-gray-500">{activeSection === 'groupes' ? 'Organisez vos pratiquants en groupes et sous-groupes.' : 'Personnalisez votre établissement et votre site vitrine public.'}</p>
         </div>
-        <div className="flex items-center space-x-3">
-          {selectedGym && (
-            <a 
-              href={`#/salle/${selectedGym.id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-bold text-xs border border-slate-200 transition-all"
+        {activeSection === 'salle' && (
+          <div className="flex items-center space-x-3">
+            {selectedGym && (
+              <a
+                href={`#/salle/${selectedGym.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium text-xs border border-slate-200 transition-all"
+              >
+                <span>Voir ma page publique</span>
+                <ExternalLink size={14} />
+              </a>
+            )}
+            <button
+              onClick={handleSave}
+              className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold text-xs hover:bg-indigo-700 transition-colors"
             >
-              <span>Voir ma page publique</span>
-              <ExternalLink size={14} />
-            </a>
-          )}
-          <button 
-            onClick={handleSave}
-            className="flex items-center space-x-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
-          >
-            <Save size={16} />
-            <span>Sauvegarder</span>
-          </button>
-        </div>
+              <Save size={16} />
+              <span>Sauvegarder</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {saveStatus === 'saved' && (
@@ -166,7 +169,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             <Check size={14} strokeWidth={3} />
           </div>
           <div>
-            <p className="text-xs font-black text-green-800">Modifications enregistrées avec succès !</p>
+            <p className="text-xs font-semibold text-green-800">Modifications enregistrées avec succès !</p>
             <p className="text-[10px] text-green-600 font-semibold font-bold">Votre site vitrine public pour "{gymName}" est à jour.</p>
           </div>
         </div>
@@ -176,30 +179,39 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
       <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm w-fit">
         <button 
           onClick={() => setActiveSection('salle')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${activeSection === 'salle' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeSection === 'salle' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
         >
           <Globe size={16} />
           <span>Éditeur du Site Vitrine</span>
         </button>
         <button 
           onClick={() => setActiveSection('compte')}
-          className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl text-xs font-black transition-all ${activeSection === 'compte' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeSection === 'compte' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
         >
           <User size={16} />
           <span>Mon Compte Administrateur</span>
         </button>
+        <button
+          onClick={() => setActiveSection('groupes')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeSection === 'groupes' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
+        >
+          <Layers size={16} />
+          <span>Groupes</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8">
-        {activeSection === 'salle' ? (
+      <div className="grid grid-cols-1 gap-6">
+        {activeSection === 'groupes' ? (
+          <GroupsSettingsPage embedded />
+        ) : activeSection === 'salle' ? (
           <>
             {/* Gym Selector & Base Info Card */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-50 pb-5 gap-3">
                 <div className="flex items-center space-x-3">
                   <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600"><Globe size={20} /></div>
                   <div>
-                    <h3 className="text-lg font-black text-gray-900 tracking-tight">Choix de la salle à administrer</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Choix de la salle à administrer</h3>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Multi-établissements NoResa</p>
                   </div>
                 </div>
@@ -207,7 +219,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                   <select 
                     value={selectedGym?.id || ''}
                     onChange={handleGymSelect}
-                    className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-black text-gray-700 outline-none"
+                    className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs font-semibold text-gray-700 outline-none"
                   >
                     {gyms.map(g => (
                       <option key={g.id} value={g.id}>{g.name} ({g.plan})</option>
@@ -219,42 +231,42 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
               {/* Section: Identité de la marque */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom commercial de l'enseigne</label>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom commercial de l'enseigne</label>
                   <input 
                     type="text" 
                     value={gymName}
                     onChange={(e) => setGymName(e.target.value)}
                     placeholder="Ex: Fitness Club Paris"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium" 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarification d'appel affichée</label>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tarification d'appel affichée</label>
                   <input 
                     type="text" 
                     value={gymPricing}
                     onChange={(e) => setGymPricing(e.target.value)}
                     placeholder="Ex: à partir de 29.99 € / mois"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium" 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium" 
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Slogan / Description d'accroche pour les prospects</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Slogan / Description d'accroche pour les prospects</label>
                 <textarea 
                   rows={4} 
                   value={gymDescription}
                   onChange={(e) => setGymDescription(e.target.value)}
                   placeholder="Présentez l'esprit de votre salle, le type d'équipement, et l'ambiance unique..."
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium"
                 ></textarea>
               </div>
 
               {/* Contact de la salle */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                     <MapPin size={10} /> <span>Adresse Postale</span>
                   </label>
                   <input 
@@ -262,11 +274,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                     value={gymAddress}
                     onChange={(e) => setGymAddress(e.target.value)}
                     placeholder="12 rue de Rivoli, Paris"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none" 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                     <Phone size={10} /> <span>Téléphone direct</span>
                   </label>
                   <input 
@@ -274,11 +286,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                     value={gymPhone}
                     onChange={(e) => setGymPhone(e.target.value)}
                     placeholder="01 02 03 04 05"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none" 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center space-x-1">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
                     <Mail size={10} /> <span>E-mail contact</span>
                   </label>
                   <input 
@@ -286,18 +298,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                     value={gymEmail}
                     onChange={(e) => setGymEmail(e.target.value)}
                     placeholder="contact@salle.com"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none" 
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none" 
                   />
                 </div>
               </div>
             </div>
 
             {/* Banner Cover Customization */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
               <div className="flex items-center space-x-3 mb-2">
                 <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600"><Camera size={20} /></div>
                 <div>
-                  <h3 className="text-lg font-black text-gray-900 tracking-tight">Bannière de couverture</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Bannière de couverture</h3>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Sélectionnez ou liez l'image de fond principale du site</p>
                 </div>
               </div>
@@ -309,27 +321,27 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                 ) : (
                   <div className="text-slate-400 text-xs font-bold font-mono">Aucune couverture sélectionnée</div>
                 )}
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 py-3 px-4 flex justify-between items-center text-white">
-                  <p className="text-xs font-extrabold">{gymName}</p>
-                  <span className="text-[9px] uppercase font-black bg-indigo-600/80 px-2 py-0.5 rounded-md">Aperçu direct</span>
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 py-2.5 px-4 flex justify-between items-center text-white">
+                  <p className="text-xs font-semibold">{gymName}</p>
+                  <span className="text-[9px] uppercase font-semibold bg-indigo-600/80 px-2 py-0.5 rounded-md">Aperçu direct</span>
                 </div>
               </div>
 
               {/* Input for manual URL */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Adresse URL personnalisée de la photo de couverture</label>
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Adresse URL personnalisée de la photo de couverture</label>
                 <input 
                   type="text" 
                   value={gymBanner}
                   onChange={(e) => setGymBanner(e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none" 
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none" 
                 />
               </div>
 
               {/* Curated Presets */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Presets d'images de sport professionnelles</h4>
+                <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Presets d'images de sport professionnelles</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
                   {COVER_PRESETS.map((preset, idx) => {
                     const isSelected = gymBanner === preset.url;
@@ -360,11 +372,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             </div>
 
             {/* Prestations/Services List Card */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
               <div className="flex items-center space-x-3 mb-2">
                 <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600"><Sparkles size={20} /></div>
                 <div>
-                  <h3 className="text-lg font-black text-gray-900 tracking-tight">Prestations & Matériel</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Prestations & Matériel</h3>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Configurez la liste des services phares affichés sur votre vitrine</p>
                 </div>
               </div>
@@ -397,13 +409,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                   value={newFeatureText}
                   onChange={(e) => setNewFeatureText(e.target.value)}
                   placeholder="Ex: Espace Saunas & Hammam privatifs, Coachs diplômés d'État..."
-                  className="flex-grow bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
+                  className="flex-grow bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all"
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
                 />
                 <button 
                   type="button"
                   onClick={handleAddFeature}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-5 py-3 rounded-xl text-xs flex items-center space-x-1.5 shrink-0 shadow-md transition-all"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center space-x-1.5 shrink-0 shadow-md transition-all"
                 >
                   <Plus size={14} />
                   <span>Ajouter</span>
@@ -412,23 +424,23 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             </div>
 
             {/* Hours Customization Grid */}
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
               <div className="flex items-center space-x-3 mb-2">
                 <div className="bg-indigo-50 p-2.5 rounded-xl text-indigo-600"><Clock size={20} /></div>
                 <div>
-                  <h3 className="text-lg font-black text-gray-900 tracking-tight">Horaires de la salle</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Horaires de la salle</h3>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Configurez la grille d'ouverture hebdomadaire de votre club</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {Object.entries(gymHours).map(([day, hr]) => (
                    <div key={day} className="flex items-center justify-between p-4 bg-slate-50/50 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-colors">
-                      <span className="text-xs font-black text-gray-700 capitalize">{day}</span>
+                      <span className="text-xs font-semibold text-gray-700 capitalize">{day}</span>
                       <input 
                         type="text" 
                         value={hr} 
                         onChange={(e) => handleHourChange(day, e.target.value)}
-                        className="bg-white border border-slate-150 rounded-xl px-3 py-1.5 text-xs font-black text-indigo-600 text-right focus:ring-4 focus:ring-indigo-500/10 w-36 outline-none" 
+                        className="bg-white border border-slate-150 rounded-xl px-3 py-1.5 text-xs font-semibold text-indigo-600 text-right focus:ring-4 focus:ring-indigo-500/10 w-36 outline-none" 
                       />
                    </div>
                  ))}
@@ -436,9 +448,9 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             </div>
           </>
         ) : (
-          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-6">
             <div className="flex flex-col items-center text-center space-y-4 mb-8">
-               <img src="https://picsum.photos/seed/admin/120/120" className="w-24 h-24 rounded-3xl border-4 border-white shadow-xl" alt="" />
+               <img src="https://picsum.photos/seed/admin/120/120" className="w-24 h-24 rounded-2xl border-4 border-white shadow-sm" alt="" />
                <div>
                   <h3 className="text-xl font-bold text-gray-900">Admin NoResa</h3>
                   <p className="text-xs font-bold text-indigo-600">Super Administrateur de l'écosystème commercial</p>
@@ -446,14 +458,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             </div>
             <div className="space-y-4">
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email personnel</label>
-                  <input type="email" defaultValue="admin@noresa.io" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" disabled />
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Email personnel</label>
+                  <input type="email" defaultValue="admin@noresa.io" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" disabled />
                </div>
             </div>
             <div className="pt-6 border-t border-gray-50 flex items-center justify-between">
                <div className="flex items-center space-x-2">
                   <ShieldCheck size={18} className="text-green-500" />
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Double authentification activée</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Double authentification activée</span>
                </div>
                <span className="text-xs font-bold text-gray-400">Géré par l'infrastructure SaaS</span>
             </div>

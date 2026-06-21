@@ -100,6 +100,7 @@ const App: React.FC = () => {
 
             {/* Settings Sub-routes */}
             <Route path="parametres" element={<SettingsPage />} />
+            <Route path="parametres/groupes" element={<SettingsPage section="groupes" />} />
             <Route path="parametres/salle" element={<SettingsPage section="salle" />} />
             <Route path="parametres/mon-compte" element={<SettingsPage section="compte" />} />
           </Route>
