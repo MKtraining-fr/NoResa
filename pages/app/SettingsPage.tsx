@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers, HelpCircle } from 'lucide-react';
+import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers, HelpCircle, Smartphone } from 'lucide-react';
 import { getGyms, updateGym, ExtendedGym } from '../../utils/storage';
 import GroupsSettingsPage from './GroupsSettingsPage';
 import FaqSettingsPage from './FaqSettingsPage';
+import AppIdentitySection from './AppIdentitySection';
 
 interface SettingsPageProps {
   section?: string;
@@ -137,8 +138,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">{activeSection === 'groupes' ? 'Groupes' : activeSection === 'faq' ? 'Aide rapide (FAQ)' : activeSection === 'compte' ? 'Mon compte' : 'Configuration'}</h1>
-          <p className="text-sm text-gray-500">{activeSection === 'groupes' ? 'Organisez vos pratiquants en groupes et sous-groupes.' : activeSection === 'faq' ? 'Les questions/réponses affichées aux adhérents dans la messagerie.' : 'Personnalisez votre établissement et votre site vitrine public.'}</p>
+          <h1 className="text-xl font-semibold text-gray-900">{activeSection === 'groupes' ? 'Groupes' : activeSection === 'faq' ? 'Aide rapide (FAQ)' : activeSection === 'app' ? 'App adhérent' : activeSection === 'compte' ? 'Mon compte' : 'Configuration'}</h1>
+          <p className="text-sm text-gray-500">{activeSection === 'groupes' ? 'Organisez vos pratiquants en groupes et sous-groupes.' : activeSection === 'faq' ? 'Les questions/réponses affichées aux adhérents dans la messagerie.' : activeSection === 'app' ? "Nom, couleur et logo de l'application adhérent." : 'Personnalisez votre établissement et votre site vitrine public.'}</p>
         </div>
         {activeSection === 'salle' && (
           <div className="flex items-center space-x-3">
@@ -206,6 +207,13 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
           <HelpCircle size={16} />
           <span>FAQ</span>
         </button>
+        <button
+          onClick={() => setActiveSection('app')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeSection === 'app' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-750'}`}
+        >
+          <Smartphone size={16} />
+          <span>App adhérent</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-6">
@@ -213,6 +221,8 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
           <GroupsSettingsPage embedded />
         ) : activeSection === 'faq' ? (
           <FaqSettingsPage embedded />
+        ) : activeSection === 'app' ? (
+          <AppIdentitySection />
         ) : activeSection === 'salle' ? (
           <>
             {/* Gym Selector & Base Info Card */}
