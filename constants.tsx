@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Calendar, Wallet, ShoppingBag, Settings, UserCircle, Bell, QrCode, CreditCard, HelpCircle, ArrowRightLeft, Cctv, DoorOpen, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Wallet, ShoppingBag, Settings, UserCircle, Bell, QrCode, CreditCard, HelpCircle, ArrowRightLeft, Cctv, DoorOpen, MessageSquare, Home, FileText } from 'lucide-react';
 
 export const MOCK_REVENUE_DATA = [
   { name: 'Jan', revenue: 4500 },
@@ -49,10 +49,10 @@ export const APP_NAV_ITEMS = [
   { label: 'Paramètres', path: '/app/parametres', icon: Settings },
 ];
 
+// Barre du bas de l'espace membre : 2 items à gauche du bouton QR central, 2 à droite.
 export const MEMBER_NAV_ITEMS = [
-  { label: 'Accueil', path: '/membre', icon: LayoutDashboard },
-  { label: 'Réservations', path: '/membre/reservations', icon: Calendar },
-  { label: 'Abonnement', path: '/membre/mon-abonnement', icon: CreditCard },
+  { label: 'Accueil', path: '/membre', icon: Home },
+  { label: 'Planning', path: '/membre/reservations', icon: Calendar },
+  { label: 'Dossier', path: '/membre/dossier', icon: FileText },
   { label: 'Messages', path: '/membre/messagerie', icon: MessageSquare },
-  { label: 'Profil', path: '/membre/profil', icon: UserCircle },
 ];

@@ -43,6 +43,7 @@ const MemberMessages = lazy(() => import('./pages/member/MemberMessages'));
 const MemberDossier = lazy(() => import('./pages/member/MemberDossier'));
 const MemberInfos = lazy(() => import('./pages/member/MemberInfos'));
 const MemberParrainage = lazy(() => import('./pages/member/MemberParrainage'));
+const MemberQr = lazy(() => import('./pages/member/MemberQr'));
 
 // Écran d'attente pendant le chargement d'une page
 const PageLoader: React.FC = () => (
@@ -129,6 +130,7 @@ const App: React.FC = () => {
             <Route path="dossier" element={<MemberDossier />} />
             <Route path="infos" element={<MemberInfos />} />
             <Route path="parrainage" element={<MemberParrainage />} />
+            <Route path="qr" element={<MemberQr />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
