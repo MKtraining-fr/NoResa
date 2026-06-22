@@ -1,184 +1,445 @@
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import {
+  Plus, ChevronLeft, ChevronRight, Clock, Users, X, Save, Trash2, Loader2,
+  Calendar, UserPlus, Search, Repeat, Pencil,
+} from 'lucide-react';
+import {
+  adminListSessions, sessionRoster, adminBookMember, adminCancelMember,
+  listClassTypes, upsertClassType, deleteClassType,
+  listRecurrences, upsertRecurrence, deleteRecurrence,
+  createSession, deleteSession, generateSessions, hhmm,
+  type AdminSession, type RosterEntry, type ClassType, type Recurrence,
+} from '../../lib/planningApi';
+import { getMembers } from '../../lib/membersApi';
+import { Member } from '../../types';
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, User, Users, Activity, X, Save, Trash2, Star } from 'lucide-react';
+const DOW = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
+const DOW_FULL = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+const WEEKDAY_OPTS = [1, 2, 3, 4, 5, 6, 0]; // Lun..Dim (JS getDay)
+const startOfWeek = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); const day = x.getDay(); x.setDate(x.getDate() + ((day === 0 ? -6 : 1) - day)); return x; };
+const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+const fmtDay = (d: Date) => `${DOW[d.getDay()]} ${d.getDate()}`;
 
-interface PlanningPageProps {
-  view?: string;
-}
-
-const PlanningPage: React.FC<PlanningPageProps> = ({ view = 'calendrier' }) => {
-  const [activeView, setActiveView] = useState(view);
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [selectedCourse, setSelectedCourse] = useState<any>(null);
-
-  useEffect(() => {
-    setActiveView(view);
-  }, [view]);
-
-  const handleOpenCourse = (course?: any) => {
-    setSelectedCourse(course || null);
-    setIsCourseModalOpen(true);
-  };
+const PlanningPage: React.FC<{ view?: string }> = ({ view = 'calendrier' }) => {
+  const [tab, setTab] = useState<'planning' | 'cours'>(view === 'cours' ? 'cours' : 'planning');
+  useEffect(() => { setTab(view === 'cours' ? 'cours' : 'planning'); }, [view]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Planning & Activités</h1>
-          <p className="text-sm text-gray-500">Gérez vos créneaux et affectations.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Planning & cours</h1>
+          <p className="text-sm text-gray-500">Créneaux, réservations et liste d'attente — synchronisés avec l'app adhérent.</p>
         </div>
-        <button 
-          onClick={() => activeView === 'coachs' ? null : setIsEventModalOpen(true)}
-          className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-        >
-          <Plus size={18} />
-          <span>{activeView === 'coachs' ? 'Ajouter coach' : 'Nouvel événement'}</span>
-        </button>
-      </div>
-
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 overflow-hidden">
-        <div className="flex bg-gray-50 p-1 rounded-2xl mb-8 w-fit">
-          {['Calendrier', 'Cours', 'Coachs'].map(v => (
-            <button 
-              key={v}
-              onClick={() => setActiveView(v.toLowerCase())}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeView === v.toLowerCase() ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {v}
+        <div className="flex bg-gray-100 p-1 rounded-2xl w-fit">
+          {(['planning', 'cours'] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)} className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${tab === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+              {t === 'planning' ? 'Planning' : 'Cours'}
             </button>
           ))}
         </div>
+      </div>
+      {tab === 'planning' ? <PlanningTab /> : <CoursesTab />}
+    </div>
+  );
+};
 
-        {activeView === 'calendrier' && (
-           <div className="animate-in fade-in zoom-in-95 duration-500">
-              <div className="flex items-center justify-between mb-8">
-                 <div className="flex items-center space-x-4">
-                   <h2 className="text-xl font-bold text-gray-900">Mars 2024</h2>
-                   <div className="flex items-center space-x-1">
-                     <button className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronLeft size={20} className="text-gray-400" /></button>
-                     <button className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronRight size={20} className="text-gray-400" /></button>
-                   </div>
-                 </div>
-              </div>
-              <div className="grid grid-cols-8 gap-1 border-t border-gray-100 pt-1">
-                <div className="py-4"></div>
-                {['LUN 11', 'MAR 12', 'MER 13', 'JEU 14', 'VEN 15', 'SAM 16', 'DIM 17'].map(day => (
-                  <div key={day} className="py-4 text-center">
-                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{day}</span>
-                  </div>
-                ))}
-                {['08:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'].map(time => (
-                  <React.Fragment key={time}>
-                    <div className="py-8 text-[10px] font-black text-gray-400 text-right pr-4 tracking-widest">{time}</div>
-                    {[1, 2, 3, 4, 5, 6, 7].map(col => (
-                      <div key={`${time}-${col}`} className="border-t border-l border-gray-50 relative group min-h-[100px] hover:bg-gray-50/50 transition-colors">
-                        {time === '10:00' && col === 2 && (
-                          <div onClick={() => setIsEventModalOpen(true)} className="absolute inset-1 bg-indigo-600 rounded-2xl p-3 shadow-lg cursor-pointer animate-in zoom-in duration-500">
-                            <p className="text-[10px] font-black text-white uppercase tracking-widest">WOD</p>
-                            <p className="text-[9px] font-bold text-indigo-100 mt-1">10:00 - 11:30</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </div>
-           </div>
-        )}
+// =========================== Planning (semaine) ============================
 
-        {activeView === 'cours' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {[
-               { id: 1, title: 'CrossFit', icon: <Activity className="text-red-500" />, slots: 15, duration: '60 min' },
-               { id: 2, title: 'Yoga Vinyasa', icon: <Activity className="text-teal-500" />, slots: 20, duration: '75 min' },
-             ].map((c, i) => (
-               <div key={i} onClick={() => handleOpenCourse(c)} className="p-6 rounded-[2rem] border border-gray-100 bg-gray-50/30 hover:shadow-xl cursor-pointer transition-all group">
-                  <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-6">{c.icon}</div>
-                  <h3 className="text-lg font-black text-gray-900 mb-2">{c.title}</h3>
-                  <div className="flex items-center space-x-4 text-xs font-bold text-gray-400">
-                     <span className="flex items-center"><Users size={14} className="mr-1" /> {c.slots} pers.</span>
-                     <span className="flex items-center"><Clock size={14} className="mr-1" /> {c.duration}</span>
-                  </div>
-               </div>
-             ))}
-             <button onClick={() => handleOpenCourse()} className="p-6 rounded-[2rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center space-y-2 text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition-all">
-                <Plus size={32} />
-                <span className="text-sm font-bold">Nouveau type de cours</span>
-             </button>
-          </div>
-        )}
+const PlanningTab: React.FC = () => {
+  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
+  const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [types, setTypes] = useState<ClassType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rosterFor, setRosterFor] = useState<AdminSession | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const [s, t] = await Promise.all([adminListSessions(weekStart, addDays(weekStart, 7)), listClassTypes()]);
+    setSessions(s); setTypes(t); setLoading(false);
+  }, [weekStart]);
+  useEffect(() => { reload(); }, [reload]);
+
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const groups = days.map((d) => ({ day: d, items: sessions.filter((s) => sameDay(new Date(s.startsAt), d)) }));
+  const label = `${weekStart.getDate()} ${weekStart.toLocaleDateString('fr-FR', { month: 'short' })} – ${addDays(weekStart, 6).getDate()} ${addDays(weekStart, 6).toLocaleDateString('fr-FR', { month: 'short' })}`;
+
+  return (
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 sm:p-6">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronLeft size={18} className="text-gray-500" /></button>
+          <h2 className="text-base font-bold text-gray-900 w-44 text-center">{label}</h2>
+          <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronRight size={18} className="text-gray-500" /></button>
+          <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="ml-1 text-xs font-bold text-gray-500 hover:text-indigo-600 px-2 py-1">Cette semaine</button>
+        </div>
+        <button onClick={() => setNewOpen(true)} disabled={types.length === 0} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"><Plus size={16} /> Nouveau créneau</button>
       </div>
 
-      {/* MODALE EVENEMENT (Session spécifique) */}
-      {isEventModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 bg-indigo-600 text-white flex justify-between items-center">
-               <h2 className="text-xl font-black">Planifier une séance</h2>
-               <button onClick={() => setIsEventModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl"><X size={20} /></button>
+      {loading ? (
+        <div className="py-16 text-center text-gray-400 text-sm flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Chargement…</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {groups.map((g) => (
+            <div key={g.day.toISOString()} className={`rounded-2xl border p-3 ${sameDay(g.day, new Date()) ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-100'}`}>
+              <p className="text-xs font-extrabold uppercase tracking-wide text-gray-500 mb-2 px-1">{fmtDay(g.day)}</p>
+              {g.items.length === 0 ? (
+                <p className="text-[11px] text-gray-300 px-1 py-2">—</p>
+              ) : (
+                <div className="space-y-2">
+                  {g.items.map((s) => {
+                    const full = s.bookedCount >= s.capacity;
+                    return (
+                      <button key={s.id} onClick={() => setRosterFor(s)} className="w-full text-left rounded-xl p-2.5 border border-gray-100 bg-white hover:border-indigo-300 hover:shadow-sm transition-all">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+                          <span className="font-bold text-sm text-gray-900 truncate">{s.typeName}</span>
+                          <span className="ml-auto text-[11px] font-bold text-gray-400">{hhmm(s.startsAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${full ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{s.bookedCount}/{s.capacity}</span>
+                          {s.waitlistCount > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-600">+{s.waitlistCount} attente</span>}
+                          {s.coachName && <span className="text-[11px] text-gray-400 truncate">{s.coachName}</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="p-8 space-y-6">
-               <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Type de cours</label>
-                  <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
-                    <option>CrossFit WOD</option>
-                    <option>Yoga Vinyasa</option>
-                    <option>BodyPump</option>
-                  </select>
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Heure début</label>
-                    <input type="time" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" defaultValue="10:00" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Coach</label>
-                    <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
-                      <option>David Strong</option>
-                      <option>Sarah Zen</option>
-                    </select>
-                  </div>
-               </div>
-               <button onClick={() => setIsEventModalOpen(false)} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Ajouter au planning</button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* MODALE COURS (Template) */}
-      {isCourseModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 bg-slate-800 text-white flex justify-between items-center">
-               <h2 className="text-xl font-black">{selectedCourse ? 'Modifier le cours' : 'Nouveau type de cours'}</h2>
-               <button onClick={() => setIsCourseModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl"><X size={20} /></button>
-            </div>
-            <div className="p-8 space-y-6">
-               <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom de l'activité</label>
-                  <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" defaultValue={selectedCourse?.title} />
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Capacité max</label>
-                    <input type="number" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" defaultValue={selectedCourse?.slots || 15} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Durée (min)</label>
-                    <input type="number" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" defaultValue={60} />
-                  </div>
-               </div>
-               <div className="flex space-x-3">
-                  {selectedCourse && (
-                    <button className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all"><Trash2 size={20} /></button>
-                  )}
-                  <button onClick={() => setIsCourseModalOpen(false)} className="flex-grow py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Enregistrer</button>
-               </div>
-            </div>
+      {rosterFor && <RosterModal session={rosterFor} onClose={() => setRosterFor(null)} onChanged={reload} />}
+      {newOpen && <NewSessionModal types={types} onClose={() => setNewOpen(false)} onSaved={reload} />}
+    </div>
+  );
+};
+
+// =========================== Roster (inscrits) =============================
+
+const RosterModal: React.FC<{ session: AdminSession; onClose: () => void; onChanged: () => void }> = ({ session, onClose, onChanged }) => {
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const dt = new Date(session.startsAt);
+
+  const load = useCallback(async () => { setLoading(true); setRoster(await sessionRoster(session.id)); setLoading(false); }, [session.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const booked = roster.filter((r) => r.status === 'booked');
+  const waitlist = roster.filter((r) => r.status === 'waitlist');
+
+  const remove = async (memberId: string) => {
+    setBusy(memberId);
+    try { await adminCancelMember(session.id, memberId); await load(); onChanged(); }
+    catch (e: any) { alert(e?.message || 'Erreur'); } finally { setBusy(null); }
+  };
+  const del = async () => {
+    if (!confirm('Supprimer ce créneau et toutes ses réservations ?')) return;
+    try { await deleteSession(session.id); onChanged(); onClose(); }
+    catch (e: any) { alert(e?.message || 'Erreur'); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-lg max-h-[88vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: session.color }} />
+          <div className="min-w-0 flex-grow">
+            <p className="font-bold text-gray-900 truncate">{session.typeName}</p>
+            <p className="text-xs text-gray-500 capitalize">{DOW_FULL[dt.getDay()]} {dt.getDate()}/{dt.getMonth() + 1} · {hhmm(session.startsAt)}–{hhmm(session.endsAt)}</p>
           </div>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${booked.length >= session.capacity ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{booked.length}/{session.capacity}</span>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button>
         </div>
-      )}
+
+        <div className="overflow-y-auto p-4 space-y-4">
+          {loading ? (
+            <div className="py-8 flex justify-center text-gray-400"><Loader2 size={18} className="animate-spin" /></div>
+          ) : (
+            <>
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-wide text-gray-400 mb-2">Inscrits ({booked.length})</p>
+                {booked.length === 0 ? <p className="text-sm text-gray-300">Personne pour l'instant.</p> : (
+                  <div className="space-y-1.5">{booked.map((r) => <RosterRow key={r.bookingId} r={r} busy={busy === r.memberId} onRemove={() => remove(r.memberId)} />)}</div>
+                )}
+              </div>
+              {waitlist.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-extrabold uppercase tracking-wide text-orange-500 mb-2">Liste d'attente ({waitlist.length})</p>
+                  <div className="space-y-1.5">{waitlist.map((r, i) => <RosterRow key={r.bookingId} r={r} rank={i + 1} busy={busy === r.memberId} onRemove={() => remove(r.memberId)} />)}</div>
+                </div>
+              )}
+              {adding
+                ? <MemberPicker exclude={roster.map((r) => r.memberId)} onPick={async (m) => { setBusy(m.id); try { await adminBookMember(session.id, m.id); setAdding(false); await load(); onChanged(); } catch (e: any) { alert(e?.message || 'Erreur'); } finally { setBusy(null); } }} onCancel={() => setAdding(false)} />
+                : <button onClick={() => setAdding(true)} className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-gray-200 text-gray-500 rounded-2xl py-3 font-bold text-sm hover:border-indigo-400 hover:text-indigo-600"><UserPlus size={16} /> Inscrire un client</button>}
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex justify-between">
+          <button onClick={del} className="flex items-center gap-1.5 text-sm font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl"><Trash2 size={15} /> Supprimer le créneau</button>
+          <button onClick={onClose} className="text-sm font-bold text-gray-500 hover:bg-gray-100 px-4 py-2 rounded-xl">Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RosterRow: React.FC<{ r: RosterEntry; rank?: number; busy: boolean; onRemove: () => void }> = ({ r, rank, busy, onRemove }) => (
+  <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2">
+    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
+      {rank ?? `${(r.firstName[0] || '')}${(r.lastName[0] || '')}`.toUpperCase()}
+    </div>
+    <div className="min-w-0 flex-grow">
+      <p className="text-sm font-bold text-gray-900 truncate">{r.firstName} {r.lastName}</p>
+      {r.memberNumber && <p className="text-[11px] text-gray-400">n° {r.memberNumber}</p>}
+    </div>
+    <button onClick={onRemove} disabled={busy} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50">{busy ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}</button>
+  </div>
+);
+
+const MemberPicker: React.FC<{ exclude: string[]; onPick: (m: Member) => void; onCancel: () => void }> = ({ exclude, onPick, onCancel }) => {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [q, setQ] = useState('');
+  useEffect(() => { getMembers().then(setMembers).catch(() => {}); }, []);
+  const ex = new Set(exclude);
+  const list = members
+    .filter((m) => !ex.has(m.id))
+    .filter((m) => `${m.firstName} ${m.lastName} ${m.memberNumber ?? ''}`.toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 30);
+  return (
+    <div className="border-2 border-indigo-200 rounded-2xl p-3 bg-indigo-50/30">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="relative flex-grow">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un client…" className="w-full bg-white border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+        </div>
+        <button onClick={onCancel} className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg"><X size={16} /></button>
+      </div>
+      <div className="max-h-52 overflow-y-auto space-y-1">
+        {list.length === 0 ? <p className="text-xs text-gray-400 py-2 text-center">Aucun client.</p> : list.map((m) => (
+          <button key={m.id} onClick={() => onPick(m)} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white text-left">
+            <span className="text-sm font-semibold text-gray-900">{m.firstName} {m.lastName}</span>
+            {m.memberNumber && <span className="text-[11px] text-gray-400">n° {m.memberNumber}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const NewSessionModal: React.FC<{ types: ClassType[]; onClose: () => void; onSaved: () => void }> = ({ types, onClose, onSaved }) => {
+  const [classTypeId, setClassTypeId] = useState(types[0]?.id ?? '');
+  const ct = types.find((t) => t.id === classTypeId);
+  const [when, setWhen] = useState('');
+  const [capacity, setCapacity] = useState(ct?.capacity ?? 12);
+  const [coach, setCoach] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const save = async () => {
+    setErr('');
+    if (!classTypeId || !when) { setErr('Choisis un cours et une date/heure.'); return; }
+    setBusy(true);
+    try {
+      const id = await createSession({ classTypeId, startsAt: new Date(when).toISOString(), durationMin: ct?.durationMin ?? 60, capacity, coachName: coach || null });
+      if (!id) { setErr('Un créneau existe déjà à cet horaire.'); setBusy(false); return; }
+      onSaved(); onClose();
+    } catch (e: any) { setErr(e?.message || 'Erreur'); setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-lg text-gray-900">Nouveau créneau</h3><button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button></div>
+        {err && <p className="text-sm text-red-600 font-medium mb-3">{err}</p>}
+        <div className="space-y-3">
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cours</label>
+            <select value={classTypeId} onChange={(e) => { setClassTypeId(e.target.value); const t = types.find((x) => x.id === e.target.value); if (t) setCapacity(t.capacity); }} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none">
+              {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select></div>
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Date & heure</label>
+            <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Capacité</label>
+            <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Coach (facultatif)</label>
+            <input type="text" value={coach} onChange={(e) => setCoach(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+        </div>
+        <button onClick={save} disabled={busy} className="mt-5 w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Créer le créneau</button>
+      </div>
+    </div>
+  );
+};
+
+// =========================== Cours + récurrences ===========================
+
+const CoursesTab: React.FC = () => {
+  const [types, setTypes] = useState<ClassType[]>([]);
+  const [recs, setRecs] = useState<Recurrence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [courseModal, setCourseModal] = useState<ClassType | null | 'new'>(null);
+  const [recModal, setRecModal] = useState<Recurrence | null | 'new'>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const [t, r] = await Promise.all([listClassTypes(), listRecurrences()]);
+    setTypes(t); setRecs(r); setLoading(false);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const delCourse = async (id: string) => {
+    if (!confirm('Supprimer ce cours, ses créneaux et toutes les réservations associées ?')) return;
+    try { await deleteClassType(id); reload(); } catch (e: any) { alert(e?.message || 'Erreur'); }
+  };
+  const delRec = async (id: string) => {
+    if (!confirm('Supprimer cette récurrence ? (les créneaux déjà créés restent)')) return;
+    try { await deleteRecurrence(id); reload(); } catch (e: any) { alert(e?.message || 'Erreur'); }
+  };
+
+  if (loading) return <div className="py-16 text-center text-gray-400 text-sm flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Chargement…</div>;
+
+  return (
+    <div className="space-y-6">
+      {/* Cours */}
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4"><h2 className="font-bold text-gray-900">Types de cours</h2>
+          <button onClick={() => setCourseModal('new')} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700"><Plus size={16} /> Nouveau cours</button></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {types.map((t) => (
+            <div key={t.id} className="rounded-2xl border border-gray-100 p-4 group">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5"><span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${t.color}1a`, color: t.color }}><Calendar size={18} /></span>
+                  <div><p className="font-extrabold text-gray-900">{t.name}</p>{!t.active && <span className="text-[10px] font-bold text-gray-400 uppercase">inactif</span>}</div></div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => setCourseModal(t)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
+                  <button onClick={() => delCourse(t.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button></div>
+              </div>
+              <div className="flex items-center gap-3 mt-3 text-xs font-bold text-gray-400">
+                <span className="flex items-center gap-1"><Users size={13} /> {t.capacity} pl.</span>
+                <span className="flex items-center gap-1"><Clock size={13} /> {t.durationMin} min</span>
+              </div>
+            </div>
+          ))}
+          {types.length === 0 && <p className="text-sm text-gray-400 col-span-full py-4">Aucun cours. Crée le premier.</p>}
+        </div>
+      </div>
+
+      {/* Récurrences */}
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-1"><h2 className="font-bold text-gray-900 flex items-center gap-2"><Repeat size={17} className="text-indigo-500" /> Créneaux récurrents</h2>
+          <button onClick={() => setRecModal('new')} disabled={types.length === 0} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"><Plus size={16} /> Ajouter</button></div>
+        <p className="text-xs text-gray-400 mb-4">Les créneaux sont générés automatiquement ~8 semaines à l'avance.</p>
+        <div className="space-y-2">
+          {recs.map((r) => (
+            <div key={r.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 px-4 py-3">
+              <span className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex flex-col items-center justify-center shrink-0"><span className="text-[10px] font-extrabold">{DOW[r.weekday]}</span></span>
+              <div className="min-w-0 flex-grow">
+                <p className="font-bold text-sm text-gray-900 truncate">{r.typeName} <span className="text-gray-400 font-medium">· {DOW_FULL[r.weekday]} {r.startTime}</span></p>
+                <p className="text-[11px] text-gray-400">{r.durationMin} min{r.capacity ? ` · ${r.capacity} pl.` : ''}{r.coachName ? ` · ${r.coachName}` : ''}{r.active ? '' : ' · inactif'}</p>
+              </div>
+              <button onClick={() => setRecModal(r)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14} /></button>
+              <button onClick={() => delRec(r.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
+            </div>
+          ))}
+          {recs.length === 0 && <p className="text-sm text-gray-400 py-2">Aucune récurrence.</p>}
+        </div>
+      </div>
+
+      {courseModal && <CourseModal course={courseModal === 'new' ? null : courseModal} onClose={() => setCourseModal(null)} onSaved={reload} />}
+      {recModal && <RecurrenceModal rec={recModal === 'new' ? null : recModal} types={types} onClose={() => setRecModal(null)} onSaved={reload} />}
+    </div>
+  );
+};
+
+const COLORS = ['#E11D2A', '#4F46E5', '#0EA5E9', '#16A34A', '#F59E0B', '#9333EA', '#DB2777', '#0F172A'];
+
+const CourseModal: React.FC<{ course: ClassType | null; onClose: () => void; onSaved: () => void }> = ({ course, onClose, onSaved }) => {
+  const [name, setName] = useState(course?.name ?? '');
+  const [color, setColor] = useState(course?.color ?? COLORS[0]);
+  const [capacity, setCapacity] = useState(course?.capacity ?? 12);
+  const [duration, setDuration] = useState(course?.durationMin ?? 60);
+  const [active, setActive] = useState(course?.active ?? true);
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const save = async () => {
+    if (!name.trim()) { setErr('Nom requis.'); return; }
+    setBusy(true); setErr('');
+    try { await upsertClassType({ id: course?.id, name: name.trim(), color, durationMin: duration, capacity, active }); onSaved(); onClose(); }
+    catch (e: any) { setErr(e?.message || 'Erreur'); setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-lg text-gray-900">{course ? 'Modifier le cours' : 'Nouveau cours'}</h3><button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button></div>
+        {err && <p className="text-sm text-red-600 font-medium mb-3">{err}</p>}
+        <div className="space-y-3">
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Nom</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" placeholder="Ex. Hyrox" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Capacité</label>
+              <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Durée (min)</label>
+              <input type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          </div>
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Couleur</label>
+            <div className="flex flex-wrap gap-2 mt-1.5">{COLORS.map((c) => <button key={c} onClick={() => setColor(c)} className={`w-7 h-7 rounded-full ${color === c ? 'ring-2 ring-offset-2 ring-gray-900' : ''}`} style={{ background: c }} />)}</div></div>
+          <label className="flex items-center gap-2 cursor-pointer pt-1"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4 rounded text-indigo-600" /><span className="text-sm font-semibold text-gray-700">Actif (visible côté adhérent)</span></label>
+        </div>
+        <button onClick={save} disabled={busy} className="mt-5 w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Enregistrer</button>
+      </div>
+    </div>
+  );
+};
+
+const RecurrenceModal: React.FC<{ rec: Recurrence | null; types: ClassType[]; onClose: () => void; onSaved: () => void }> = ({ rec, types, onClose, onSaved }) => {
+  const [classTypeId, setClassTypeId] = useState(rec?.classTypeId ?? types[0]?.id ?? '');
+  const ct = types.find((t) => t.id === classTypeId);
+  const [weekday, setWeekday] = useState(rec?.weekday ?? 2);
+  const [time, setTime] = useState(rec?.startTime ?? '18:30');
+  const [duration, setDuration] = useState(rec?.durationMin ?? ct?.durationMin ?? 60);
+  const [capacity, setCapacity] = useState<number | ''>(rec?.capacity ?? '');
+  const [coach, setCoach] = useState(rec?.coachName ?? '');
+  const [active, setActive] = useState(rec?.active ?? true);
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const save = async () => {
+    if (!classTypeId) { setErr('Choisis un cours.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await upsertRecurrence({ id: rec?.id, classTypeId, weekday, startTime: time, durationMin: duration, capacity: capacity === '' ? null : Number(capacity), coachName: coach || null, active });
+      onSaved(); onClose();
+    } catch (e: any) { setErr(e?.message || 'Erreur'); setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-lg text-gray-900">{rec ? 'Modifier la récurrence' : 'Nouvelle récurrence'}</h3><button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button></div>
+        {err && <p className="text-sm text-red-600 font-medium mb-3">{err}</p>}
+        <div className="space-y-3">
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Cours</label>
+            <select value={classTypeId} onChange={(e) => setClassTypeId(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none">{types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Jour</label>
+              <select value={weekday} onChange={(e) => setWeekday(Number(e.target.value))} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none">{WEEKDAY_OPTS.map((w) => <option key={w} value={w}>{DOW_FULL[w]}</option>)}</select></div>
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Heure</label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Durée (min)</label>
+              <input type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(Number(e.target.value))} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+            <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Capacité</label>
+              <input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value === '' ? '' : Number(e.target.value))} placeholder={`défaut ${ct?.capacity ?? ''}`} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          </div>
+          <div><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Coach (facultatif)</label>
+            <input value={coach} onChange={(e) => setCoach(e.target.value)} className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none" /></div>
+          <label className="flex items-center gap-2 cursor-pointer pt-1"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="w-4 h-4 rounded text-indigo-600" /><span className="text-sm font-semibold text-gray-700">Active</span></label>
+        </div>
+        <button onClick={save} disabled={busy} className="mt-5 w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Enregistrer & générer</button>
+      </div>
     </div>
   );
 };
