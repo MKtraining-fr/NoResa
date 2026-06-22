@@ -107,7 +107,6 @@ const App: React.FC = () => {
             {/* Planning Sub-routes */}
             <Route path="planning" element={<PlanningPage />} />
             <Route path="planning/cours" element={<PlanningPage view="cours" />} />
-            <Route path="planning/coachs" element={<PlanningPage view="coachs" />} />
 
             {/* Finance Sub-routes */}
             <Route path="finance" element={<FinancePage />} />

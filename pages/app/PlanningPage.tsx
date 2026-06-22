@@ -47,69 +47,125 @@ const PlanningPage: React.FC<{ view?: string }> = ({ view = 'calendrier' }) => {
 
 // =========================== Planning (semaine) ============================
 
+const SessionChip: React.FC<{ s: AdminSession; onClick: () => void }> = ({ s, onClick }) => {
+  const full = s.bookedCount >= s.capacity;
+  return (
+    <button onClick={onClick} className="w-full text-left rounded-xl p-2.5 border border-gray-100 bg-white hover:border-indigo-300 hover:shadow-sm transition-all">
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+        <span className="font-bold text-sm text-gray-900 truncate">{s.typeName}</span>
+        <span className="ml-auto text-[11px] font-bold text-gray-400">{hhmm(s.startsAt)}</span>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${full ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{s.bookedCount}/{s.capacity}</span>
+        {s.waitlistCount > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-600">+{s.waitlistCount} attente</span>}
+        {s.coachName && <span className="text-[11px] text-gray-400 truncate">{s.coachName}</span>}
+      </div>
+    </button>
+  );
+};
+
 const PlanningTab: React.FC = () => {
-  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
+  const [mode, setMode] = useState<'week' | 'month'>('week');
+  const [anchor, setAnchor] = useState(new Date());
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [types, setTypes] = useState<ClassType[]>([]);
   const [loading, setLoading] = useState(true);
   const [rosterFor, setRosterFor] = useState<AdminSession | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
+  const range = useMemo(() => {
+    if (mode === 'week') {
+      const ws = startOfWeek(anchor);
+      return { from: ws, to: addDays(ws, 7), gridStart: ws, count: 7 };
+    }
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const gs = startOfWeek(first);
+    return { from: gs, to: addDays(gs, 42), gridStart: gs, count: 42 };
+  }, [mode, anchor]);
+
   const reload = useCallback(async () => {
     setLoading(true);
-    const [s, t] = await Promise.all([adminListSessions(weekStart, addDays(weekStart, 7)), listClassTypes()]);
+    const [s, t] = await Promise.all([adminListSessions(range.from, range.to), listClassTypes()]);
     setSessions(s); setTypes(t); setLoading(false);
-  }, [weekStart]);
+  }, [range.from, range.to]);
   useEffect(() => { reload(); }, [reload]);
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const groups = days.map((d) => ({ day: d, items: sessions.filter((s) => sameDay(new Date(s.startsAt), d)) }));
-  const label = `${weekStart.getDate()} ${weekStart.toLocaleDateString('fr-FR', { month: 'short' })} – ${addDays(weekStart, 6).getDate()} ${addDays(weekStart, 6).toLocaleDateString('fr-FR', { month: 'short' })}`;
+  const move = (dir: number) => {
+    if (mode === 'week') setAnchor(addDays(anchor, dir * 7));
+    else setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1));
+  };
+  const cells = useMemo(() => Array.from({ length: range.count }, (_, i) => addDays(range.gridStart, i)), [range.gridStart, range.count]);
+  const sessionsOf = (d: Date) => sessions.filter((s) => sameDay(new Date(s.startsAt), d));
+  const label = mode === 'week'
+    ? `${range.gridStart.getDate()} ${range.gridStart.toLocaleDateString('fr-FR', { month: 'short' })} – ${addDays(range.gridStart, 6).getDate()} ${addDays(range.gridStart, 6).toLocaleDateString('fr-FR', { month: 'short' })}`
+    : anchor.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 
   return (
     <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 sm:p-6">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronLeft size={18} className="text-gray-500" /></button>
-          <h2 className="text-base font-bold text-gray-900 w-44 text-center">{label}</h2>
-          <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronRight size={18} className="text-gray-500" /></button>
-          <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="ml-1 text-xs font-bold text-gray-500 hover:text-indigo-600 px-2 py-1">Cette semaine</button>
+          <button onClick={() => move(-1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronLeft size={18} className="text-gray-500" /></button>
+          <h2 className="text-base font-bold text-gray-900 min-w-[11rem] text-center capitalize">{label}</h2>
+          <button onClick={() => move(1)} className="p-2 hover:bg-gray-100 rounded-xl"><ChevronRight size={18} className="text-gray-500" /></button>
+          <button onClick={() => setAnchor(new Date())} className="ml-1 text-xs font-bold text-gray-500 hover:text-indigo-600 px-2 py-1">Aujourd'hui</button>
         </div>
-        <button onClick={() => setNewOpen(true)} disabled={types.length === 0} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"><Plus size={16} /> Nouveau créneau</button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            {(['week', 'month'] as const).map((m) => (
+              <button key={m} onClick={() => setMode(m)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === m ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}>{m === 'week' ? 'Semaine' : 'Mois'}</button>
+            ))}
+          </div>
+          <button onClick={() => setNewOpen(true)} disabled={types.length === 0} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"><Plus size={16} /> <span className="hidden sm:inline">Nouveau créneau</span></button>
+        </div>
       </div>
 
       {loading ? (
         <div className="py-16 text-center text-gray-400 text-sm flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Chargement…</div>
-      ) : (
+      ) : mode === 'week' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {groups.map((g) => (
-            <div key={g.day.toISOString()} className={`rounded-2xl border p-3 ${sameDay(g.day, new Date()) ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-100'}`}>
-              <p className="text-xs font-extrabold uppercase tracking-wide text-gray-500 mb-2 px-1">{fmtDay(g.day)}</p>
-              {g.items.length === 0 ? (
-                <p className="text-[11px] text-gray-300 px-1 py-2">—</p>
-              ) : (
-                <div className="space-y-2">
-                  {g.items.map((s) => {
-                    const full = s.bookedCount >= s.capacity;
-                    return (
-                      <button key={s.id} onClick={() => setRosterFor(s)} className="w-full text-left rounded-xl p-2.5 border border-gray-100 bg-white hover:border-indigo-300 hover:shadow-sm transition-all">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
-                          <span className="font-bold text-sm text-gray-900 truncate">{s.typeName}</span>
-                          <span className="ml-auto text-[11px] font-bold text-gray-400">{hhmm(s.startsAt)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${full ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{s.bookedCount}/{s.capacity}</span>
-                          {s.waitlistCount > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-600">+{s.waitlistCount} attente</span>}
-                          {s.coachName && <span className="text-[11px] text-gray-400 truncate">{s.coachName}</span>}
-                        </div>
-                      </button>
-                    );
-                  })}
+          {cells.map((d) => {
+            const items = sessionsOf(d);
+            return (
+              <div key={d.toISOString()} className={`rounded-2xl border p-3 ${sameDay(d, new Date()) ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-100'}`}>
+                <p className="text-xs font-extrabold uppercase tracking-wide text-gray-500 mb-2 px-1">{fmtDay(d)}</p>
+                {items.length === 0 ? <p className="text-[11px] text-gray-300 px-1 py-2">—</p> : (
+                  <div className="space-y-2">{items.map((s) => <SessionChip key={s.id} s={s} onClick={() => setRosterFor(s)} />)}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div>
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'].map((d) => <div key={d} className="text-center text-[10px] font-extrabold uppercase tracking-wide text-gray-400 py-1">{d}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((d) => {
+              const items = sessionsOf(d);
+              const inMonth = d.getMonth() === anchor.getMonth();
+              const today = sameDay(d, new Date());
+              return (
+                <div key={d.toISOString()} className={`min-h-[84px] rounded-xl border p-1.5 ${today ? 'border-indigo-300 bg-indigo-50/30' : inMonth ? 'border-gray-100' : 'border-gray-50 bg-gray-50/40'}`}>
+                  <p className={`text-[11px] font-bold mb-1 px-0.5 ${inMonth ? 'text-gray-700' : 'text-gray-300'}`}>{d.getDate()}</p>
+                  <div className="space-y-1">
+                    {items.slice(0, 3).map((s) => {
+                      const full = s.bookedCount >= s.capacity;
+                      return (
+                        <button key={s.id} onClick={() => setRosterFor(s)} title={`${s.typeName} ${hhmm(s.startsAt)} · ${s.bookedCount}/${s.capacity}`} className="w-full flex items-center gap-1 rounded-md px-1 py-0.5 text-left hover:opacity-80" style={{ background: `${s.color}1a` }}>
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.color }} />
+                          <span className="text-[10px] font-bold text-gray-700 truncate">{hhmm(s.startsAt)} {s.typeName}</span>
+                          <span className={`ml-auto text-[9px] font-bold ${full ? 'text-red-600' : 'text-gray-400'}`}>{s.bookedCount}/{s.capacity}</span>
+                        </button>
+                      );
+                    })}
+                    {items.length > 3 && <p className="text-[9px] font-bold text-gray-400 px-1">+{items.length - 3}</p>}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
 
