@@ -88,4 +88,8 @@ export interface Member {
   gocardlessMandateId?: string;
   gocardlessCustomerId?: string;
   archivedAt?: string;
+  // Contrôle d'accès : blocage manuel du badge/code + motif
+  accessBlocked?: boolean;
+  accessBlockReason?: string;
+  accessBlockedAt?: string;
 }

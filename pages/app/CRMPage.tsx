@@ -302,7 +302,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
   // --- Accès contrôleur (via le pont) : bloquer / débloquer / (re)créer ---
   const [accessBusy, setAccessBusy] = useState(false);
-  const sendAccess = async (action: 'grant' | 'block' | 'unblock' | 'revoke') => {
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const openBlockModal = () => { setBlockReason((selectedContact as any)?.accessBlockReason || ''); setBlockModalOpen(true); };
+
+  const sendAccess = async (action: 'grant' | 'unblock' | 'revoke') => {
     if (!selectedContact) return;
     const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
     if (!pin) { alert("Ce membre n'a pas de numéro d'adhérent."); return; }
@@ -315,11 +319,42 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
         action,
       });
-      const label = { grant: 'Création/activation', block: 'Blocage', unblock: 'Déblocage', revoke: 'Suppression' }[action];
+      // Activer / Débloquer lèvent le statut « bloqué »
+      if (action === 'grant' || action === 'unblock') {
+        await patchMember(selectedContact.id, { access_blocked: false, access_block_reason: null, access_blocked_at: null });
+        updateField('accessBlocked' as any, false);
+        updateField('accessBlockReason' as any, undefined);
+      }
+      const label = { grant: 'Création/activation', unblock: 'Déblocage', revoke: 'Suppression' }[action];
       alert(`${label} de l'accès demandé. Le pont l'appliquera sur le contrôleur dans quelques secondes.`);
     } catch (err: any) {
       console.error(err);
       alert(err?.message || "Impossible d'envoyer la commande d'accès.");
+    } finally { setAccessBusy(false); }
+  };
+
+  const confirmBlock = async () => {
+    if (!selectedContact) return;
+    const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
+    if (!pin) { alert("Ce membre n'a pas de numéro d'adhérent."); return; }
+    setAccessBusy(true);
+    try {
+      const reason = blockReason.trim();
+      await patchMember(selectedContact.id, { access_blocked: true, access_block_reason: reason || null, access_blocked_at: new Date().toISOString() });
+      await enqueueAccessCommand({
+        memberId: selectedContact.id, pin,
+        cardNumber: selectedContact.cardNumber || null,
+        keypadCode: (selectedContact as any).keypadCode || null,
+        name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
+        action: 'block',
+      });
+      updateField('accessBlocked' as any, true);
+      updateField('accessBlockReason' as any, reason || undefined);
+      setBlockModalOpen(false);
+      alert("Accès bloqué. Le pont l'appliquera sur le contrôleur dans quelques secondes.");
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || "Impossible de bloquer l'accès.");
     } finally { setAccessBusy(false); }
   };
 
@@ -1309,12 +1344,23 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   )}
 
+                  {/* Bandeau « accès bloqué » + motif */}
+                  {(selectedContact as any).accessBlocked && (
+                    <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+                      <ShieldAlert size={16} className="text-red-600 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">Accès bloqué</p>
+                        <p className="text-sm font-semibold text-red-900 break-words">{(selectedContact as any).accessBlockReason || 'Sans motif précisé'}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Contrôle d'accès (compact) */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
                     <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
                     <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
-                    <button type="button" onClick={() => sendAccess('block')} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
+                    <button type="button" onClick={openBlockModal} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
                   </div>
 
                   {/* Contact + abonnement résumé */}
@@ -1808,6 +1854,28 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de confirmation de blocage (+ motif optionnel) */}
+      {blockModalOpen && selectedContact && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => !accessBusy && setBlockModalOpen(false)}>
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert size={22} /></div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg leading-tight">Bloquer l'accès</h3>
+                <p className="text-sm text-gray-500">{selectedContact.firstName} {selectedContact.lastName}{selectedContact.memberNumber ? ` · n° ${selectedContact.memberNumber}` : ''}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">Le badge et le code de ce membre seront retirés du contrôleur. Tu peux préciser un motif (facultatif) — il restera visible sur sa fiche et sur la page contrôle d'accès.</p>
+            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Motif (facultatif)</label>
+            <textarea rows={3} value={blockReason} onChange={(e) => setBlockReason(e.target.value)} autoFocus placeholder="Ex. impayé, comportement, badge perdu…" className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-red-500/20" />
+            <div className="flex gap-2 mt-5">
+              <button type="button" onClick={() => setBlockModalOpen(false)} disabled={accessBusy} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold text-sm">Annuler</button>
+              <button type="button" onClick={confirmBlock} disabled={accessBusy} className="flex-1 bg-red-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-1.5"><X size={16} /> {accessBusy ? 'Blocage…' : "Bloquer l'accès"}</button>
             </div>
           </div>
         </div>

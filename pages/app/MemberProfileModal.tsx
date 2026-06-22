@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Phone, Mail, MapPin, CreditCard, Layers, Hash, KeyRound, Calendar, ExternalLink, Ticket, Loader2 } from 'lucide-react';
+import { X, Phone, Mail, MapPin, CreditCard, Layers, Hash, KeyRound, Calendar, ExternalLink, Ticket, Loader2, ShieldAlert } from 'lucide-react';
 import { getMemberById, getPhotoUrl } from '../../lib/membersApi';
 import { getPackStatus, PackStatus } from '../../lib/accessApi';
 
@@ -48,7 +48,10 @@ const MemberProfileModal: React.FC<{ memberId: string; onClose: () => void }> = 
             ? <img src={photo} alt="" className="w-12 h-12 rounded-full object-cover" />
             : <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-base font-semibold">{member ? initials(member) : '…'}</div>}
           <div className="min-w-0 flex-grow">
-            <p className="text-base font-semibold text-gray-900 truncate">{member ? nameOf(member) : 'Chargement…'}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-semibold text-gray-900 truncate">{member ? nameOf(member) : 'Chargement…'}</p>
+              {member?.accessBlocked && <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg"><ShieldAlert size={11} /> Bloqué</span>}
+            </div>
             {member?.memberNumber && <p className="text-xs text-gray-400">N° {member.memberNumber}</p>}
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button>
@@ -62,6 +65,17 @@ const MemberProfileModal: React.FC<{ memberId: string; onClose: () => void }> = 
             <p className="py-8 text-center text-sm text-gray-400">Fiche introuvable.</p>
           ) : (
             <div className="space-y-4">
+              {/* Accès bloqué + motif */}
+              {member.accessBlocked && (
+                <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3">
+                  <ShieldAlert size={16} className="text-red-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">Accès bloqué</p>
+                    <p className="text-sm font-semibold text-red-900 break-words">{member.accessBlockReason || 'Sans motif précisé'}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Abonnement */}
               <div className="bg-gray-50 rounded-xl p-3">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Abonnement</p>

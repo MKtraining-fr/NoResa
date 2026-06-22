@@ -26,6 +26,38 @@ export async function enqueueAccessCommand(p: {
   if (error) { console.error('enqueueAccessCommand', error); throw error; }
 }
 
+export interface BlockedMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  memberNumber: string | null;
+  cardNumber: string | null;
+  photoPath: string | null;
+  reason: string | null;
+  blockedAt: string | null;
+}
+
+/** Membres dont l'accès est actuellement bloqué (badge/code retiré du contrôleur). */
+export async function getBlockedMembers(): Promise<BlockedMember[]> {
+  const { data, error } = await supabase
+    .from('members')
+    .select('id, first_name, last_name, member_number, rfid_badge, photo_path, access_block_reason, access_blocked_at')
+    .eq('access_blocked', true)
+    .is('archived_at', null)
+    .order('access_blocked_at', { ascending: false });
+  if (error) { console.error('getBlockedMembers', error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    firstName: r.first_name ?? '',
+    lastName: r.last_name ?? '',
+    memberNumber: r.member_number ?? null,
+    cardNumber: r.rfid_badge ?? null,
+    photoPath: r.photo_path ?? null,
+    reason: r.access_block_reason ?? null,
+    blockedAt: r.access_blocked_at ?? null,
+  }));
+}
+
 
 // Valeur encodée dans le QR d'un membre = son numéro d'adhérent (= card number côté ZKAccess)
 export function memberQrValue(memberNumber?: string | null): string {

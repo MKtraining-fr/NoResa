@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight } from 'lucide-react';
+import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight, Ban } from 'lucide-react';
 import {
-  getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls,
-  AccessEntry, AccessAlert,
+  getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls, getBlockedMembers,
+  AccessEntry, AccessAlert, BlockedMember,
 } from '../../lib/accessApi';
 import { getGroupTree, getMemberIdsInGroup, GroupNode } from '../../lib/groupsApi';
 import MemberProfileModal from './MemberProfileModal';
@@ -25,9 +25,11 @@ const AccessControlPage: React.FC = () => {
   const [entries, setEntries] = useState<AccessEntry[]>([]);
   const [present, setPresent] = useState(0);
   const [alerts, setAlerts] = useState<AccessAlert[]>([]);
+  const [blocked, setBlocked] = useState<BlockedMember[]>([]);
   const [photos, setPhotos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [alertsOpen, setAlertsOpen] = useState(false);
+  const [blockedOpen, setBlockedOpen] = useState(false);
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
 
   // Recherche : un jour + plage horaire optionnelle
@@ -53,13 +55,14 @@ const AccessControlPage: React.FC = () => {
     // Si un groupe est sélectionné, on restreint aux membres de ce groupe/sous-groupe
     let memberIds: string[] | undefined;
     if (groupName) memberIds = await getMemberIdsInGroup(groupName, subgroupName || undefined);
-    const [e, p, a] = await Promise.all([
+    const [e, p, a, b] = await Promise.all([
       getEntriesBetween(range.from, range.to, { memberIds }),
       getPresentCount(90),
       getAccessAlerts('open'),
+      getBlockedMembers(),
     ]);
-    setEntries(e); setPresent(p); setAlerts(a); setLoading(false);
-    const map = await resolvePhotoUrls(e.map((x) => x.member?.photo_path));
+    setEntries(e); setPresent(p); setAlerts(a); setBlocked(b); setLoading(false);
+    const map = await resolvePhotoUrls([...e.map((x) => x.member?.photo_path), ...b.map((x) => x.photoPath)]);
     setPhotos(map);
   }, [range.from, range.to, groupName, subgroupName]);
 
@@ -92,7 +95,7 @@ const AccessControlPage: React.FC = () => {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="bg-indigo-50 text-indigo-600 p-1.5 rounded-lg"><Users size={15} /></span>
@@ -122,6 +125,18 @@ const AccessControlPage: React.FC = () => {
           </div>
           <p className="text-2xl font-semibold text-gray-900 tabular-nums">{alerts.length}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">double passage détecté</p>
+        </button>
+
+        <button onClick={() => setBlockedOpen(true)} className="bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-gray-300 transition-colors">
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`p-1.5 rounded-lg ${blocked.length ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+              {blocked.length ? <Ban size={15} /> : <ShieldCheck size={15} />}
+            </span>
+            <p className="text-xs font-medium text-gray-500">Accès bloqués</p>
+            {blocked.length > 0 && <span className="ml-auto text-[11px] font-medium text-red-600">Voir</span>}
+          </div>
+          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{blocked.length}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">badge/code retiré</p>
         </button>
       </div>
 
@@ -232,6 +247,44 @@ const AccessControlPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fenêtre accès bloqués */}
+      {blockedOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={() => setBlockedOpen(false)}>
+          <div className="bg-white w-full max-w-2xl max-h-[80vh] rounded-2xl shadow-xl overflow-hidden flex flex-col" onClick={(ev) => ev.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Ban size={17} className="text-red-500" /> Accès bloqués ({blocked.length})</h2>
+              <button onClick={() => setBlockedOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {blocked.length === 0 ? (
+                <p className="p-8 text-center text-sm text-gray-400">Aucun accès bloqué actuellement. Tout est ouvert.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {blocked.map((b) => {
+                    const url = b.photoPath ? photos[b.photoPath] : undefined;
+                    const ini = `${(b.firstName || '?')[0] || ''}${(b.lastName || '')[0] || ''}`.toUpperCase();
+                    const display = `${b.firstName} ${b.lastName}`.trim() || (b.cardNumber ? `Carte ${b.cardNumber}` : 'Adhérent');
+                    return (
+                      <button key={b.id} onClick={() => { setBlockedOpen(false); setProfileMemberId(b.id); }} title={b.reason || 'Sans motif précisé — cliquer pour la fiche'}
+                        className="bg-white border-2 border-red-300 rounded-xl p-3 flex flex-col items-center text-center hover:border-red-400 hover:shadow-sm transition-colors">
+                        <div className="relative ring-2 ring-red-200 rounded-full">
+                          {url
+                            ? <img src={url} alt="" className="w-12 h-12 rounded-full object-cover" />
+                            : <div className="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-sm font-semibold">{ini}</div>}
+                          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center"><Ban size={10} /></span>
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-gray-900 truncate w-full" title={display}>{display}</p>
+                        <p className="text-[11px] text-red-600 font-medium truncate w-full">{b.reason || 'Sans motif'}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
