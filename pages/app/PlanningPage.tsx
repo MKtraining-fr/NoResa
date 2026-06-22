@@ -56,10 +56,10 @@ const SessionChip: React.FC<{ s: AdminSession; onClick: () => void }> = ({ s, on
         <span className="font-bold text-sm text-gray-900 truncate">{s.typeName}</span>
         <span className="ml-auto text-[11px] font-bold text-gray-400">{hhmm(s.startsAt)}</span>
       </div>
-      <div className="flex items-center gap-2 mt-1.5">
+      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${full ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700'}`}>{s.bookedCount}/{s.capacity}</span>
-        {s.waitlistCount > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-600">+{s.waitlistCount} attente</span>}
-        {s.coachName && <span className="text-[11px] text-gray-400 truncate">{s.coachName}</span>}
+        {s.waitlistCount > 0 && <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-600">+{s.waitlistCount}</span>}
+        {s.coachName && <span className="text-[11px] text-gray-400 truncate max-w-full">{s.coachName}</span>}
       </div>
     </button>
   );
@@ -123,18 +123,21 @@ const PlanningTab: React.FC = () => {
       {loading ? (
         <div className="py-16 text-center text-gray-400 text-sm flex items-center justify-center gap-2"><Loader2 size={18} className="animate-spin" /> Chargement…</div>
       ) : mode === 'week' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {cells.map((d) => {
-            const items = sessionsOf(d);
-            return (
-              <div key={d.toISOString()} className={`rounded-2xl border p-3 ${sameDay(d, new Date()) ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-100'}`}>
-                <p className="text-xs font-extrabold uppercase tracking-wide text-gray-500 mb-2 px-1">{fmtDay(d)}</p>
-                {items.length === 0 ? <p className="text-[11px] text-gray-300 px-1 py-2">—</p> : (
-                  <div className="space-y-2">{items.map((s) => <SessionChip key={s.id} s={s} onClick={() => setRosterFor(s)} />)}</div>
-                )}
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto -mx-1 px-1 pb-1">
+          <div className="grid grid-cols-7 gap-2 min-w-[780px]">
+            {cells.map((d) => {
+              const items = sessionsOf(d);
+              const today = sameDay(d, new Date());
+              return (
+                <div key={d.toISOString()} className={`rounded-2xl border p-2 min-h-[280px] ${today ? 'border-indigo-300 bg-indigo-50/30' : 'border-gray-100'}`}>
+                  <p className={`text-xs font-extrabold uppercase tracking-wide mb-2 px-0.5 text-center ${today ? 'text-indigo-600' : 'text-gray-500'}`}>{fmtDay(d)}</p>
+                  {items.length === 0 ? <p className="text-[11px] text-gray-300 text-center py-2">—</p> : (
+                    <div className="space-y-2">{items.map((s) => <SessionChip key={s.id} s={s} onClick={() => setRosterFor(s)} />)}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div>
