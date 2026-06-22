@@ -274,10 +274,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!selectedContact) return;
     setSavingCode(true);
     try {
-      await updateKeypadCode(selectedContact.id, codeDraft);
-      updateField('keypadCode' as any, codeDraft.trim());
+      const code = codeDraft.trim();
+      await updateKeypadCode(selectedContact.id, code);
+      updateField('keypadCode' as any, code);
+      // Pousse le code au contrôleur (sinon il reste en base sans être actif à la porte).
+      const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
+      let pushed = false;
+      if (pin && code) {
+        await enqueueAccessCommand({
+          memberId: selectedContact.id, pin,
+          cardNumber: selectedContact.cardNumber || null,
+          keypadCode: code,
+          name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
+          action: 'grant',
+        });
+        pushed = true;
+      }
       setContacts(await getMembers());
       setEditingCode(false);
+      if (pushed) alert("Code enregistré et envoyé au contrôleur. Il sera actif à la porte dans quelques secondes.");
+      else if (!pin) alert("Code enregistré. ⚠️ Ce membre n'a pas de numéro d'adhérent : impossible de l'activer au contrôleur.");
     } catch (err: any) {
       console.error(err);
       alert(err?.message || "Impossible de modifier le code clavier.");
