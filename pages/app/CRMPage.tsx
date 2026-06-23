@@ -14,7 +14,7 @@ import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
-import { startMandateSetup, getMemberGocardlessPayments, changeFormula, type GocardlessPayment } from '../../lib/gocardless';
+import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
@@ -462,7 +462,25 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const handleSaveFormula = async () => {
     if (!selectedContact?.id) return;
     if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
-    const isPrelevement = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+    const hasMandate = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+    // Membre SANS mandat -> formule prélevée : on met en place le mandat (saisie du RIB chez GoCardless).
+    if (!hasMandate) {
+      const okSetup = window.confirm(`« ${formulaDraft.label} » est une formule en prélèvement SEPA.\n\nCe membre n'a pas encore de mandat : il va être redirigé vers GoCardless pour saisir son RIB et signer le mandat. L'abonnement sera créé automatiquement après la signature.\n\nContinuer ?`);
+      if (!okSetup) return;
+      setSavingFormula(true);
+      try {
+        const redirect = `${window.location.origin}/#/app/crm`;
+        const r = await setupMandateForMember(selectedContact.id, formulaDraft.label, Number(formulaDraft.price), redirect);
+        window.location.href = r.authorisation_url; // page RIB GoCardless (le client signe sur place)
+        return;
+      } catch (err: any) {
+        console.error(err);
+        alert(err?.message || 'Impossible de démarrer la mise en place du mandat.');
+        setSavingFormula(false);
+      }
+      return;
+    }
+    const isPrelevement = hasMandate;
     if (isPrelevement) {
       const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${Number(formulaDraft.price).toFixed(2).replace('.', ',')} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
       if (!ok) return;
