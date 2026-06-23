@@ -130,6 +130,26 @@ export interface ChangeFormulaResult {
   error?: string;
 }
 
+/**
+ * Met en place un mandat SEPA pour un membre EXISTANT (passage à une formule prélevée
+ * alors qu'il n'a pas encore de mandat). Renvoie l'URL GoCardless (saisie du RIB).
+ * Le webhook crée l'abonnement une fois le mandat signé.
+ */
+export async function setupMandateForMember(
+  memberId: string, label: string, price: number, redirectUrl: string, exitUrl?: string,
+): Promise<{ authorisation_url: string; billing_request_id: string }> {
+  const { data, error } = await supabase.functions.invoke('gocardless-setup-existing-mandate', {
+    body: { member_id: memberId, label, price, redirectUrl, exitUrl },
+  });
+  if (error) {
+    let msg = error.message || 'Impossible de démarrer la mise en place du mandat.';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    throw new Error(msg);
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { authorisation_url: string; billing_request_id: string };
+}
+
 /** Change la formule d'un membre et synchronise GoCardless (annule l'ancien abo, crée le nouveau). */
 export async function changeFormula(memberId: string, label: string, price: number): Promise<ChangeFormulaResult> {
   const { data, error } = await supabase.functions.invoke('gocardless-change-formula', {
