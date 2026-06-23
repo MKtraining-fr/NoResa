@@ -36,12 +36,16 @@ export async function getGymId(): Promise<string | null> {
 
 // Statut DB (varchar) -> statut CRM
 function toContactStatus(dbStatus: string | null): ContactStatus {
-  return dbStatus === 'active' ? 'MEMBER_ACTIVE' : 'MEMBER_INACTIVE';
+  if (dbStatus === 'active') return 'MEMBER_ACTIVE';
+  if (dbStatus === 'prospect') return 'PROSPECT_NEW'; // compte créé, pas encore payé
+  return 'MEMBER_INACTIVE';
 }
 
 // Statut CRM -> statut DB
 function toDbStatus(status: ContactStatus): string {
-  return status === 'MEMBER_ACTIVE' ? 'active' : 'cancelled';
+  if (status === 'MEMBER_ACTIVE') return 'active';
+  if (status === 'PROSPECT_NEW' || status === 'PROSPECT_FOLLOWUP' || status === 'PROSPECT_TRIAL') return 'prospect';
+  return 'cancelled';
 }
 
 // Ligne Supabase -> objet Member du front

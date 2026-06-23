@@ -10,6 +10,7 @@ import {
 } from '../../lib/contractsApi';
 import { generateCardNumber } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
+import { markProspectConverted } from '../../lib/prospectsApi';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
 const RED = '#C81E1E';
@@ -17,6 +18,8 @@ const RED = '#C81E1E';
 const InscriptionPage: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+  // Conversion d'un prospect : id à marquer "converti" après création du membre.
+  const convertingProspectId = useRef<string | null>(null);
 
   // Identité
   const [civility, setCivility] = useState('Monsieur');
@@ -39,6 +42,25 @@ const InscriptionPage: React.FC = () => {
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
   useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
   const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
+
+  // Pré-remplissage depuis une conversion de prospect (déposé en sessionStorage).
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('noresa_prospect_prefill');
+      if (!raw) return;
+      sessionStorage.removeItem('noresa_prospect_prefill');
+      const p = JSON.parse(raw);
+      convertingProspectId.current = p.prospectId ?? null;
+      if (p.firstName) setFirstName(p.firstName);
+      if (p.lastName) setLastName(p.lastName);
+      if (p.birthDate) setBirthDate(p.birthDate);
+      if (p.address) setAddress(p.address);
+      if (p.postalCode) setPostalCode(p.postalCode);
+      if (p.city) setCity(p.city);
+      if (p.phone) setPhone(p.phone);
+      if (p.email) setEmail(p.email);
+    } catch { /* ignore */ }
+  }, []);
 
   const handleGenerateCard = async () => {
     setGenningCard(true);
@@ -184,6 +206,12 @@ const InscriptionPage: React.FC = () => {
         totalDue: total,
       });
       setResult(res);
+      // Si on convertit un prospect : on le marque converti vers le nouveau membre.
+      if (convertingProspectId.current && res.memberId) {
+        try { await markProspectConverted(convertingProspectId.current, res.memberId); }
+        catch (e) { console.error('markProspectConverted', e); }
+        convertingProspectId.current = null;
+      }
     } catch (e) {
       setError((e as Error)?.message || "L'inscription a échoué.");
     } finally {

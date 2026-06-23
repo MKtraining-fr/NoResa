@@ -17,6 +17,7 @@ import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../l
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
+import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
 
 // Initiales (ex. "Jean Dupont" -> "JD") pour les avatars, en attendant les photos webcam.
 const getInitials = (first?: string, last?: string): string => {
@@ -58,6 +59,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   
   // State database & search
   const [contacts, setContacts] = useState<Member[]>([]);
+  const [prospectContacts, setProspectContacts] = useState<ProspectContact[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
 
@@ -118,7 +120,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [partnerCategory, setPartnerCategory] = useState('Équipementier');
 
   useEffect(() => {
-    const load = () => getMembers().then(setContacts).catch(console.error);
+    const load = () => {
+      getMembers().then(setContacts).catch(console.error);
+      listProspects().then(setProspectContacts).catch(console.error);
+    };
     load();
     window.addEventListener('focus', load);
     return () => window.removeEventListener('focus', load);
@@ -255,10 +260,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!selectedContact) return;
     setSavingCard(true);
     try {
+      const card = cardDraft.trim();
       await updateCardNumber(selectedContact.id, cardDraft);
-      updateField('cardNumber', cardDraft.trim());
+      updateField('cardNumber', card);
+      // Pousse le badge au contrôleur (sinon il reste en base sans être actif à la porte).
+      const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
+      let pushed = false;
+      if (pin && card) {
+        await enqueueAccessCommand({
+          memberId: selectedContact.id, pin,
+          cardNumber: card,
+          keypadCode: (selectedContact as any).keypadCode || null,
+          name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
+          action: 'grant',
+        });
+        pushed = true;
+      }
       setContacts(await getMembers());
       setEditingCard(false);
+      if (pushed) alert("Badge enregistré et envoyé au contrôleur. Il sera actif à la porte dans quelques secondes.");
+      else if (!pin) alert("Badge enregistré. ⚠️ Ce membre n'a pas de numéro d'adhérent : impossible de l'activer au contrôleur.");
     } catch (err: any) {
       console.error(err);
       alert(err?.message || "Impossible de modifier le numéro de badge.");
@@ -637,13 +658,34 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     setTrialSession(false);
   };
 
+  // Conversion prospect -> membre : on dépose les infos puis on ouvre l'inscription
+  // (qui pré-remplit et marquera le prospect "converti" après création du membre).
+  const convertProspect = (p: any) => {
+    try {
+      sessionStorage.setItem('noresa_prospect_prefill', JSON.stringify({
+        prospectId: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+        phone: p.phone,
+        email: p.email,
+      }));
+    } catch { /* ignore */ }
+    window.location.hash = '#/app/inscription';
+  };
+
   const getFilteredData = () => {
     let filtered = contacts;
 
     if (activeTab === 'membres') {
       filtered = contacts.filter(m => m.status === 'MEMBER_ACTIVE' || m.status === 'MEMBER_INACTIVE');
     } else if (activeTab === 'prospects') {
-      filtered = contacts.filter(m => m.status === 'PROSPECT_NEW' || m.status === 'PROSPECT_FOLLOWUP' || m.status === 'PROSPECT_TRIAL');
+      // Prospects = union : leads sans compte (table `prospects`, ex. séances d'essai)
+      // + inscrits via l'app non encore payés (membres en statut 'prospect').
+      const leads = prospectContacts.map(p => ({ ...p, __kind: 'lead' as const }));
+      const memberProspects = contacts
+        .filter(m => m.status === 'PROSPECT_NEW' || m.status === 'PROSPECT_FOLLOWUP' || m.status === 'PROSPECT_TRIAL')
+        .map(m => ({ ...m, __kind: 'member' as const }));
+      filtered = [...leads, ...memberProspects] as any;
     } else if (activeTab === 'partenaires') {
       filtered = contacts.filter(m => m.status === 'PARTNER');
     }
@@ -789,9 +831,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {getFilteredData().map((member: any) => (
-                <tr 
-                  key={member.id} 
-                  onClick={() => openContactDetails(member)}
+                <tr
+                  key={member.id}
+                  onClick={() => { if (activeTab === 'prospects' && member.__kind === 'lead') return; openContactDetails(member); }}
                   className="hover:bg-indigo-50/30 cursor-pointer transition-colors group"
                 >
                   <td className="px-6 py-4">
@@ -821,7 +863,16 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"><ChevronRight size={18} /></button>
+                    {activeTab === 'prospects' && member.__kind === 'lead' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); convertProspect(member); }}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                      >
+                        Convertir en membre
+                      </button>
+                    ) : (
+                      <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"><ChevronRight size={18} /></button>
+                    )}
                   </td>
                 </tr>
               ))}

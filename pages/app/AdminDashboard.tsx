@@ -4,9 +4,10 @@ import {
   Users, CreditCard, Calendar, TrendingUp, ArrowUpRight, 
   ArrowDownRight, Activity, UserPlus, X, Save, ShieldAlert, 
   MapPin, Phone, Mail, Briefcase, HeartPulse, Target,
-  Image as ImageIcon, CheckCircle2, UserCheck, Camera, AlertTriangle, Clock
+  Image as ImageIcon, CheckCircle2, UserCheck, Camera, AlertTriangle, Clock, ClipboardCheck
 } from 'lucide-react';
 import { MOCK_REVENUE_DATA } from '../../constants.tsx';
+import TrialSessionModal from './TrialSessionModal';
 import { createMember, patchMember, getGymId, uploadMemberPhoto, getDashboardStats, DashboardStats, getExpiringSubscriptions, ExpiringMember } from '../../lib/membersApi';
 import { getProducts } from '../../lib/boutiqueApi';
 import { startMandateSetup, getGocardlessStats, GocardlessStats } from '../../lib/gocardless';
@@ -14,6 +15,7 @@ import { Product } from '../../types';
 
 const AdminDashboard: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false);
 
   // Champs du formulaire d'inscription
   const [addFirstName, setAddFirstName] = useState('');
@@ -173,6 +175,7 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-500">
+      <TrialSessionModal open={isTrialModalOpen} onClose={() => setIsTrialModalOpen(false)} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Tableau de bord</h1>
@@ -180,6 +183,13 @@ const AdminDashboard: React.FC = () => {
         </div>
         <div className="flex space-x-2">
           <button className="px-3.5 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition-colors">Exporter</button>
+          <button
+            onClick={() => setIsTrialModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-indigo-200 text-sm font-semibold text-indigo-700 rounded-xl hover:bg-indigo-50 transition-colors"
+          >
+            <ClipboardCheck size={16} />
+            <span>Séance d'essai</span>
+          </button>
           <button
             onClick={() => { window.location.hash = '#/app/inscription'; }}
             className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors"
