@@ -150,6 +150,31 @@ export async function setupMandateForMember(
   return data as { authorisation_url: string; billing_request_id: string };
 }
 
+export interface CancelSubscriptionResult {
+  updated: boolean;
+  mandate_kept: boolean;
+  cancelled: { id: string; amount: number }[];
+  error?: string;
+}
+
+/**
+ * Rétrograde un membre vers un produit sans engagement : annule le(s) abonnement(s)
+ * GoCardless mais CONSERVE le mandat (réutilisable). Met à jour la fiche (produit/prix/paiement).
+ */
+export async function cancelSubscriptionKeepMandate(
+  memberId: string, label: string, price: number, paymentMethod?: string, periodicity?: string,
+): Promise<CancelSubscriptionResult> {
+  const { data, error } = await supabase.functions.invoke('gocardless-cancel-subscription', {
+    body: { member_id: memberId, label, price, paymentMethod, periodicity },
+  });
+  if (error) {
+    let msg = error.message || "Échec de la résiliation de l'abonnement";
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    return { updated: false, mandate_kept: false, cancelled: [], error: msg };
+  }
+  return data as CancelSubscriptionResult;
+}
+
 /** Change la formule d'un membre et synchronise GoCardless (annule l'ancien abo, crée le nouveau). */
 export async function changeFormula(memberId: string, label: string, price: number): Promise<ChangeFormulaResult> {
   const { data, error } = await supabase.functions.invoke('gocardless-change-formula', {

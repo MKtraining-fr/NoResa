@@ -14,7 +14,7 @@ import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
-import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, type GocardlessPayment } from '../../lib/gocardless';
+import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
@@ -379,6 +379,33 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } finally { setAccessBusy(false); }
   };
 
+  // --- Blocage programmé (date future, appliqué par un job quotidien) ---
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleReason, setScheduleReason] = useState('');
+  const saveScheduledBlock = async () => {
+    if (!selectedContact || !scheduleDate) { alert('Choisis une date.'); return; }
+    setAccessBusy(true);
+    try {
+      await patchMember(selectedContact.id, { access_block_scheduled_at: scheduleDate, access_block_scheduled_reason: scheduleReason.trim() || null });
+      updateField('accessBlockScheduledAt' as any, scheduleDate);
+      updateField('accessBlockScheduledReason' as any, scheduleReason.trim() || undefined);
+      setScheduleOpen(false); setScheduleDate(''); setScheduleReason('');
+      alert(`Blocage programmé le ${new Date(scheduleDate).toLocaleDateString('fr-FR')}. L'accès sera coupé automatiquement ce jour-là.`);
+    } catch (e: any) { console.error(e); alert(e?.message || 'Impossible de programmer le blocage.'); }
+    finally { setAccessBusy(false); }
+  };
+  const cancelScheduledBlock = async () => {
+    if (!selectedContact) return;
+    setAccessBusy(true);
+    try {
+      await patchMember(selectedContact.id, { access_block_scheduled_at: null, access_block_scheduled_reason: null });
+      updateField('accessBlockScheduledAt' as any, undefined);
+      updateField('accessBlockScheduledReason' as any, undefined);
+    } catch (e: any) { console.error(e); alert(e?.message || 'Erreur.'); }
+    finally { setAccessBusy(false); }
+  };
+
   // --- Rattacher un mandat GoCardless existant ---
   const handleLinkMandate = async () => {
     if (!selectedContact) return;
@@ -462,15 +489,61 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const handleSaveFormula = async () => {
     if (!selectedContact?.id) return;
     if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
+    const price = Number(formulaDraft.price);
+    const isPrelevementFormula = [25.9, 29.9, 59.9].includes(price);
     const hasMandate = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
-    // Membre SANS mandat -> formule prélevée : on met en place le mandat (saisie du RIB chez GoCardless).
+
+    // CAS A — produit SANS prélèvement : rétrogradation (si mandat) ou simple changement.
+    if (!isPrelevementFormula) {
+      if (hasMandate) {
+        // Rétrogradation : vérifier l'engagement (12 mois depuis le début), avertir si pas fini.
+        const start = selectedContact.subscriptionStart ? new Date(selectedContact.subscriptionStart) : null;
+        if (start && !isNaN(start.getTime())) {
+          const engEnd = new Date(start); engEnd.setMonth(engEnd.getMonth() + 12);
+          if (new Date() < engEnd) {
+            const force = window.confirm(`⚠️ L'engagement de ce membre n'est pas terminé (jusqu'au ${engEnd.toLocaleDateString('fr-FR')}).\n\nRésilier quand même et passer à « ${formulaDraft.label} » ? (cas exceptionnel)`);
+            if (!force) return;
+          }
+        }
+        const okDown = window.confirm(`Rétrograder vers « ${formulaDraft.label} » : l'abonnement GoCardless sera annulé, le mandat conservé (réutilisable plus tard). Continuer ?`);
+        if (!okDown) return;
+        setSavingFormula(true);
+        try {
+          const res = await cancelSubscriptionKeepMandate(selectedContact.id, formulaDraft.label, price, formulaDraft.method || undefined, formulaDraft.periodicity || undefined);
+          if (res.error) { alert('Échec : ' + res.error); return; }
+          updateField('subscription', formulaDraft.label);
+          updateField('price', price);
+          setContacts(await getMembers());
+          if (selectedContact.gocardlessCustomerId || selectedContact.gocardlessMandateId) getMemberGocardlessPayments(selectedContact.id).then((p) => setMemberGcPayments(p));
+          setEditingFormula(false);
+          alert(`Rétrogradation effectuée : ${res.cancelled.length} abonnement(s) annulé(s), mandat conservé.`);
+        } catch (err: any) { console.error(err); alert(err?.message || 'Échec de la rétrogradation.'); }
+        finally { setSavingFormula(false); }
+        return;
+      }
+      // Pas de mandat -> simple mise à jour du produit (aucun GoCardless).
+      setSavingFormula(true);
+      try {
+        const res = await changeFormula(selectedContact.id, formulaDraft.label, price);
+        if (res.error) { alert('Échec : ' + res.error); return; }
+        updateField('subscription', formulaDraft.label);
+        updateField('price', price);
+        setContacts(await getMembers());
+        setEditingFormula(false);
+        alert('Formule mise à jour.');
+      } catch (err: any) { console.error(err); alert(err?.message || 'Impossible de changer la formule.'); }
+      finally { setSavingFormula(false); }
+      return;
+    }
+
+    // CAS B — formule à prélèvement, membre SANS mandat : mise en place du mandat (RIB).
     if (!hasMandate) {
       const okSetup = window.confirm(`« ${formulaDraft.label} » est une formule en prélèvement SEPA.\n\nCe membre n'a pas encore de mandat : il va être redirigé vers GoCardless pour saisir son RIB et signer le mandat. L'abonnement sera créé automatiquement après la signature.\n\nContinuer ?`);
       if (!okSetup) return;
       setSavingFormula(true);
       try {
         const redirect = `${window.location.origin}/#/app/crm`;
-        const r = await setupMandateForMember(selectedContact.id, formulaDraft.label, Number(formulaDraft.price), redirect);
+        const r = await setupMandateForMember(selectedContact.id, formulaDraft.label, price, redirect);
         window.location.href = r.authorisation_url; // page RIB GoCardless (le client signe sur place)
         return;
       } catch (err: any) {
@@ -480,9 +553,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       }
       return;
     }
-    const isPrelevement = hasMandate;
-    if (isPrelevement) {
-      const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${Number(formulaDraft.price).toFixed(2).replace('.', ',')} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
+
+    // CAS C — formule à prélèvement + mandat existant : bascule de l'abonnement (ci-dessous).
+    {
+      const ok = window.confirm(`Changer la formule de ce membre prélevé pour « ${formulaDraft.label} » (${price.toFixed(2).replace('.', ',')} €) ?\n\nL'abonnement GoCardless actuel sera annulé et un nouveau sera créé au montant de la formule. À ne faire que si le client est d'accord.`);
       if (!ok) return;
     }
     setSavingFormula(true);
@@ -1432,6 +1506,33 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <button type="button" onClick={openBlockModal} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
                   </div>
 
+                  {/* Blocage programmé (date future) */}
+                  {(selectedContact as any).accessBlockScheduledAt ? (
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      <Clock size={14} className="text-amber-600 shrink-0" />
+                      <p className="text-[12px] font-bold text-amber-800 flex-1 min-w-0">
+                        Blocage programmé le {new Date((selectedContact as any).accessBlockScheduledAt).toLocaleDateString('fr-FR')}
+                        {(selectedContact as any).accessBlockScheduledReason ? ` · ${(selectedContact as any).accessBlockScheduledReason}` : ''}
+                      </p>
+                      <button type="button" onClick={cancelScheduledBlock} disabled={accessBusy} className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline shrink-0">Annuler</button>
+                    </div>
+                  ) : scheduleOpen ? (
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Programmer un blocage</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none" />
+                        <input type="text" value={scheduleReason} onChange={(e) => setScheduleReason(e.target.value)} placeholder="Motif (facultatif)" className="flex-1 min-w-[140px] bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none" />
+                        <button type="button" onClick={saveScheduledBlock} disabled={accessBusy || !scheduleDate} className="bg-gray-900 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] uppercase tracking-wide disabled:opacity-50">Programmer</button>
+                        <button type="button" onClick={() => { setScheduleOpen(false); setScheduleDate(''); setScheduleReason(''); }} className="text-[11px] font-bold text-gray-400 px-2">Fermer</button>
+                      </div>
+                      <p className="text-[10.5px] text-gray-400">L'accès sera coupé automatiquement à cette date (sans tolérance).</p>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => setScheduleOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-amber-600">
+                      <Clock size={13} /> Programmer un blocage à une date
+                    </button>
+                  )}
+
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
@@ -1573,40 +1674,57 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                     {editingFormula && (() => {
                       const RECURRING = [25.9, 29.9, 59.9];
-                      const recurring = (formulaOptions || [])
-                        .filter((p: any) => RECURRING.includes(Number(p.price)))
-                        .map((p: any) => ({ label: p.name as string, price: Number(p.price) }));
-                      const fallback = [
+                      const all = (formulaOptions || []).map((p: any) => ({ label: p.name as string, price: Number(p.price) }));
+                      const recurring = all.filter((o) => RECURRING.includes(o.price));
+                      const downgrade = all.filter((o) => !RECURRING.includes(o.price));
+                      const recurringList = recurring.length ? recurring : [
                         { label: 'Abo famille/étudiant', price: 25.9 },
                         { label: 'Abo classique', price: 29.9 },
                         { label: 'Abo suivi et formation', price: 59.9 },
                       ];
-                      const options = recurring.length ? recurring : fallback;
-                      const isPrelevement = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+                      const downgradeList = downgrade.length ? downgrade : [
+                        { label: 'Mensuel sans engagement', price: 40 },
+                        { label: 'Carnet 10 séances', price: 45 },
+                        { label: 'Séance', price: 5 },
+                      ];
+                      const hasMandate = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
+                      const selPrice = Number(formulaDraft.price);
+                      const selDowngrade = !!formulaDraft.label && !RECURRING.includes(selPrice);
+                      const Opt = (o: { label: string; price: number }) => {
+                        const active = formulaDraft.label === o.label && Number(formulaDraft.price) === o.price;
+                        return (
+                          <button key={o.label + o.price} type="button"
+                            onClick={() => setFormulaDraft({ ...formulaDraft, label: o.label, price: String(o.price) })}
+                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+                            <span className="text-sm font-semibold text-gray-900">{o.label}</span>
+                            <span className={`text-sm font-semibold ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2).replace('.', ',')} €</span>
+                          </button>
+                        );
+                      };
                       return (
                         <div className="p-5 bg-white border border-gray-100 rounded-2xl space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nouvelle formule</label>
-                            <div className="grid grid-cols-1 gap-2">
-                              {options.map((o) => {
-                                const active = formulaDraft.label === o.label && Number(formulaDraft.price) === o.price;
-                                return (
-                                  <button key={o.label + o.price} type="button"
-                                    onClick={() => setFormulaDraft({ ...formulaDraft, label: o.label, price: String(o.price) })}
-                                    className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
-                                    <span className="text-sm font-semibold text-gray-900">{o.label}</span>
-                                    <span className={`text-sm font-semibold ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2).replace('.', ',')} €</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Formules à prélèvement (engagement)</label>
+                            <div className="grid grid-cols-1 gap-2">{recurringList.map(Opt)}</div>
                           </div>
-                          {isPrelevement ? (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sans engagement / produits (rétrogradation)</label>
+                            <div className="grid grid-cols-1 gap-2">{downgradeList.map(Opt)}</div>
+                          </div>
+                          {selDowngrade && hasMandate ? (
+                            <p className="text-[11px] font-bold text-red-600 bg-red-50 rounded-xl px-3 py-2 leading-relaxed">
+                              Rétrogradation : l'abonnement GoCardless sera <b>annulé</b>, le <b>mandat conservé</b>. L'engagement (12 mois) sera vérifié avant.
+                            </p>
+                          ) : !selDowngrade && hasMandate ? (
                             <p className="text-[11px] font-bold text-amber-600 bg-amber-50 rounded-xl px-3 py-2 leading-relaxed">
-                              Ce membre est en prélèvement : GoCardless sera mis à jour automatiquement (ancien abonnement annulé, nouveau créé au montant de la formule, prélevé le 10).
+                              Membre en prélèvement : GoCardless sera mis à jour (ancien abonnement annulé, nouveau créé, prélevé le 10).
+                            </p>
+                          ) : !selDowngrade && !hasMandate ? (
+                            <p className="text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 leading-relaxed">
+                              Formule à prélèvement : le membre sera redirigé vers GoCardless pour saisir son RIB (création du mandat).
                             </p>
                           ) : (
-                            <p className="text-[11px] font-bold text-gray-400 px-1">Ce membre n'est pas en prélèvement : seule la formule NoResa sera modifiée.</p>
+                            <p className="text-[11px] font-bold text-gray-400 px-1">Pas de prélèvement : seule la formule NoResa sera modifiée.</p>
                           )}
                           <div className="flex items-center gap-2">
                             <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : 'Appliquer la formule'}</button>

@@ -90,6 +90,8 @@ function rowToMember(r: any): Member {
     accessBlocked: r.access_blocked ?? false,
     accessBlockReason: r.access_block_reason ?? undefined,
     accessBlockedAt: r.access_blocked_at ?? undefined,
+    accessBlockScheduledAt: r.access_block_scheduled_at ?? undefined,
+    accessBlockScheduledReason: r.access_block_scheduled_reason ?? undefined,
   } as Member;
 }
 
@@ -104,7 +106,7 @@ export async function getMembers(): Promise<Member[]> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
     )
     .is('archived_at', null)
     .order('last_name', { ascending: true });
@@ -126,7 +128,7 @@ export async function getMemberById(id: string): Promise<Member | null> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
     )
     .eq('id', id)
     .single();
@@ -142,7 +144,7 @@ export async function getArchivedMembers(): Promise<Member[]> {
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, archived_at, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
     )
     .not('archived_at', 'is', null)
     .order('archived_at', { ascending: false });
@@ -505,7 +507,7 @@ export async function searchMembers(query: string, limit = 8): Promise<Member[]>
       'id, first_name, last_name, email, phone, address, postal_code, city, ' +
         'subscription_label, price, payment_method_label, periodicity, paid_by, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
-        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at'
+        'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
     )
     .or(
       `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},member_number.ilike.${like}`

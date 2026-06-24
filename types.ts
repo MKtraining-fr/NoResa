@@ -92,4 +92,7 @@ export interface Member {
   accessBlocked?: boolean;
   accessBlockReason?: string;
   accessBlockedAt?: string;
+  // Blocage programmé à une date future (job quotidien)
+  accessBlockScheduledAt?: string;
+  accessBlockScheduledReason?: string;
 }
