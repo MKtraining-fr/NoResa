@@ -486,6 +486,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     });
     setEditingFormula(true);
   };
+  // (Re)ouvre la page GoCardless de signature du mandat (RIB) pour un membre en attente.
+  const [resumingMandate, setResumingMandate] = useState(false);
+  const resumeMandateSignature = async () => {
+    if (!selectedContact?.id) return;
+    setResumingMandate(true);
+    try {
+      const redirect = `${window.location.origin}/#/app/crm`;
+      const r = await setupMandateForMember(selectedContact.id, selectedContact.subscription || 'Abonnement', Number(selectedContact.price) || 0, redirect);
+      window.location.href = r.authorisation_url; // page RIB GoCardless (le client signe sur place)
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Impossible d'ouvrir la signature du mandat.");
+      setResumingMandate(false);
+    }
+  };
+
   const handleSaveFormula = async () => {
     if (!selectedContact?.id) return;
     if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
@@ -1804,6 +1820,15 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessCustomerId || '—'}</p>
                         </div>
                       </div>
+                      {selectedContact.gocardlessStatus === 'pending' && (
+                        <div className="space-y-1.5">
+                          <button type="button" onClick={resumeMandateSignature} disabled={resumingMandate}
+                            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-amber-600 disabled:opacity-50">
+                            <CreditCard size={14} /> {resumingMandate ? 'Ouverture…' : 'Faire signer le mandat (RIB)'}
+                          </button>
+                          <p className="text-[10.5px] text-gray-400 px-1">Ouvre la page GoCardless de saisie du RIB — le client signe sur place, ici.</p>
+                        </div>
+                      )}
                       {selectedContact.gocardlessCustomerId && (
                         <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
                           <ChevronRight size={14} /> <span>Ouvrir la fiche dans GoCardless</span>
