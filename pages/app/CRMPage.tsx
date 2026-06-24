@@ -186,6 +186,33 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     }
   }, [contacts]);
 
+  // Au retour de la signature du mandat GoCardless (#/app/crm?member=<id>&gcpoll=1),
+  // on rafraîchit le statut quelques fois — le webhook met ~quelques secondes à synchroniser.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!/[?&]gcpoll=1/.test(hash)) return;
+    const mm = hash.match(/[?&]member=([^&]+)/);
+    const id = mm ? decodeURIComponent(mm[1]) : null;
+    if (!id) return;
+    let tries = 0; let stopped = false;
+    const tick = async () => {
+      if (stopped) return;
+      tries++;
+      try {
+        const list = await getMembers();
+        setContacts(list);
+        const mem: any = list.find((x: any) => x.id === id);
+        if (mem) {
+          setSelectedContact((prev: any) => (prev && prev.id === id ? { ...prev, ...mem } : prev));
+          if (mem.gocardlessStatus === 'mandate_active' || mem.gocardlessStatus === 'mandate_submitted') return;
+        }
+      } catch { /* noop */ }
+      if (tries < 10) setTimeout(tick, 3000);
+    };
+    setTimeout(tick, 2500);
+    return () => { stopped = true; };
+  }, []);
+
   // --- Édition d'une fiche depuis la fenêtre de détail ---
   const startEditing = () => {
     setDetailTab('profil');
@@ -558,7 +585,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       if (!okSetup) return;
       setSavingFormula(true);
       try {
-        const redirect = `${window.location.origin}/#/app/crm`;
+        const redirect = `${window.location.origin}/#/app/crm?member=${selectedContact.id}&gcpoll=1`;
         const r = await setupMandateForMember(selectedContact.id, formulaDraft.label, price, redirect);
         window.location.href = r.authorisation_url; // page RIB GoCardless (le client signe sur place)
         return;
