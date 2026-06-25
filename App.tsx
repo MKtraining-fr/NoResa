@@ -50,6 +50,7 @@ const SurveillancePage = lazy(() => import('./pages/app/SurveillancePage'));
 const AccessControlPage = lazy(() => import('./pages/app/AccessControlPage'));
 const InscriptionPage = lazy(() => import('./pages/app/InscriptionPage'));
 const MusicPage = lazy(() => import('./pages/app/MusicPage'));
+const ClimatePage = lazy(() => import('./pages/app/ClimatePage'));
 
 const MemberHome = lazy(() => import('./pages/member/MemberHome'));
 const MemberReservations = lazy(() => import('./pages/member/MemberReservations'));
@@ -128,6 +129,9 @@ const App: React.FC = () => {
 
             {/* Musique / ambiance (radio internet) */}
             <Route path="musique" element={<MusicPage />} />
+
+            {/* Climatisation (réglages des unités) */}
+            <Route path="climatisation" element={<ClimatePage />} />
 
             <Route path="equipe" element={<TeamPage />} />
 
