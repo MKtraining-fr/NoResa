@@ -390,30 +390,23 @@ const InscriptionPage: React.FC = () => {
                       <div className="mt-1 font-semibold" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
                     </button>
                   ))}
+                  {grp === 'Sans engagement' && (
+                    <div onClick={() => setFormulaKey('libre')} className={`text-left p-4 rounded-2xl border-2 transition cursor-pointer ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
+                      <div className="font-bold text-gray-900 text-sm leading-snug">Accès à montant libre</div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <input type="number" step="0.01" min="0" value={freeAmount}
+                          onChange={(e) => setFreeAmount(e.target.value)}
+                          onClick={(e) => { e.stopPropagation(); setFormulaKey('libre'); }}
+                          onFocus={() => setFormulaKey('libre')}
+                          placeholder="0,00"
+                          className="w-24 bg-transparent font-semibold outline-none border-b-2 border-gray-300 focus:border-red-500 text-base" style={{ color: RED }} />
+                        <span className="font-semibold" style={{ color: RED }}>€</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
-
-            {/* Montant libre — tarif personnalisé, accès coupé à la date de fin */}
-            <div>
-              <span className={label}>Montant libre</span>
-              <button onClick={() => setFormulaKey('libre')} className={`w-full text-left p-4 rounded-2xl border-2 transition ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
-                <div className="font-bold text-gray-900 text-sm">Accès à montant libre</div>
-                <div className="mt-1 text-[12px] text-gray-500">Tarif personnalisé — l'accès se coupe automatiquement à la date de fin.</div>
-              </button>
-              {formulaKey === 'libre' && (
-                <div className="mt-3 grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <span className="text-[11px] text-gray-400">Montant (€) *</span>
-                    <input type="number" step="0.01" min="0" className={field} value={freeAmount} onChange={(e) => setFreeAmount(e.target.value)} placeholder="ex. 80" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-gray-400">Libellé (facultatif)</span>
-                    <input className={field} value={freeLabel} onChange={(e) => setFreeLabel(e.target.value)} placeholder="ex. Accès 3 mois" />
-                  </div>
-                </div>
-              )}
-            </div>
 
             <div>
               <span className={label}>Période d'abonnement</span>
