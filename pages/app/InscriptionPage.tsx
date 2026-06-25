@@ -85,6 +85,9 @@ const InscriptionPage: React.FC = () => {
 
   // Formule
   const [formulaKey, setFormulaKey] = useState('');
+  // Montant libre (tarif personnalisé, conditionné par la date de fin)
+  const [freeAmount, setFreeAmount] = useState('');
+  const [freeLabel, setFreeLabel] = useState('');
   const [formulaPaymentMethod, setFormulaPaymentMethod] = useState('');
   const [badgePaymentMethod, setBadgePaymentMethod] = useState('CB');
   const [services, setServices] = useState<Record<string, boolean>>({});
@@ -98,7 +101,12 @@ const InscriptionPage: React.FC = () => {
   const [error, setError] = useState('');
   const [result, setResult] = useState<InscriptionResult | null>(null);
 
-  const formula = useMemo<Formula | null>(() => FORMULAS.find((f) => f.key === formulaKey) || null, [formulaKey]);
+  const formula = useMemo<Formula | null>(() => {
+    if (formulaKey === 'libre') {
+      return { key: 'libre', label: freeLabel.trim() || 'Accès — montant libre', price: Number(freeAmount) || 0, recurring: false, engagement: false, periodicity: 'Ponctuel', group: 'Sans engagement' };
+    }
+    return FORMULAS.find((f) => f.key === formulaKey) || null;
+  }, [formulaKey, freeAmount, freeLabel]);
   const chosenServices = SERVICES.filter((s) => services[s.key]);
   // Le badge n'est requis que pour un abonnement (formule "Engagement"). Pas d'abonnement = pas de badge.
   const needsBadge = formula?.group === 'Engagement';
@@ -169,7 +177,7 @@ const InscriptionPage: React.FC = () => {
   // --- Navigation entre étapes ----------------------------------------------
   const canNext = () => {
     if (step === 0) return firstName.trim() && lastName.trim();
-    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod);
+    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod) && (formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
     if (step === 2) return consentCga && consentMedical;
     return true;
   };
@@ -222,7 +230,7 @@ const InscriptionPage: React.FC = () => {
   const reset = () => {
     setStep(0); setCivility('Monsieur'); setFirstName(''); setLastName(''); setBirthDate('');
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
-    setProfession(''); setCompany(''); setFormulaKey(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
+    setProfession(''); setCompany(''); setFormulaKey(''); setFreeAmount(''); setFreeLabel(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName('');
@@ -386,6 +394,27 @@ const InscriptionPage: React.FC = () => {
               </div>
             ))}
 
+            {/* Montant libre — tarif personnalisé, accès coupé à la date de fin */}
+            <div>
+              <span className={label}>Montant libre</span>
+              <button onClick={() => setFormulaKey('libre')} className={`w-full text-left p-4 rounded-2xl border-2 transition ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
+                <div className="font-bold text-gray-900 text-sm">Accès à montant libre</div>
+                <div className="mt-1 text-[12px] text-gray-500">Tarif personnalisé — l'accès se coupe automatiquement à la date de fin.</div>
+              </button>
+              {formulaKey === 'libre' && (
+                <div className="mt-3 grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-[11px] text-gray-400">Montant (€) *</span>
+                    <input type="number" step="0.01" min="0" className={field} value={freeAmount} onChange={(e) => setFreeAmount(e.target.value)} placeholder="ex. 80" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-gray-400">Libellé (facultatif)</span>
+                    <input className={field} value={freeLabel} onChange={(e) => setFreeLabel(e.target.value)} placeholder="ex. Accès 3 mois" />
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
               <span className={label}>Période d'abonnement</span>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -399,6 +428,7 @@ const InscriptionPage: React.FC = () => {
                 </div>
               </div>
               {formula?.recurring && <p className="text-[11px] text-gray-400 mt-1">Formule avec engagement reconduit tacitement : la date de fin est facultative.</p>}
+              {formulaKey === 'libre' && <p className="text-[11px] mt-1" style={{ color: RED }}>Date de fin obligatoire : l'accès sera automatiquement bloqué ce jour-là.</p>}
             </div>
 
             <div>

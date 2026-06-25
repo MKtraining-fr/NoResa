@@ -274,6 +274,13 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     memberId = m.id;
   }
 
+  // Accès limité dans le temps : formule non reconduite + date de fin -> on programme
+  // le blocage automatique de l'accès à cette date (cohérent avec le « montant libre »).
+  if (!d.formula.recurring && d.subscriptionEnd) {
+    try { await patchMember(memberId, { access_block_scheduled_at: d.subscriptionEnd }); }
+    catch (e) { console.error('schedule block at end', e); }
+  }
+
   // Photo (optionnelle) — ne bloque pas l'inscription si l'upload échoue
   if (d.photo) {
     try { await uploadMemberPhoto(memberId, d.photo); } catch (e) { console.error('upload photo', e); }
