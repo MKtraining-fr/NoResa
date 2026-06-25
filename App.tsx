@@ -49,6 +49,7 @@ const MessageriePage = lazy(() => import('./pages/app/MessageriePage'));
 const SurveillancePage = lazy(() => import('./pages/app/SurveillancePage'));
 const AccessControlPage = lazy(() => import('./pages/app/AccessControlPage'));
 const InscriptionPage = lazy(() => import('./pages/app/InscriptionPage'));
+const MusicPage = lazy(() => import('./pages/app/MusicPage'));
 
 const MemberHome = lazy(() => import('./pages/member/MemberHome'));
 const MemberReservations = lazy(() => import('./pages/member/MemberReservations'));
@@ -124,6 +125,9 @@ const App: React.FC = () => {
 
             {/* Surveillance Route */}
             <Route path="surveillance" element={<SurveillancePage />} />
+
+            {/* Musique / ambiance (radio internet) */}
+            <Route path="musique" element={<MusicPage />} />
 
             <Route path="equipe" element={<TeamPage />} />
 
