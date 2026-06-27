@@ -11,6 +11,7 @@ export default {
     './layouts/**/*.{ts,tsx}',
     './lib/**/*.{ts,tsx}',
     './utils/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {

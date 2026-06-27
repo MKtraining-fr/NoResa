@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
-  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera,
+  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload,
 } from 'lucide-react';
+import WebcamCapture from '../../components/WebcamCapture';
 import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
   submitInscription, getContractUrl, Formula, InscriptionResult,
@@ -73,6 +74,7 @@ const InscriptionPage: React.FC = () => {
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
+  const [webcamOpen, setWebcamOpen] = useState(false);
   const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) { setPhoto(f); setPhotoPreview(URL.createObjectURL(f)); }
@@ -322,11 +324,16 @@ const InscriptionPage: React.FC = () => {
               </div>
               <div>
                 <span className={label}>Photo de l'adhérent</span>
-                <input ref={photoInputRef} type="file" accept="image/*" capture="user" className="hidden" onChange={onPhoto} />
-                <button onClick={() => photoInputRef.current?.click()} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 font-semibold text-gray-700 hover:bg-gray-50">
-                  <Camera size={18} /> {photoPreview ? 'Changer la photo' : 'Prendre / choisir une photo'}
-                </button>
-                {photoPreview && <button onClick={() => { setPhoto(null); setPhotoPreview(''); }} className="ml-2 text-sm text-gray-400 hover:text-red-600">Retirer</button>}
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => setWebcamOpen(true)} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold" style={{ backgroundColor: RED }}>
+                    <Camera size={18} /> Webcam
+                  </button>
+                  <button onClick={() => photoInputRef.current?.click()} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 font-semibold text-gray-700 hover:bg-gray-50">
+                    <Upload size={18} /> Importer
+                  </button>
+                  {photoPreview && <button onClick={() => { setPhoto(null); setPhotoPreview(''); }} className="text-sm text-gray-400 hover:text-red-600">Retirer</button>}
+                </div>
               </div>
             </div>
             <div>
@@ -539,6 +546,8 @@ const InscriptionPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {webcamOpen && <WebcamCapture onCapture={(f) => { setPhoto(f); setPhotoPreview(URL.createObjectURL(f)); }} onClose={() => setWebcamOpen(false)} />}
     </div>
   );
 };

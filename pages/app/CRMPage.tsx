@@ -6,7 +6,7 @@ import {
   MapPin, Activity, Award, Star, History, Building2,
   User, ChevronRight, CheckCircle2, Clock, Trash2,
   ShieldAlert, HeartPulse, ImageIcon, Briefcase as JobIcon,
-  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera,
+  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload,
   RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
 } from 'lucide-react';
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
@@ -16,6 +16,7 @@ import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
+import WebcamCapture from '../../components/WebcamCapture';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
 
@@ -622,9 +623,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } finally { setSavingFormula(false); }
   };
 
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // permet de re-sélectionner le même fichier
+  const applyFichePhoto = async (file: File) => {
     if (!file || !selectedContact?.id) return;
     setPhotoUploading(true);
     try {
@@ -640,14 +639,24 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       setPhotoUploading(false);
     }
   };
-
-  const handleAddPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+    e.target.value = ''; // permet de re-sélectionner le même fichier
+    if (file) applyFichePhoto(file);
+  };
+
+  const applyAddPhoto = (file: File) => {
     setAddPhotoFile(file);
     setAddPhotoPreview(URL.createObjectURL(file));
   };
+  const handleAddPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) applyAddPhoto(file);
+  };
+
+  // Cible de la capture webcam : fiche membre existant ou formulaire d'ajout
+  const [webcamFor, setWebcamFor] = useState<null | 'member' | 'add'>(null);
 
   const resetAddForm = () => {
     setAddFirstName(''); setAddLastName(''); setAddEmail(''); setAddPhone('');
@@ -1067,9 +1076,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </button>
                       <div>
                         <p className="text-xs font-semibold text-gray-700">Photo du membre</p>
-                        <p className="text-[10px] font-bold text-gray-400">Importer un fichier ou prendre une photo (tablette/mobile)</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:underline"><Upload size={13} /> Importer</button>
+                          <button type="button" onClick={() => setWebcamFor('add')} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:underline"><Camera size={13} /> Webcam</button>
+                        </div>
                       </div>
-                      <input ref={addPhotoInputRef} type="file" accept="image/*" capture="user" onChange={handleAddPhoto} className="hidden" />
+                      <input ref={addPhotoInputRef} type="file" accept="image/*" onChange={handleAddPhoto} className="hidden" />
                     </div>
                   )}
                   
@@ -1338,7 +1350,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {photoUploading && (
                     <span className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center text-white text-[10px] font-semibold uppercase tracking-wide">Envoi…</span>
                   )}
-                  <input ref={photoInputRef} type="file" accept="image/*" capture="user" onChange={handlePhotoChange} className="hidden" />
+                  <button type="button" onClick={() => setWebcamFor('member')} title="Prendre une photo (webcam)" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-white text-indigo-600 shadow-lg flex items-center justify-center border border-gray-200 hover:bg-indigo-50"><Camera size={13} /></button>
+                  <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                 </div>
                 <div>
                   <h2 className="text-3xl font-semibold">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
@@ -2119,6 +2132,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
           </div>
         </div>
       )}
+
+      {webcamFor && <WebcamCapture onCapture={(f) => { if (webcamFor === 'member') applyFichePhoto(f); else applyAddPhoto(f); }} onClose={() => setWebcamFor(null)} />}
     </div>
   );
 };
