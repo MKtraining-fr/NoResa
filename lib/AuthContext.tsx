@@ -68,10 +68,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((e) => console.error('getSession', e))
       .finally(finish);
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      // IMPORTANT : ne JAMAIS `await` un autre appel supabase ici. Le callback est
+      // exécuté en tenant le verrou d'authentification ; appeler loadProfile (qui a
+      // besoin du même verrou) dans la foulée provoque un interblocage — la connexion
+      // « tourne en rond » au 1er clic. On diffère donc la lecture du profil (setTimeout 0).
       if (session?.user) {
-        setUserId(session.user.id);
-        try { await loadProfile(session.user.id); } catch (e) { console.error('loadProfile', e); }
+        const uid = session.user.id;
+        setUserId(uid);
+        setTimeout(() => { loadProfile(uid).catch((e) => console.error('loadProfile', e)); }, 0);
       } else {
         setUserId(null);
         setProfile(null);
@@ -82,17 +87,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
 
-    // On récupère le rôle tout de suite pour pouvoir rediriger correctement.
-    let role: DbRole | undefined;
-    if (data.user) {
-      const { data: row } = await supabase
-        .from('users').select('role').eq('id', data.user.id).maybeSingle();
-      role = (row?.role as DbRole) ?? undefined;
+      // On récupère le rôle tout de suite pour pouvoir rediriger correctement.
+      // (L'interblocage du verrou d'auth étant levé, cette lecture résout normalement.)
+      let role: DbRole | undefined;
+      if (data.user) {
+        try {
+          const { data: row } = await supabase
+            .from('users').select('role').eq('id', data.user.id).maybeSingle();
+          role = (row?.role as DbRole) ?? undefined;
+        } catch (e) { console.error('signIn role', e); }
+      }
+      return { role };
+    } catch (e) {
+      console.error('signIn', e);
+      return { error: (e as Error)?.message || 'Connexion impossible.' };
     }
-    return { role };
   };
 
   const signOut = async () => {
