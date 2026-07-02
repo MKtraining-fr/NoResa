@@ -6,7 +6,7 @@ import {
   MapPin, Activity, Award, Star, History, Building2,
   User, ChevronRight, CheckCircle2, Clock, Trash2,
   ShieldAlert, HeartPulse, ImageIcon, Briefcase as JobIcon,
-  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload,
+  CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload, StickyNote,
   RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
 } from 'lucide-react';
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
@@ -423,6 +423,18 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } catch (e: any) { console.error(e); alert(e?.message || 'Impossible de programmer le blocage.'); }
     finally { setAccessBusy(false); }
   };
+  // Note interne (consultable sur la fiche + signalée sur le contrôle d'accès)
+  const [savingNote, setSavingNote] = useState(false);
+  const saveNote = async () => {
+    if (!selectedContact?.id) return;
+    setSavingNote(true);
+    try {
+      await patchMember(selectedContact.id, { notes: (selectedContact.notes || '').trim() || null });
+      setContacts(await getMembers());
+    } catch (e: any) { console.error(e); alert(e?.message || 'Enregistrement impossible.'); }
+    finally { setSavingNote(false); }
+  };
+
   const cancelScheduledBlock = async () => {
     if (!selectedContact) return;
     setAccessBusy(true);
@@ -1525,6 +1537,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         );
                       })()}
                     </div>
+                  </div>
+
+                  {/* Note interne */}
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-2 flex items-center gap-1.5"><StickyNote size={13} /> Note interne <span className="text-amber-400 normal-case font-medium">· visible sur le contrôle d'accès</span></p>
+                    <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} placeholder="Ex. paiement en attente, blessure, consigne accueil…" className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/20" />
+                    <button type="button" onClick={saveNote} disabled={savingNote} className="mt-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide hover:bg-amber-600 disabled:opacity-50">{savingNote ? 'Enregistrement…' : 'Enregistrer la note'}</button>
                   </div>
 
                   {/* Carte 10 séances : séances restantes */}

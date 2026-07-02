@@ -72,10 +72,10 @@ export interface AccessEntry {
   qr_code: string | null;
   device_sn: string | null;
   member_id: string | null;
-  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null } | null;
+  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null; notes: string | null } | null;
 }
 
-const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path)';
+const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path, notes)';
 
 /** Entrées du jour (passages enregistrés depuis minuit), plus récentes d'abord. */
 export async function getTodayEntries(): Promise<AccessEntry[]> {

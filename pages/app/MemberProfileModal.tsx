@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Phone, Mail, MapPin, CreditCard, Layers, Hash, KeyRound, Calendar, ExternalLink, Ticket, Loader2, ShieldAlert } from 'lucide-react';
+import { X, Phone, Mail, MapPin, CreditCard, Layers, Hash, KeyRound, Calendar, ExternalLink, Ticket, Loader2, ShieldAlert, StickyNote } from 'lucide-react';
 import { getMemberById, getPhotoUrl } from '../../lib/membersApi';
 import { getPackStatus, PackStatus } from '../../lib/accessApi';
 
@@ -72,6 +72,17 @@ const MemberProfileModal: React.FC<{ memberId: string; onClose: () => void }> = 
                   <div className="min-w-0">
                     <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">Accès bloqué</p>
                     <p className="text-sm font-semibold text-red-900 break-words">{member.accessBlockReason || 'Sans motif précisé'}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Note interne */}
+              {member.notes && (
+                <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <StickyNote size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Note</p>
+                    <p className="text-sm font-medium text-amber-900 break-words whitespace-pre-wrap">{member.notes}</p>
                   </div>
                 </div>
               )}

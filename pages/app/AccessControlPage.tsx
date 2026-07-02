@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight, Ban } from 'lucide-react';
+import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight, Ban, StickyNote } from 'lucide-react';
 import {
   getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls, getBlockedMembers,
   AccessEntry, AccessAlert, BlockedMember,
@@ -204,6 +204,7 @@ const AccessControlPage: React.FC = () => {
                 {/* Dégradé pour la lisibilité du texte */}
                 <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
                 {refused && <span className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-lg shadow">Refusé</span>}
+                {e.member?.notes && <span className="absolute top-2 right-2 bg-amber-400 text-amber-900 w-6 h-6 rounded-lg flex items-center justify-center shadow" title={e.member.notes}><StickyNote size={13} /></span>}
                 {/* Nom + date/heure en surimpression */}
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <p className="text-white font-black text-[15px] leading-tight truncate drop-shadow-lg" title={nameOf(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}>
