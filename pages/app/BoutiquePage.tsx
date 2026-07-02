@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { Product, Member } from '../../types';
 import IbpPaymentModal from '../../components/IbpPaymentModal';
-import IbpChargeModal from '../../components/IbpChargeModal';
 import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
 import { activatePurchasedAccess } from '../../lib/accessApi';
@@ -39,7 +38,10 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [ibpOpen, setIbpOpen] = useState(false);
-  const [chargeOpen, setChargeOpen] = useState(false);
+  // Article libre (montant + libellé) ajouté au panier comme n'importe quel article
+  const [freeOpen, setFreeOpen] = useState(false);
+  const [freeAmount, setFreeAmount] = useState('');
+  const [freeLabel, setFreeLabel] = useState('');
   const [saleResult, setSaleResult] = useState<{ sale_id: string; invoice_number: string; total_ttc: number } | null>(null);
   const [invoiceMsg, setInvoiceMsg] = useState<string | null>(null);
   const [accessMsg, setAccessMsg] = useState<string | null>(null);
@@ -111,6 +113,15 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
     });
   };
 
+  const addFreeLine = () => {
+    const amount = Number(freeAmount);
+    if (!(amount > 0)) return;
+    const label = freeLabel.trim() || 'Article libre';
+    const free: any = { id: `free-${Date.now()}`, name: label, price: amount, vatRate: 0, image: null, stock: 0, __free: true };
+    setCart(prev => [...prev, { product: free, quantity: 1 }]);
+    setFreeOpen(false); setFreeAmount(''); setFreeLabel('');
+  };
+
   const updateQuantity = (productId: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.product.id === productId) {
@@ -147,7 +158,9 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       const res = await recordSale(
         selectedMember?.id ?? null,
         paymentMethod || 'Espèces',
-        cart.map(i => ({ product_id: i.product.id, quantity: i.quantity })),
+        cart.map(i => (i.product as any).__free
+          ? { label: i.product.name, unit_price: i.product.price, quantity: i.quantity }
+          : { product_id: i.product.id, quantity: i.quantity }),
       );
       setSaleResult(res);
       setSaleStep('success');
@@ -569,13 +582,9 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg"><ShoppingCart size={24} className="text-white" /></div>
                     <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Terminal de Vente</h2>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setChargeOpen(true)} className="flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={15} /> Montant libre (IBP)</button>
-                    <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
-                  </div>
+                  <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
                </div>
-               {chargeOpen && <IbpChargeModal memberId={selectedMember?.id} email={selectedMember?.email} onClose={() => setChargeOpen(false)} onPaid={() => setChargeOpen(false)} />}
-               
+
                <div className="relative mb-8">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                  <input 
@@ -590,6 +599,24 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                </div>
 
                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {/* Article libre : montant + libellé (le libellé = nom de l'article vendu) */}
+                  {!freeOpen ? (
+                    <button onClick={() => setFreeOpen(true)} className="flex flex-col items-center justify-center text-gray-400 bg-white p-5 rounded-2xl border-2 border-dashed border-gray-200 hover:border-indigo-400 hover:text-indigo-600 transition-all min-h-[210px]">
+                      <Plus size={28} />
+                      <span className="text-xs font-semibold mt-2 uppercase tracking-wide">Article libre</span>
+                      <span className="text-[9px] text-gray-300 mt-1">Montant + libellé</span>
+                    </button>
+                  ) : (
+                    <div className="flex flex-col justify-center gap-2 bg-white p-4 rounded-2xl border-2 border-indigo-300 min-h-[210px]">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">Article libre</p>
+                      <input value={freeLabel} onChange={(e) => setFreeLabel(e.target.value)} placeholder="Libellé (nom de l'article)" className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      <input type="number" min="0" step="0.01" value={freeAmount} onChange={(e) => setFreeAmount(e.target.value)} placeholder="Montant €" className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      <div className="flex gap-2">
+                        <button disabled={!(Number(freeAmount) > 0)} onClick={addFreeLine} className="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide disabled:opacity-40">Ajouter</button>
+                        <button onClick={() => { setFreeOpen(false); setFreeAmount(''); setFreeLabel(''); }} className="px-2 text-[10px] font-bold text-gray-400 hover:text-gray-600">Annuler</button>
+                      </div>
+                    </div>
+                  )}
                   {posProducts.map(product => (
                     <button 
                       key={product.id} 

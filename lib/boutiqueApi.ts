@@ -49,7 +49,7 @@ export async function getCategories(): Promise<CategoryRow[]> {
 
 // --- Ventes -----------------------------------------------------------------
 
-export interface SaleLine { product_id: string; quantity: number; }
+export interface SaleLine { product_id?: string; quantity: number; label?: string; unit_price?: number; vat_rate?: number; }
 export interface SaleResult { sale_id: string; invoice_number: string; total_ttc: number; }
 
 /** Encaisse une vente (crée le ticket, les lignes, décrémente le stock). */
@@ -84,7 +84,7 @@ export async function getRecentSales(limit = 50): Promise<any[]> {
 export async function getMemberSales(memberId: string): Promise<any[]> {
   const { data, error } = await supabase
     .from('sales')
-    .select('id, invoice_number, sale_date, payment_method, total_ttc, invoice_email_status, invoice_pdf_path, lines:product_sales(quantity, unit_price, product:products(name))')
+    .select('id, invoice_number, sale_date, payment_method, total_ttc, invoice_email_status, invoice_pdf_path, lines:product_sales(quantity, unit_price, label, product:products(name))')
     .eq('member_id', memberId)
     .order('sale_date', { ascending: false });
   if (error) { console.error('boutiqueApi.getMemberSales', error); return []; }

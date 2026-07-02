@@ -2042,7 +2042,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             <div className="flex flex-wrap gap-1.5">
                               {(s.lines || []).map((l: any, i: number) => (
                                 <span key={i} className="inline-flex items-center bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-600">
-                                  {l.quantity}× {l.product?.name || 'Article'}
+                                  {l.quantity}× {l.product?.name || l.label || 'Article'}
                                 </span>
                               ))}
                             </div>
