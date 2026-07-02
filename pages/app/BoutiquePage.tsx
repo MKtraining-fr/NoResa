@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Product, Member } from '../../types';
 import IbpPaymentModal from '../../components/IbpPaymentModal';
+import IbpChargeModal from '../../components/IbpChargeModal';
 import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
 import { activatePurchasedAccess } from '../../lib/accessApi';
@@ -38,6 +39,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [ibpOpen, setIbpOpen] = useState(false);
+  const [chargeOpen, setChargeOpen] = useState(false);
   const [saleResult, setSaleResult] = useState<{ sale_id: string; invoice_number: string; total_ttc: number } | null>(null);
   const [invoiceMsg, setInvoiceMsg] = useState<string | null>(null);
   const [accessMsg, setAccessMsg] = useState<string | null>(null);
@@ -567,8 +569,12 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg"><ShoppingCart size={24} className="text-white" /></div>
                     <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Terminal de Vente</h2>
                   </div>
-                  <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setChargeOpen(true)} className="flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={15} /> Montant libre (IBP)</button>
+                    <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
+                  </div>
                </div>
+               {chargeOpen && <IbpChargeModal memberId={selectedMember?.id} email={selectedMember?.email} onClose={() => setChargeOpen(false)} onPaid={() => setChargeOpen(false)} />}
                
                <div className="relative mb-8">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
