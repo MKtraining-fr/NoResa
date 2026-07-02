@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Search, Filter, MoreHorizontal, UserPlus, Mail, Phone, 
   Target, UserCheck, Briefcase, X, Save, Calendar, 
@@ -173,20 +174,24 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     setPhotoUrl(null);
   };
 
-  // Ouverture directe d'une fiche depuis une autre page (ex. Contrôle d'accès) via #/app/crm?member=<id>
-  const deepLinkedRef = useRef<string | null>(null);
+  // Ouverture directe d'une fiche via ?member=<id> (recherche du header, Contrôle d'accès, etc.).
+  // On dépend de `location` (et pas seulement de `contacts`) : sinon, quand on est DÉJÀ sur la
+  // page, changer le paramètre d'URL ne rechargeait pas le composant et rien ne s'ouvrait.
+  const location = useLocation();
+  const deepLinkedKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    const m = window.location.hash.match(/[?&]member=([^&]+)/);
-    if (!m || contacts.length === 0) return;
-    const id = decodeURIComponent(m[1]);
-    if (deepLinkedRef.current === id) return;
+    if (contacts.length === 0) return;
+    // Le paramètre est dans le hash (HashRouter) : location.search le contient, avec repli sur le hash brut.
+    const raw = location.search || (window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : '');
+    const id = new URLSearchParams(raw).get('member');
+    if (!id) return;
+    if (deepLinkedKeyRef.current === location.key) return; // navigation déjà traitée
     const found = contacts.find((c) => c.id === id);
     if (found) {
-      deepLinkedRef.current = id;
+      deepLinkedKeyRef.current = location.key;
       openContactDetails(found);
-      window.history.replaceState(null, '', window.location.hash.split('?')[0]);
     }
-  }, [contacts]);
+  }, [contacts, location.key, location.search]);
 
   // Au retour de la signature du mandat GoCardless (#/app/crm?member=<id>&gcpoll=1),
   // on rafraîchit le statut quelques fois — le webhook met ~quelques secondes à synchroniser.
