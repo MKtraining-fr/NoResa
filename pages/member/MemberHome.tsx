@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   QrCode, FileText, MapPin, Gift, Megaphone, X, Maximize2,
   Package, Calendar, Plus, ChevronRight, MessageCircle,
@@ -43,16 +43,35 @@ const MemberHome: React.FC = () => {
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [partnerOpen, setPartnerOpen] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [m, o, g, p] = await Promise.all([
-          getMyMember(), getHourlyOccupancy(), getMyGym(), getMyPackStatus(),
-        ]);
-        setMember(m); setOcc(o); setGym(g); setPack(p);
-      } finally { setLoading(false); }
-    })();
+  const inFlight = useRef(false);
+  const load = useCallback(async (silent = false) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (!silent) setLoading(true);
+    try {
+      const [m, o, g, p] = await Promise.all([
+        getMyMember(), getHourlyOccupancy(), getMyGym(), getMyPackStatus(),
+      ]);
+      setMember(m); setOcc(o); setGym(g); setPack(p);
+    } finally {
+      // Toujours sortir du chargement, même en cas de souci réseau (jamais bloqué).
+      setLoading(false);
+      inFlight.current = false;
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+    // Au retour au premier plan (app mobile revenue d'arrière-plan), on rafraîchit
+    // en silence — sans re-flasher les squelettes — pour ne jamais rester figé.
+    const onVisible = () => { if (document.visibilityState === 'visible') load(true); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [load]);
 
   if (loading) return <HomeSkeleton />;
   if (!member) {
