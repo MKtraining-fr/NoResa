@@ -88,6 +88,33 @@ export async function startInstantPayment(
   return data as { authorisation_url: string; billing_request_id: string };
 }
 
+/**
+ * Encaissement au comptoir par Instant Bank Pay (staff). Crée un paiement IBP
+ * (produit d'accès, produit boutique ou montant libre) et renvoie l'URL (QR/lien).
+ */
+export interface StaffPaymentResult { authorisation_url: string; order_id: string; billing_request_id: string; amount_cents: number; label: string; }
+export async function startStaffPayment(input: {
+  amount?: number; product?: string; label: string; memberId?: string; email?: string; redirectUrl?: string;
+}): Promise<StaffPaymentResult> {
+  const { data, error } = await supabase.functions.invoke('gocardless-staff-payment', {
+    body: { amount: input.amount, product: input.product, label: input.label, member_id: input.memberId, email: input.email, redirectUrl: input.redirectUrl },
+  });
+  if (error) {
+    let msg = error.message || 'Paiement indisponible';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    throw new Error(msg);
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as StaffPaymentResult;
+}
+
+/** Statut d'une commande POS (pending | done | failed) — pour le polling au comptoir. */
+export async function posOrderStatus(orderId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('admin_pos_order_status', { p_id: orderId });
+  if (error) { console.error('posOrderStatus', error); return null; }
+  return (data as string) ?? null;
+}
+
 export interface GocardlessStats {
   mandates_active: number;
   collected_30d: number;

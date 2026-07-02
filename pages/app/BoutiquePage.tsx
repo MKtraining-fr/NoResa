@@ -4,9 +4,10 @@ import {
   ShoppingBag, Plus, Package, TrendingUp, Search, Truck, 
   ShoppingCart, ArrowUpRight, X, Minus, Trash2, CheckCircle2, 
   CreditCard, Banknote, User, UserPlus, Check, ChevronDown,
-  Edit2, Save, Calendar, Camera, Tag, AlertTriangle, Download, Send, Pencil, FileText
+  Edit2, Save, Calendar, Camera, Tag, AlertTriangle, Download, Send, Pencil, FileText, Zap
 } from 'lucide-react';
 import { Product, Member } from '../../types';
+import IbpPaymentModal from '../../components/IbpPaymentModal';
 import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
 import { activatePurchasedAccess } from '../../lib/accessApi';
@@ -36,6 +37,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [memberResults, setMemberResults] = useState<Member[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [ibpOpen, setIbpOpen] = useState(false);
   const [saleResult, setSaleResult] = useState<{ sale_id: string; invoice_number: string; total_ttc: number } | null>(null);
   const [invoiceMsg, setInvoiceMsg] = useState<string | null>(null);
   const [accessMsg, setAccessMsg] = useState<string | null>(null);
@@ -732,7 +734,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-3 gap-3 mb-4">
                      <button onClick={() => setPaymentMethod('CB')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'CB' ? 'border-indigo-600 text-indigo-600 ring-2 ring-indigo-500/10' : 'border-gray-100 hover:border-indigo-600 hover:text-indigo-600'}`}>
                         <CreditCard size={20} className={`mb-2 ${paymentMethod === 'CB' ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600'}`} />
                         <span className="text-[10px] font-semibold uppercase tracking-wide">CB / Sans contact</span>
@@ -741,18 +743,33 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                         <Banknote size={20} className={`mb-2 ${paymentMethod === 'Espèces' ? 'text-green-600' : 'text-gray-400 group-hover:text-green-600'}`} />
                         <span className="text-[10px] font-semibold uppercase tracking-wide">Espèces</span>
                      </button>
+                     <button onClick={() => setPaymentMethod('Instant Bank Pay')} className={`flex flex-col items-center justify-center p-4 bg-white border rounded-2xl transition-all group shadow-sm ${paymentMethod === 'Instant Bank Pay' ? 'border-amber-500 text-amber-600 ring-2 ring-amber-500/10' : 'border-gray-100 hover:border-amber-500 hover:text-amber-600'}`}>
+                        <Zap size={20} className={`mb-2 ${paymentMethod === 'Instant Bank Pay' ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-600'}`} />
+                        <span className="text-[10px] font-semibold uppercase tracking-wide">Instant Bank Pay</span>
+                     </button>
                   </div>
 
-                  <button 
-                    onClick={handleCheckout} 
-                    disabled={cart.length === 0 || processing} 
+                  <button
+                    onClick={() => { if (paymentMethod === 'Instant Bank Pay') setIbpOpen(true); else handleCheckout(); }}
+                    disabled={cart.length === 0 || processing || !paymentMethod}
                     className={`w-full py-5 rounded-2xl font-semibold text-sm uppercase tracking-wide shadow-xl transition-all flex items-center justify-center space-x-3 active:scale-[0.98] ${
-                      cart.length === 0 || processing ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'
+                      cart.length === 0 || processing || !paymentMethod ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-indigo-100 hover:bg-indigo-700'
                     }`}
                   >
                     <CheckCircle2 size={20} />
-                    <span>{processing ? 'Encaissement…' : 'Valider & Encaisser'}</span>
+                    <span>{processing ? 'Encaissement…' : paymentMethod === 'Instant Bank Pay' ? 'Générer le paiement' : 'Valider & Encaisser'}</span>
                   </button>
+
+                  {ibpOpen && (
+                    <IbpPaymentModal
+                      amount={cartTotal}
+                      label={`Vente caisse${selectedMember ? ' · ' + selectedMember.firstName + ' ' + selectedMember.lastName : ''}`}
+                      memberId={selectedMember?.id}
+                      email={selectedMember?.email}
+                      onClose={() => setIbpOpen(false)}
+                      onPaid={() => { setIbpOpen(false); handleCheckout(); }}
+                    />
+                  )}
                </div>
             </div>
           </div>
