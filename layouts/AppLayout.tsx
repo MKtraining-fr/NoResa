@@ -53,32 +53,11 @@ const AppLayout: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Logique de filtrage globale
+  // Recherche globale : membres réels uniquement (les autres tables ne sont pas
+  // encore branchées — on évite d'afficher de faux résultats).
   const getSearchResults = () => {
-    if (!searchQuery.trim()) return null;
-    const query = searchQuery.toLowerCase();
-
-    // Membres : données réelles (via Supabase)
-    const members = memberResults;
-
-    // Prospects / Partenaires / Produits : données d'exemple tant que leurs tables
-    // ne sont pas connectées à la base.
-    const prospects = MOCK_MEMBERS.filter(m => 
-      m.status === 'PROSPECT' && 
-      (`${m.firstName} ${m.lastName}`.toLowerCase().includes(query) || m.email.toLowerCase().includes(query))
-    );
-
-    const partners = MOCK_PARTNERS.filter(p => 
-      p.company.toLowerCase().includes(query) || p.email.toLowerCase().includes(query)
-    );
-
-    const products = MOCK_PRODUCTS.filter(p => 
-      p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query)
-    );
-
-    if (!members.length && !prospects.length && !partners.length && !products.length) return null;
-
-    return { members, prospects, partners, products };
+    if (!searchQuery.trim() || !memberResults.length) return null;
+    return { members: memberResults };
   };
 
   const results = getSearchResults();
@@ -86,10 +65,7 @@ const AppLayout: React.FC = () => {
   const handleResultClick = (type: string, id: string) => {
     setIsSearchOpen(false);
     setSearchQuery('');
-    if (type === 'member') navigate('/app/crm/membres');
-    if (type === 'prospect') navigate('/app/crm/prospects');
-    if (type === 'partner') navigate('/app/crm/partenaires');
-    if (type === 'product') navigate('/app/boutique/produits');
+    if (type === 'member') navigate(`/app/crm/membres?member=${id}`);
   };
 
   return (
@@ -216,62 +192,6 @@ const AppLayout: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Section Prospects */}
-                  {results.prospects.length > 0 && (
-                    <div className="p-4 border-b border-gray-50">
-                      <h4 className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide mb-3 px-2 flex items-center"><Target size={10} className="mr-2" /> Prospects</h4>
-                      <div className="space-y-1">
-                        {results.prospects.map(p => (
-                          <button key={p.id} onClick={() => handleResultClick('prospect', p.id)} className="w-full flex items-center p-2 hover:bg-amber-50 rounded-xl transition-colors group text-left">
-                            <img src={`https://picsum.photos/seed/${p.id}/40/40`} className="w-8 h-8 rounded-lg mr-3 shadow-sm" alt="" />
-                            <div>
-                              <p className="text-xs font-semibold text-gray-900 group-hover:text-amber-600">{p.firstName} {p.lastName}</p>
-                              <p className="text-[10px] text-gray-400 font-bold">Relance automatique active</p>
-                            </div>
-                            <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-amber-400 transition-all" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Section Partenaires */}
-                  {results.partners.length > 0 && (
-                    <div className="p-4 border-b border-gray-50">
-                      <h4 className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-3 px-2 flex items-center"><Briefcase size={10} className="mr-2" /> Partenaires</h4>
-                      <div className="space-y-1">
-                        {results.partners.map(p => (
-                          <button key={p.id} onClick={() => handleResultClick('partner', p.id)} className="w-full flex items-center p-2 hover:bg-slate-50 rounded-xl transition-colors group text-left">
-                            <div className="w-8 h-8 bg-slate-100 rounded-lg mr-3 flex items-center justify-center text-slate-400 font-semibold text-[10px]">{p.company.substring(0, 2)}</div>
-                            <div>
-                              <p className="text-xs font-semibold text-gray-900 group-hover:text-slate-600">{p.company}</p>
-                              <p className="text-[10px] text-gray-400 font-bold">{p.category}</p>
-                            </div>
-                            <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-slate-400 transition-all" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Section Produits */}
-                  {results.products.length > 0 && (
-                    <div className="p-4">
-                      <h4 className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-3 px-2 flex items-center"><ShoppingBag size={10} className="mr-2" /> Boutique</h4>
-                      <div className="space-y-1">
-                        {results.products.map(p => (
-                          <button key={p.id} onClick={() => handleResultClick('product', p.id)} className="w-full flex items-center p-2 hover:bg-indigo-50 rounded-xl transition-colors group text-left">
-                            <img src={p.image} className="w-8 h-8 rounded-lg mr-3 object-cover shadow-sm" alt="" />
-                            <div>
-                              <p className="text-xs font-semibold text-gray-900 group-hover:text-indigo-600">{p.name}</p>
-                              <p className="text-[10px] text-indigo-500 font-semibold">{p.price.toFixed(2).replace('.', ',')} €</p>
-                            </div>
-                            <ArrowUpRight size={14} className="ml-auto text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-indigo-400 transition-all" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

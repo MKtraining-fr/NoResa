@@ -25,6 +25,7 @@ const SurveillancePage: React.FC = () => {
   const [selectedCam, setSelectedCam] = useState<any>(null);
   const [isGridMode, setIsGridMode] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
+  const [camSearch, setCamSearch] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -64,7 +65,7 @@ const SurveillancePage: React.FC = () => {
           <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 w-full max-w-xs group focus-within:ring-2 focus-within:ring-indigo-500/10">
               <Search size={16} className="text-gray-400" />
-              <input type="text" placeholder="Rechercher une caméra..." className="bg-transparent border-none outline-none text-xs ml-2 w-full font-bold" />
+              <input type="text" value={camSearch} onChange={(e) => setCamSearch(e.target.value)} placeholder="Rechercher une caméra..." className="bg-transparent border-none outline-none text-xs ml-2 w-full font-bold" />
             </div>
             <div className="flex items-center bg-gray-50 p-1 rounded-xl">
               <button 
@@ -83,7 +84,7 @@ const SurveillancePage: React.FC = () => {
           </div>
 
           <div className={`grid gap-6 ${isGridMode ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
-            {CAMERAS.map((cam) => (
+            {CAMERAS.filter((c) => !camSearch.trim() || `${c.name} ${c.zone}`.toLowerCase().includes(camSearch.toLowerCase())).map((cam) => (
               <div 
                 key={cam.id} 
                 className="bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-slate-800 group relative aspect-video cursor-pointer hover:ring-4 hover:ring-indigo-500/20 transition-all"
