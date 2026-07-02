@@ -95,9 +95,11 @@ export async function startInstantPayment(
 export interface StaffPaymentResult { authorisation_url: string; order_id: string; billing_request_id: string; amount_cents: number; label: string; }
 export async function startStaffPayment(input: {
   amount?: number; product?: string; label: string; memberId?: string; email?: string; redirectUrl?: string;
+  /** Inscrire l'encaissement dans les paiements (fiche + stats). Def: true. Mettre false si la vente est déjà enregistrée ailleurs (ex. caisse). */
+  recordPayment?: boolean;
 }): Promise<StaffPaymentResult> {
   const { data, error } = await supabase.functions.invoke('gocardless-staff-payment', {
-    body: { amount: input.amount, product: input.product, label: input.label, member_id: input.memberId, email: input.email, redirectUrl: input.redirectUrl },
+    body: { amount: input.amount, product: input.product, label: input.label, member_id: input.memberId, email: input.email, redirectUrl: input.redirectUrl, record_payment: input.recordPayment },
   });
   if (error) {
     let msg = error.message || 'Paiement indisponible';

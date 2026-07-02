@@ -12,13 +12,13 @@ const PRESETS = [
   { product: 'mois', label: "1 mois d'accès", price: '40,00 €' },
 ];
 
-const IbpChargeModal: React.FC<{ memberId?: string; email?: string; onClose: () => void; onPaid?: () => void }> = ({ memberId, email, onClose, onPaid }) => {
+const IbpChargeModal: React.FC<{ memberId?: string; email?: string; recordPayment?: boolean; onClose: () => void; onPaid?: () => void }> = ({ memberId, email, recordPayment, onClose, onPaid }) => {
   const [charge, setCharge] = useState<null | { product?: string; amount?: number; label: string }>(null);
   const [freeAmount, setFreeAmount] = useState('');
   const [freeLabel, setFreeLabel] = useState('');
 
   if (charge) {
-    return <IbpPaymentModal label={charge.label} product={charge.product} amount={charge.amount} memberId={memberId} email={email} onClose={onClose} onPaid={onPaid} />;
+    return <IbpPaymentModal label={charge.label} product={charge.product} amount={charge.amount} memberId={memberId} email={email} recordPayment={recordPayment} onClose={onClose} onPaid={onPaid} />;
   }
 
   return (

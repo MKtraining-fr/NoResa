@@ -14,9 +14,10 @@ const IbpPaymentModal: React.FC<{
   product?: string;       // 'seance' | 'carnet' | 'mois' (crédite l'accès)
   memberId?: string;
   email?: string;
+  recordPayment?: boolean; // inscrire dans les paiements (def: true) — false si déjà enregistré (caisse)
   onClose: () => void;
   onPaid?: () => void;
-}> = ({ label, amount, product, memberId, email, onClose, onPaid }) => {
+}> = ({ label, amount, product, memberId, email, recordPayment, onClose, onPaid }) => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [url, setUrl] = useState('');
@@ -30,7 +31,7 @@ const IbpPaymentModal: React.FC<{
     let alive = true;
     (async () => {
       try {
-        const r = await startStaffPayment({ label, amount, product, memberId, email });
+        const r = await startStaffPayment({ label, amount, product, memberId, email, recordPayment });
         if (!alive) return;
         setUrl(r.authorisation_url); setOrderId(r.order_id); setAmountCents(r.amount_cents); setLoading(false);
       } catch (e: any) {

@@ -772,6 +772,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       label={`Vente caisse${selectedMember ? ' · ' + selectedMember.firstName + ' ' + selectedMember.lastName : ''}`}
                       memberId={selectedMember?.id}
                       email={selectedMember?.email}
+                      recordPayment={false}
                       onClose={() => setIbpOpen(false)}
                       onPaid={() => { setIbpOpen(false); handleCheckout(); }}
                     />
