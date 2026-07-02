@@ -8,9 +8,12 @@ interface Props {
 }
 
 const ProtectedRoute: React.FC<Props> = ({ children, space }) => {
-  const { loading, role, isStaff } = useAuth();
+  const { loading, userId, profileLoaded, role, isStaff } = useAuth();
 
-  if (loading) {
+  // On attend la fin du boot ET, si une session existe, la lecture du profil :
+  // sinon, juste après connexion, le rôle n'est pas encore là et on rebondirait
+  // vers /connexion (l'app « tournait en rond » tant qu'on ne la relançait pas).
+  if (loading || (userId && !profileLoaded)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400 text-sm">
         Chargement…

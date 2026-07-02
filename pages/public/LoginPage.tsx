@@ -24,7 +24,9 @@ const LoginPage: React.FC = () => {
       return;
     }
     // Redirection selon le rôle réel du compte (back-office ou espace membre).
-    navigate(homePathForRole(role));
+    // Repli sur /app si le rôle n'a pas pu être lu : ProtectedRoute redirigera un
+    // membre vers /membre une fois le profil chargé (jamais de renvoi vers /connexion).
+    navigate(role ? homePathForRole(role) : '/app');
   };
 
   return (

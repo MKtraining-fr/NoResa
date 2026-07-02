@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
 
 // Rôles tels qu'ils existent dans la table public.users (en minuscules).
@@ -28,6 +28,7 @@ interface AuthState {
   loading: boolean;
   userId: string | null;
   profile: UserProfile | null;
+  profileLoaded: boolean;      // le profil du user connecté a été lu (succès ou échec)
   role: DbRole | null;
   isStaff: boolean;            // peut accéder au back-office
   isSuper: boolean;            // propriétaire de la plateforme
@@ -37,18 +38,24 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+const PROFILE_COLS = 'id, email, first_name, last_name, role';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const userIdRef = useRef<string | null>(null);
 
   const loadProfile = async (uid: string) => {
-    const { data } = await supabase
-      .from('users')
-      .select('id, email, first_name, last_name, role')
-      .eq('id', uid)
-      .maybeSingle();
-    setProfile((data as UserProfile) ?? null);
+    try {
+      const { data } = await supabase.from('users').select(PROFILE_COLS).eq('id', uid).maybeSingle();
+      setProfile((data as UserProfile) ?? null);
+    } catch (e) {
+      console.error('loadProfile', e);
+    } finally {
+      setProfileLoaded(true);
+    }
   };
 
   useEffect(() => {
@@ -61,11 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession()
       .then(async ({ data: { session } }) => {
         if (session?.user) {
+          userIdRef.current = session.user.id;
           setUserId(session.user.id);
-          try { await loadProfile(session.user.id); } catch (e) { console.error('loadProfile', e); }
+          await loadProfile(session.user.id);
+        } else {
+          setProfileLoaded(true); // pas de session → rien à charger
         }
       })
-      .catch((e) => console.error('getSession', e))
+      .catch((e) => { console.error('getSession', e); setProfileLoaded(true); })
       .finally(finish);
 
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -73,13 +83,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // exécuté en tenant le verrou d'authentification ; appeler loadProfile (qui a
       // besoin du même verrou) dans la foulée provoque un interblocage — la connexion
       // « tourne en rond » au 1er clic. On diffère donc la lecture du profil (setTimeout 0).
-      if (session?.user) {
-        const uid = session.user.id;
+      const uid = session?.user?.id ?? null;
+      if (uid) {
+        const changed = userIdRef.current !== uid;
+        userIdRef.current = uid;
         setUserId(uid);
-        setTimeout(() => { loadProfile(uid).catch((e) => console.error('loadProfile', e)); }, 0);
+        // On ne recharge (et on ne remet "en chargement") que si c'est un NOUVEAU
+        // user : évite de flasher « Chargement » à chaque rafraîchissement de token.
+        if (changed) {
+          setProfileLoaded(false);
+          setTimeout(() => { loadProfile(uid); }, 0);
+        }
       } else {
+        userIdRef.current = null;
         setUserId(null);
         setProfile(null);
+        setProfileLoaded(true);
       }
       finish();
     });
@@ -91,15 +110,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
 
-      // On récupère le rôle tout de suite pour pouvoir rediriger correctement.
-      // (L'interblocage du verrou d'auth étant levé, cette lecture résout normalement.)
+      // On lit le profil complet tout de suite et on le pousse dans le contexte : ainsi
+      // la redirection post-login trouve déjà le rôle (ProtectedRoute ne rebondit pas
+      // vers /connexion en attendant le chargement différé). L'interblocage étant levé,
+      // cette lecture résout normalement.
       let role: DbRole | undefined;
       if (data.user) {
         try {
-          const { data: row } = await supabase
-            .from('users').select('role').eq('id', data.user.id).maybeSingle();
-          role = (row?.role as DbRole) ?? undefined;
-        } catch (e) { console.error('signIn role', e); }
+          const { data: row } = await supabase.from('users').select(PROFILE_COLS).eq('id', data.user.id).maybeSingle();
+          if (row) {
+            userIdRef.current = data.user.id;
+            setUserId(data.user.id);
+            setProfile(row as UserProfile);
+            setProfileLoaded(true);
+            role = (row as UserProfile).role;
+          }
+        } catch (e) { console.error('signIn profile', e); }
       }
       return { role };
     } catch (e) {
@@ -120,6 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         userId,
         profile,
+        profileLoaded,
         role,
         isStaff: !!role && STAFF_ROLES.includes(role),
         isSuper: role === 'super_admin',
