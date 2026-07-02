@@ -1546,11 +1546,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </div>
                   </div>
 
-                  {/* Note interne */}
-                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 mb-2 flex items-center gap-1.5"><StickyNote size={13} /> Note interne <span className="text-amber-400 normal-case font-medium">· visible sur le contrôle d'accès</span></p>
-                    <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} placeholder="Ex. paiement en attente, blessure, consigne accueil…" className="w-full bg-white border border-amber-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/20" />
-                    <button type="button" onClick={saveNote} disabled={savingNote} className="mt-2 bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wide hover:bg-amber-600 disabled:opacity-50">{savingNote ? 'Enregistrement…' : 'Enregistrer la note'}</button>
+                  {/* Note interne (compacte) */}
+                  <div className="rounded-xl border border-gray-100 p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex items-center gap-1.5"><StickyNote size={12} className="text-amber-500" /> Note interne <span className="normal-case font-medium text-gray-300">· visible au contrôle d'accès</span></p>
+                      <button type="button" onClick={saveNote} disabled={savingNote} className="text-[10px] font-bold uppercase tracking-wide text-amber-600 hover:text-amber-700 disabled:opacity-40">{savingNote ? '…' : 'Enregistrer'}</button>
+                    </div>
+                    <textarea rows={2} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} placeholder="Ex. paiement en attente, blessure, consigne accueil…" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/20 resize-none" />
                   </div>
 
                   {/* Carte 10 séances : séances restantes */}
@@ -1587,9 +1589,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
                     <button type="button" onClick={openBlockModal} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
                   </div>
-
-                  {/* Encaisser par Instant Bank Pay (séance/carnet/mois ou montant libre) */}
-                  <button type="button" onClick={() => setIbpChargeOpen(true)} className="w-fit flex items-center gap-1.5 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={13} /> Encaisser (Instant Bank Pay)</button>
 
                   {/* Blocage programmé (date future) */}
                   {(selectedContact as any).accessBlockScheduledAt ? (
@@ -1819,6 +1818,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       );
                     })()}
                   </div>
+
+                  {/* Encaisser par Instant Bank Pay (séance/carnet/mois ou montant libre) */}
+                  <button type="button" onClick={() => setIbpChargeOpen(true)} className="w-full sm:w-fit flex items-center justify-center gap-1.5 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={13} /> Encaisser (Instant Bank Pay)</button>
 
                   {/* Sous-onglets finance */}
                   <div className="flex items-center gap-2 flex-wrap">
