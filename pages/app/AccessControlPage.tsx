@@ -192,22 +192,27 @@ const AccessControlPage: React.FC = () => {
                 key={e.id}
                 onClick={e.member_id ? () => setProfileMemberId(e.member_id) : undefined}
                 title={e.member_id ? 'Voir la fiche' : undefined}
-                className={`bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center text-center transition-colors ${e.member_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm' : 'hover:border-gray-300'}`}
+                className={`relative rounded-2xl overflow-hidden aspect-[3/4] shadow-sm transition-all ${e.member_id ? 'cursor-pointer hover:shadow-lg' : ''} ${refused ? 'ring-2 ring-red-500' : 'ring-1 ring-gray-200'}`}
               >
-                <div className={`relative ${refused ? 'ring-2 ring-red-200 rounded-full' : ''}`}>
-                  {url ? (
-                    <img src={url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold ${refused ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-600'}`}>
-                      {initials(e.member)}
-                    </div>
-                  )}
-                  {refused && <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center"><X size={10} /></span>}
+                {url ? (
+                  <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <div className={`absolute inset-0 flex items-center justify-center text-4xl font-black ${refused ? 'bg-red-100 text-red-400' : 'bg-indigo-100 text-indigo-400'}`}>
+                    {initials(e.member)}
+                  </div>
+                )}
+                {/* Dégradé pour la lisibilité du texte */}
+                <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
+                {refused && <span className="absolute top-2 left-2 bg-red-500 text-white text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-lg shadow">Refusé</span>}
+                {/* Nom + date/heure en surimpression */}
+                <div className="absolute inset-x-0 bottom-0 p-2.5">
+                  <p className="text-white font-black text-[15px] leading-tight truncate drop-shadow-lg" title={nameOf(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}>
+                    {nameOf(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}
+                  </p>
+                  <p className="text-[12px] font-extrabold tabular-nums drop-shadow-lg mt-0.5" style={{ color: '#FDE047' }}>
+                    {fmtDate(e.access_datetime)} · {fmtTime(e.access_datetime)}
+                  </p>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-gray-900 truncate w-full" title={nameOf(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}>
-                  {nameOf(e.member, e.card_number ? `Carte ${e.card_number}` : 'Inconnu')}
-                </p>
-                <p className="text-[11px] text-gray-400 tabular-nums">{fmtDate(e.access_datetime)} · {fmtTime(e.access_datetime)}</p>
               </div>
             );
           })}
