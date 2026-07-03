@@ -45,7 +45,7 @@ export const supabase = createClient(url, anonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: !isNative,                 // pas de session dans l'URL en natif
+    detectSessionInUrl: false,                     // on gère nous-mêmes le lien e-mail (voir index.tsx)
     // processLock : sérialise les rafraîchissements de token (évite les refresh
     // concurrents qui invalident le refresh-token), SANS navigator.locks (qui
     // deadlocke dans la WebView). Storage = localStorage par défaut (persiste).

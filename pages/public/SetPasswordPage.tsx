@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabaseClient';
 const SetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const [ready, setReady] = useState<boolean | null>(null);   // session de récup active ?
+  const [linkError, setLinkError] = useState<string | null>(null); // lien expiré/invalide
   const [pwd, setPwd] = useState('');
   const [pwd2, setPwd2] = useState('');
   const [err, setErr] = useState('');
@@ -18,6 +19,10 @@ const SetPasswordPage: React.FC = () => {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    try {
+      const e = sessionStorage.getItem('pwd_link_error');
+      if (e) { setLinkError(e); sessionStorage.removeItem('pwd_link_error'); }
+    } catch { /* noop */ }
     supabase.auth.getSession().then(({ data }) => setReady(!!data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => { if (session) setReady(true); });
     return () => sub.subscription.unsubscribe();
@@ -58,7 +63,8 @@ const SetPasswordPage: React.FC = () => {
             <div className="text-center py-4">
               <div className="w-14 h-14 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto"><AlertCircle size={28} /></div>
               <p className="font-bold text-gray-900 mt-4">Lien invalide ou expiré</p>
-              <p className="text-sm text-gray-500 mt-1">Demandez un nouveau lien à votre salle, ou réinitialisez depuis la connexion.</p>
+              <p className="text-sm text-gray-500 mt-1">Ce lien est à usage unique et expire vite. Demandez un nouveau lien à votre salle, ou réinitialisez depuis la connexion.</p>
+              {linkError && <p className="text-[11px] text-gray-400 mt-2 font-mono break-words">({linkError})</p>}
               <button onClick={() => navigate('/connexion')} className="mt-5 w-full bg-gray-900 text-white py-3 rounded-2xl font-bold text-sm">Aller à la connexion</button>
             </div>
           ) : (

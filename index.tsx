@@ -7,14 +7,15 @@ import { supabase } from "./lib/supabaseClient";
 
 /**
  * Lien e-mail « créer / réinitialiser mon mot de passe » : Supabase renvoie les
- * jetons dans le fragment d'URL (#access_token=…&type=recovery). Or l'app utilise
- * un HashRouter : au montage, il verrait ce hash comme une route inconnue et
- * redirigerait vers l'accueil en RÉÉCRIVANT le hash — effaçant les jetons avant
- * que la session ne soit établie (d'où « on tombe sur la page d'accueil »).
+ * jetons (ou une erreur) dans le fragment d'URL (#access_token=… / #error=…). Or
+ * l'app utilise un HashRouter : au montage, il verrait ce hash comme une route
+ * inconnue et redirigerait vers l'accueil en RÉÉCRIVANT le hash — la session
+ * serait perdue (d'où « on tombe sur la page d'accueil »).
  *
- * On capture donc les jetons AVANT le rendu, on repositionne tout de suite la
- * route (/definir-mot-de-passe), puis on établit la session à partir des jetons
- * mémorisés. detectSessionInUrl ne trouvera plus rien à traiter : pas de conflit.
+ * On capture donc le fragment AVANT le rendu de React, on repositionne tout de
+ * suite la route sur /definir-mot-de-passe (les jetons sont déjà en mémoire), puis
+ * on établit la session. detectSessionInUrl est désactivé côté client pour que
+ * Supabase ne touche jamais l'URL et n'entre pas en concurrence avec ce traitement.
  */
 const rawHash = window.location.hash.replace(/^#/, "");
 const authParams =
@@ -23,14 +24,21 @@ const authParams =
     : null;
 
 if (authParams) {
-  const type = authParams.get("type");
-  const isPwdLink =
-    !!authParams.get("access_token") &&
-    (type === "recovery" || type === "invite" || type === "signup");
-  const dest = isPwdLink ? "#/definir-mot-de-passe" : "#/connexion";
-  // On remet la bonne route tout de suite (les jetons sont déjà en mémoire),
-  // avant que le HashRouter ne s'en empare.
-  history.replaceState(null, "", window.location.pathname + window.location.search + dest);
+  // Lien expiré / invalide : on garde le motif pour l'afficher sur la page.
+  const err =
+    authParams.get("error_description") ||
+    authParams.get("error_code") ||
+    authParams.get("error");
+  if (err && !authParams.get("access_token")) {
+    try { sessionStorage.setItem("pwd_link_error", err); } catch { /* noop */ }
+  }
+  // Depuis un lien e-mail on va TOUJOURS sur la page mot de passe (formulaire si le
+  // lien est valide, message clair s'il est expiré) — jamais sur l'accueil.
+  history.replaceState(
+    null,
+    "",
+    window.location.pathname + window.location.search + "#/definir-mot-de-passe",
+  );
 }
 
 async function boot() {
