@@ -7,10 +7,10 @@ import {
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus,
-  type MyMember, type HourOccupancy, type MyGym, type MyPackStatus,
+  getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus, getMemberFormulas,
+  type MyMember, type HourOccupancy, type MyGym, type MyPackStatus, type MemberFormula,
 } from '../../lib/memberSelfApi';
-import { startInstantPayment } from '../../lib/gocardless';
+import { startInstantPayment, startMemberMandate } from '../../lib/gocardless';
 
 /**
  * Accueil de l'espace adhérent : pass d'accès QR, solde de carnet + recharge,
@@ -255,53 +255,102 @@ const FirstSeanceCard: React.FC<{ onBuy: () => void }> = ({ onBuy }) => (
   </div>
 );
 
+type ActivSel =
+  | { kind: 'noeng'; key: 'seance' | 'carnet' | 'mois'; price: number }
+  | { kind: 'eng'; label: string; price: number };
+
 const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const PRODUCTS = [
-    { key: 'carnet', label: 'Pack de 10 séances', sub: '10 entrées (cumulées avec ton solde)', price: '45,00 €' },
-    { key: 'mois', label: '1 mois', sub: 'Accès illimité 30 jours', price: '40,00 €' },
-    { key: 'seance', label: 'Séance à l’unité', sub: '1 entrée', price: '5,00 €' },
+  const NOENG = [
+    { key: 'seance', label: 'Séance à l’unité', sub: '1 entrée', price: 5 },
+    { key: 'carnet', label: 'Pack de 10 séances', sub: '10 entrées (cumulées)', price: 45 },
+    { key: 'mois', label: '1 mois', sub: 'Accès illimité 30 jours', price: 40 },
   ] as const;
-  const [key, setKey] = useState<'carnet' | 'mois' | 'seance'>('carnet');
+  const [formulas, setFormulas] = useState<MemberFormula[]>([]);
+  const [sel, setSel] = useState<ActivSel | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  useEffect(() => {
+    // Formules à prélèvement mensuel réellement gérées par le webhook GoCardless
+    // (création auto de l'abonnement). On n'affiche que celles-là pour éviter
+    // d'activer un accès sans prélèvement associé.
+    const MONTHLY = [25.9, 29.9, 59.9];
+    getMemberFormulas()
+      .then((fs) => setFormulas(fs.filter((f) => MONTHLY.includes(Number(f.price)))))
+      .catch(() => {});
+  }, []);
+
+  const eur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
+
   const pay = async () => {
+    if (!sel) return;
     setBusy(true); setErr('');
     try {
       const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
-      const { authorisation_url } = await startInstantPayment(key, redirect);
+      const { authorisation_url } = sel.kind === 'noeng'
+        ? await startInstantPayment(sel.key, redirect)
+        : await startMemberMandate(sel.label, sel.price, redirect);
       const w = window.open(authorisation_url, '_blank');
       if (!w) window.location.href = authorisation_url;
       onClose();
     } catch (e: any) {
-      setErr(e?.message || 'Paiement indisponible pour le moment.');
+      setErr(e?.message || 'Indisponible pour le moment.');
       setBusy(false);
     }
   };
 
+  const Row = (active: boolean, title: string, sub: string, price: number, onPick: () => void) => (
+    <button onClick={onPick} className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 bg-white border-2 ${active ? 'border-brand' : 'border-gray-100'}`}>
+      <div className="flex-1 text-left"><p className="font-extrabold text-[14px] text-gray-900">{title}</p><p className="text-[11px] text-gray-400 font-semibold">{sub}</p></div>
+      <span className="font-black text-[16px] text-brand whitespace-nowrap">{eur(price)}</span>
+      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'border-brand' : 'border-gray-300'}`}>{active && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}</div>
+    </button>
+  );
+
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-white rounded-t-[30px] px-5 pt-5 pb-7 animate-in slide-in-from-bottom duration-300">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-white rounded-t-[30px] px-5 pt-5 pb-7 max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
         <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-        <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand">Recharger</p>
-        <p className="font-black text-xl text-gray-900 mt-0.5">Choisis ton produit</p>
-        <div className="mt-3.5 flex flex-col gap-2">
-          {PRODUCTS.map((p) => {
-            const a = key === p.key;
-            return (
-              <button key={p.key} onClick={() => setKey(p.key)} className={`w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 bg-white border-2 ${a ? 'border-brand' : 'border-gray-100'}`}>
-                <div className="flex-1 text-left"><p className="font-extrabold text-[14px] text-gray-900">{p.label}</p><p className="text-[11px] text-gray-400 font-semibold">{p.sub}</p></div>
-                <span className="font-black text-[16px] text-brand whitespace-nowrap">{p.price}</span>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${a ? 'border-brand' : 'border-gray-300'}`}>{a && <div className="w-2.5 h-2.5 rounded-full bg-brand" />}</div>
-              </button>
-            );
-          })}
+        <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand">Activer mon accès</p>
+        <p className="font-black text-xl text-gray-900 mt-0.5">Choisis ta formule</p>
+
+        {/* Sans engagement — paiement instantané (Instant Bank Pay) */}
+        <p className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400 mt-4 mb-2">Sans engagement · paiement instantané</p>
+        <div className="flex flex-col gap-2">
+          {NOENG.map((p) => Row(
+            sel?.kind === 'noeng' && sel.key === p.key, p.label, p.sub, p.price,
+            () => setSel({ kind: 'noeng', key: p.key, price: p.price }),
+          ))}
         </div>
+
+        {/* Avec engagement — prélèvement automatique (mandat SEPA) */}
+        {formulas.length > 0 && (
+          <>
+            <p className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400 mt-5 mb-2">Avec engagement · prélèvement automatique</p>
+            <div className="flex flex-col gap-2">
+              {formulas.map((f) => Row(
+                sel?.kind === 'eng' && sel.label === f.name, f.name, 'Prélèvement mensuel le 10', Number(f.price),
+                () => setSel({ kind: 'eng', label: f.name, price: Number(f.price) }),
+              ))}
+            </div>
+            <div className="mt-2.5 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+              <span className="text-[13px]">🎫</span>
+              <p className="text-[11px] font-semibold text-amber-800 leading-snug">
+                Badge d'accès <b>obligatoire (15 €)</b> à retirer à l'accueil de la salle lors de ta première visite.
+              </p>
+            </div>
+          </>
+        )}
+
         {err && <p className="text-[11px] text-red-600 font-semibold mt-3 text-center">{err}</p>}
-        <button onClick={pay} disabled={busy} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px] disabled:opacity-60">
-          {busy ? 'Connexion à ta banque…' : 'Payer & valider'}
+        <button onClick={pay} disabled={busy || !sel} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px] disabled:opacity-50">
+          {busy ? 'Connexion à ta banque…' : sel?.kind === 'eng' ? 'Mettre en place le prélèvement' : 'Payer & valider'}
         </button>
-        <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">Paiement instantané via ta banque (open banking) · accès débloqué en quelques minutes.</p>
+        <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">
+          {sel?.kind === 'eng'
+            ? 'Signature du mandat SEPA via ta banque · accès activé après validation.'
+            : 'Paiement instantané via ta banque (open banking) · accès activé après confirmation.'}
+        </p>
       </div>
     </div>
   );

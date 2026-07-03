@@ -25,6 +25,7 @@ import PublicLayout from './layouts/PublicLayout';
 import AppLayout from './layouts/AppLayout';
 import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
+import MemberAccessGate from './components/MemberAccessGate';
 
 // Pages : chargées à la demande (code-splitting -> bundle initial plus léger)
 const HomePage = lazy(() => import('./pages/public/HomePage'));
@@ -148,12 +149,12 @@ const App: React.FC = () => {
           {/* Member Space Routes */}
           <Route path="/membre" element={<ProtectedRoute space="member"><MemberLayout /></ProtectedRoute>}>
             <Route index element={<MemberHome />} />
-            <Route path="reservations" element={<MemberReservations />} />
-            <Route path="mon-abonnement" element={<MemberSubscription />} />
+            <Route path="reservations" element={<MemberAccessGate><MemberReservations /></MemberAccessGate>} />
+            <Route path="mon-abonnement" element={<MemberAccessGate><MemberSubscription /></MemberAccessGate>} />
             <Route path="profil" element={<MemberProfile />} />
             <Route path="notifications" element={<MemberNotifications />} />
             <Route path="messagerie" element={<MemberMessages />} />
-            <Route path="dossier" element={<MemberDossier />} />
+            <Route path="dossier" element={<MemberAccessGate><MemberDossier /></MemberAccessGate>} />
             <Route path="infos" element={<MemberInfos />} />
             <Route path="parrainage" element={<MemberParrainage />} />
             <Route path="qr" element={<MemberQr />} />

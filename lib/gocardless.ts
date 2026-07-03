@@ -117,6 +117,26 @@ export async function posOrderStatus(orderId: string): Promise<string | null> {
   return (data as string) ?? null;
 }
 
+/**
+ * Souscription d'une formule à prélèvement SEPA depuis l'espace adhérent (prospect
+ * qui active son accès « avec engagement »). Renvoie l'URL GoCardless (saisie du RIB).
+ * Le webhook active le compte (n° client + code + accès) une fois le mandat validé.
+ */
+export async function startMemberMandate(
+  label: string, price: number, redirectUrl: string,
+): Promise<{ authorisation_url: string; billing_request_id: string }> {
+  const { data, error } = await supabase.functions.invoke('gocardless-member-mandate', {
+    body: { label, price, redirectUrl },
+  });
+  if (error) {
+    let msg = error.message || 'Mise en place du prélèvement indisponible';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    throw new Error(msg);
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { authorisation_url: string; billing_request_id: string };
+}
+
 export interface GocardlessStats {
   mandates_active: number;
   collected_30d: number;

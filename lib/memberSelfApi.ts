@@ -88,6 +88,17 @@ export function affluenceLevel(occ: HourOccupancy[]): {
   return { label: 'Forte', pct, tone: 'high' };
 }
 
+// --- Formules d'abonnement (engagement) proposées à l'adhérent --------------
+
+export interface MemberFormula { id: string; name: string; price: number }
+
+/** Formules d'abonnement (catégorie « Abonnements & Séances ») de la salle du membre. */
+export async function getMemberFormulas(): Promise<MemberFormula[]> {
+  const { data, error } = await supabase.rpc('member_formulas');
+  if (error) { console.error('memberSelfApi.getMemberFormulas', error); return []; }
+  return (data ?? []).map((r: any) => ({ id: r.id, name: r.name, price: Number(r.price) }));
+}
+
 // --- Ma salle ---------------------------------------------------------------
 
 export interface MyGym {
