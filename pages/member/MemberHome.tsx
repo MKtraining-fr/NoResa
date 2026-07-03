@@ -98,9 +98,11 @@ const MemberHome: React.FC = () => {
       {/* Salutation */}
       <div>
         <h2 className="text-2xl font-extrabold text-gray-900">Salut, {member.firstName} 👋</h2>
-        <p className="text-sm text-gray-500">{DAYS[new Date().getDay()]} · prêt pour ta séance ?</p>
+        <p className="text-sm text-gray-500">{DAYS[new Date().getDay()]} · {active ? 'prêt pour ta séance ?' : 'bienvenue 👊'}</p>
       </div>
 
+      {active ? (
+      <>
       {/* Pass d'accès */}
       <button
         onClick={() => setQrOpen(true)}
@@ -137,6 +139,11 @@ const MemberHome: React.FC = () => {
 
       {/* App partenaire MuscleFlow */}
       <PartnerCard onOpen={() => setPartnerOpen(true)} />
+      </>
+      ) : (
+        /* Prospect : accès pas encore actif → carte d'activation */
+        <ProspectActivateCard onActivate={() => setRechargeOpen(true)} />
+      )}
 
       {/* Affluence en direct */}
       <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
@@ -213,6 +220,25 @@ const RachatCard: React.FC<{ pack: MyPackStatus; onRecharge: () => void }> = ({ 
     </div>
   );
 };
+
+// Carte affichée à un prospect (accès pas encore actif) : invite à prendre une
+// première séance / carnet / mois. Le QR d'accès et les avantages membres
+// n'apparaissent qu'une fois l'accès activé (statut « active »).
+const ProspectActivateCard: React.FC<{ onActivate: () => void }> = ({ onActivate }) => (
+  <div className="bg-gradient-to-br from-brand to-brand-dark rounded-[2rem] p-5 text-white relative overflow-hidden shadow-2xl shadow-gray-200">
+    <div className="absolute -top-10 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
+    <div className="relative">
+      <p className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">Bienvenue</p>
+      <p className="text-lg font-extrabold leading-tight mt-1">Ton accès n'est pas encore actif</p>
+      <p className="text-xs opacity-90 font-semibold mt-1.5 leading-relaxed">
+        Prends ta première séance, un carnet ou un mois pour entrer à la salle. Ton QR d'accès et tes avantages partenaires se débloquent aussitôt.
+      </p>
+      <button onClick={onActivate} className="mt-4 w-full bg-white text-gray-900 py-3 rounded-2xl font-extrabold text-[13.5px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
+        <Plus size={16} strokeWidth={2.4} /> Activer mon accès
+      </button>
+    </div>
+  </div>
+);
 
 const FirstSeanceCard: React.FC<{ onBuy: () => void }> = ({ onBuy }) => (
   <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
