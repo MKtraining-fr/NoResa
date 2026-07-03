@@ -73,7 +73,7 @@ export async function startMandateSetup(input: MandateSetupInput): Promise<Manda
  * du membre) et renvoie l'URL de la page banque hébergée à ouvrir.
  */
 export async function startInstantPayment(
-  product: 'seance' | 'carnet' | 'mois',
+  product: 'seance' | 'carnet' | 'mois' | 'annee',
   redirectUrl: string,
 ): Promise<{ authorisation_url: string; billing_request_id: string }> {
   const { data, error } = await supabase.functions.invoke('gocardless-instant-payment', {

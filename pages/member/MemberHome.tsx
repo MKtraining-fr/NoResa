@@ -257,7 +257,9 @@ const FirstSeanceCard: React.FC<{ onBuy: () => void }> = ({ onBuy }) => (
 
 type ActivSel =
   | { kind: 'noeng'; key: 'seance' | 'carnet' | 'mois'; price: number }
-  | { kind: 'eng'; label: string; price: number };
+  | { kind: 'eng'; label: string; price: number }
+  | { kind: 'annual1'; label: string; price: number }   // annuel réglé en 1 fois (IBP)
+  | { kind: 'annual3'; label: string; price: number };  // annuel réglé en 3 fois (mandat SEPA)
 
 const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const NOENG = [
@@ -270,15 +272,13 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  useEffect(() => {
-    // Formules à prélèvement mensuel réellement gérées par le webhook GoCardless
-    // (création auto de l'abonnement). On n'affiche que celles-là pour éviter
-    // d'activer un accès sans prélèvement associé.
-    const MONTHLY = [25.9, 29.9, 59.9];
-    getMemberFormulas()
-      .then((fs) => setFormulas(fs.filter((f) => MONTHLY.includes(Number(f.price)))))
-      .catch(() => {});
-  }, []);
+  useEffect(() => { getMemberFormulas().then(setFormulas).catch(() => {}); }, []);
+
+  // Mensuelles gérées par le webhook (abonnement auto) + annuelle (réglée en 1 ou 3 fois).
+  const monthly = formulas.filter((f) => [25.9, 29.9, 59.9].includes(Number(f.price)));
+  const annual = formulas.find((f) => /ann[eé]e|annuel/i.test(f.name));
+  const hasEngagement = monthly.length > 0 || !!annual;
+  const isMandate = sel?.kind === 'eng' || sel?.kind === 'annual3';
 
   const eur = (n: number) => `${n.toFixed(2).replace('.', ',')} €`;
 
@@ -287,11 +287,12 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setBusy(true); setErr('');
     try {
       const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
-      const { authorisation_url } = sel.kind === 'noeng'
-        ? await startInstantPayment(sel.key, redirect)
-        : await startMemberMandate(sel.label, sel.price, redirect);
-      const w = window.open(authorisation_url, '_blank');
-      if (!w) window.location.href = authorisation_url;
+      let res: { authorisation_url: string };
+      if (sel.kind === 'noeng') res = await startInstantPayment(sel.key, redirect);
+      else if (sel.kind === 'annual1') res = await startInstantPayment('annee', redirect);
+      else res = await startMemberMandate(sel.label, sel.price, redirect); // eng | annual3
+      const w = window.open(res.authorisation_url, '_blank');
+      if (!w) window.location.href = res.authorisation_url;
       onClose();
     } catch (e: any) {
       setErr(e?.message || 'Indisponible pour le moment.');
@@ -323,15 +324,35 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           ))}
         </div>
 
-        {/* Avec engagement — prélèvement automatique (mandat SEPA) */}
-        {formulas.length > 0 && (
+        {/* Avec engagement — prélèvement automatique (mandat SEPA) + annuelle */}
+        {hasEngagement && (
           <>
             <p className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400 mt-5 mb-2">Avec engagement · prélèvement automatique</p>
             <div className="flex flex-col gap-2">
-              {formulas.map((f) => Row(
+              {monthly.map((f) => Row(
                 sel?.kind === 'eng' && sel.label === f.name, f.name, 'Prélèvement mensuel le 10', Number(f.price),
                 () => setSel({ kind: 'eng', label: f.name, price: Number(f.price) }),
               ))}
+              {annual && (
+                <div className="rounded-2xl border-2 border-gray-100 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-extrabold text-[14px] text-gray-900">{annual.name}</p>
+                    <span className="font-black text-[15px] text-brand">{eur(Number(annual.price))}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setSel({ kind: 'annual1', label: annual.name, price: Number(annual.price) })}
+                      className={`rounded-xl px-2 py-2.5 text-center border-2 ${sel?.kind === 'annual1' ? 'border-brand bg-brand-soft/40' : 'border-gray-100'}`}>
+                      <p className="font-extrabold text-[12.5px] text-gray-900">En 1 fois</p>
+                      <p className="text-[10px] text-gray-400 font-semibold">Paiement instantané</p>
+                    </button>
+                    <button onClick={() => setSel({ kind: 'annual3', label: annual.name, price: Number(annual.price) })}
+                      className={`rounded-xl px-2 py-2.5 text-center border-2 ${sel?.kind === 'annual3' ? 'border-brand bg-brand-soft/40' : 'border-gray-100'}`}>
+                      <p className="font-extrabold text-[12.5px] text-gray-900">En 3 fois</p>
+                      <p className="text-[10px] text-gray-400 font-semibold">3 × {eur(Number(annual.price) / 3)}</p>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-2.5 flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
               <span className="text-[13px]">🎫</span>
@@ -344,10 +365,10 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         {err && <p className="text-[11px] text-red-600 font-semibold mt-3 text-center">{err}</p>}
         <button onClick={pay} disabled={busy || !sel} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px] disabled:opacity-50">
-          {busy ? 'Connexion à ta banque…' : sel?.kind === 'eng' ? 'Mettre en place le prélèvement' : 'Payer & valider'}
+          {busy ? 'Connexion à ta banque…' : isMandate ? 'Mettre en place le prélèvement' : 'Payer & valider'}
         </button>
         <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">
-          {sel?.kind === 'eng'
+          {isMandate
             ? 'Signature du mandat SEPA via ta banque · accès activé après validation.'
             : 'Paiement instantané via ta banque (open banking) · accès activé après confirmation.'}
         </p>
