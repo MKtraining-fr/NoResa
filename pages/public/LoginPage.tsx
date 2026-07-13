@@ -5,11 +5,27 @@ import { useAuth, homePathForRole } from '../../lib/AuthContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+
+  const handleReset = async () => {
+    setError(null); setNotice(null);
+    const mail = email.trim();
+    if (!/^\S+@\S+\.\S+$/.test(mail)) {
+      setError('Entre ton e-mail ci-dessus, puis clique à nouveau sur « Mot de passe oublié ».');
+      return;
+    }
+    setResetBusy(true);
+    const { error: e } = await resetPassword(mail);
+    setResetBusy(false);
+    if (e) { setError("Impossible d'envoyer le lien pour le moment. Réessaie."); return; }
+    setNotice("Si un compte existe pour cet e-mail, un lien de réinitialisation vient d'être envoyé. Pense à vérifier tes spams.");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +67,12 @@ const LoginPage: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
+          {notice && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-700 rounded-2xl flex items-center space-x-3 text-sm font-medium animate-in fade-in zoom-in duration-300">
+              <Mail size={18} className="shrink-0" />
+              <span>{notice}</span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
@@ -84,7 +106,9 @@ const LoginPage: React.FC = () => {
                 <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                 <span className="text-gray-500 group-hover:text-indigo-600 transition-colors">Se souvenir</span>
               </label>
-              <a href="#" className="text-indigo-600 hover:underline">Mot de passe oublié ?</a>
+              <button type="button" onClick={handleReset} disabled={resetBusy} className="text-indigo-600 hover:underline disabled:opacity-50">
+                {resetBusy ? 'Envoi…' : 'Mot de passe oublié ?'}
+              </button>
             </div>
 
             <button

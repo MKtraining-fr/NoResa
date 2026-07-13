@@ -33,6 +33,7 @@ interface AuthState {
   isStaff: boolean;            // peut accéder au back-office
   isSuper: boolean;            // propriétaire de la plateforme
   signIn: (email: string, password: string) => Promise<{ error?: string; role?: DbRole }>;
+  resetPassword: (email: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -134,6 +135,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      // Le lien de récupération doit ouvrir la version WEB (le flux mot de passe se
+      // déroule dans le navigateur, cf. index.tsx). En natif window.location.origin
+      // vaut capacitor://… → on retombe sur l'URL de prod.
+      const origin = /^https?:/.test(window.location.origin) ? window.location.origin : 'https://noresa.pages.dev';
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${origin}/` });
+      if (error) return { error: error.message };
+      return {};
+    } catch (e) {
+      console.error('resetPassword', e);
+      return { error: (e as Error)?.message || 'Envoi impossible.' };
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -151,6 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isStaff: !!role && STAFF_ROLES.includes(role),
         isSuper: role === 'super_admin',
         signIn,
+        resetPassword,
         signOut,
       }}
     >
