@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Check, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Lock, Check, Loader2, AlertCircle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
 /**
@@ -17,6 +17,7 @@ const SetPasswordPage: React.FC = () => {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
 
   useEffect(() => {
     try {
@@ -76,12 +77,16 @@ const SetPasswordPage: React.FC = () => {
               )}
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Nouveau mot de passe"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-brand-soft text-sm font-medium" />
+                <input type={showPwd ? 'text' : 'password'} required value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Nouveau mot de passe"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-12 outline-none focus:ring-2 focus:ring-brand-soft text-sm font-medium" />
+                <button type="button" onClick={() => setShowPwd((v) => !v)} aria-label={showPwd ? 'Masquer le mot de passe' : 'Voir le mot de passe'}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand transition-colors">
+                  {showPwd ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input type="password" required value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Confirmer le mot de passe"
+                <input type={showPwd ? 'text' : 'password'} required value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Confirmer le mot de passe"
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-brand-soft text-sm font-medium" />
               </div>
               <button type="submit" disabled={busy} className="w-full bg-brand text-white font-bold py-3.5 rounded-2xl shadow-xl hover:opacity-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
