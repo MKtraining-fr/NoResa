@@ -5,7 +5,6 @@ import {
   Dumbbell, TrendingUp, BookOpen,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import {
   getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus, getMemberFormulas,
   type MyMember, type HourOccupancy, type MyGym, type MyPackStatus, type MemberFormula,
@@ -110,8 +109,9 @@ const MemberHome: React.FC = () => {
       >
         <div className="absolute -top-10 -right-8 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
         <div className="relative flex items-center gap-4">
-          <div className="bg-white p-2 rounded-2xl shadow-lg">
-            <QRCodeSVG value={member.qrCode || member.memberNumber} size={72} level="M" />
+          <div className="bg-white px-3.5 py-3 rounded-2xl shadow-lg text-center shrink-0">
+            <p className="text-[8px] font-extrabold uppercase tracking-widest text-gray-400">Code d'accès</p>
+            <p className="text-[26px] leading-none font-black tracking-[0.15em] text-gray-900 tabular-nums mt-1">{member.keypadCode || '——————'}</p>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">Mon accès</p>
@@ -128,7 +128,7 @@ const MemberHome: React.FC = () => {
           </div>
         </div>
         <p className="relative mt-3 text-[11px] font-bold opacity-85 flex items-center gap-1.5">
-          <Maximize2 size={13} /> Appuie pour afficher en plein écran
+          <Maximize2 size={13} /> Tape ce code au clavier de la porte · appuie pour l'agrandir
         </p>
       </button>
 
@@ -476,16 +476,16 @@ const QuickAction: React.FC<{ to: string; icon: React.ElementType; tint: string;
 const QrOverlay: React.FC<{ member: MyMember; active: boolean; onClose: () => void }> = ({ member, active, onClose }) => (
   <div onClick={onClose} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
     <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-[2rem] p-7 w-full max-w-xs text-center shadow-2xl animate-in zoom-in-95 duration-300">
-      <p className="text-[11px] font-extrabold uppercase tracking-widest text-brand">Scanne pour entrer</p>
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-brand">Code d'accès</p>
       <p className="text-xl font-extrabold text-gray-900 mt-1">{member.firstName} {member.lastName}</p>
-      <div className="my-5 mx-auto w-fit p-4 border border-gray-100 rounded-3xl shadow-inner">
-        <QRCodeSVG value={member.qrCode || member.memberNumber} size={200} level="M" />
+      <div className="my-5 mx-auto w-full py-6 border border-gray-100 rounded-3xl shadow-inner bg-gray-50">
+        <p className="text-[44px] leading-none font-black tracking-[0.18em] text-gray-900 tabular-nums">{member.keypadCode || '——————'}</p>
       </div>
       <span className="inline-flex items-center gap-2 bg-green-50 px-3.5 py-2 rounded-xl">
         <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
         <span className="text-xs font-extrabold text-green-700">{member.subscriptionLabel ?? 'Abonnement'} · {active ? 'Actif' : 'Inactif'}</span>
       </span>
-      <p className="text-[11px] text-gray-400 font-semibold mt-3">Présente ce QR au lecteur · monte la luminosité 💡</p>
+      <p className="text-[11px] text-gray-400 font-semibold mt-3">Tape ce code au clavier de la porte 🔢</p>
       <button onClick={onClose} className="mt-5 w-full bg-gray-900 text-white py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2"><X size={16} /> Fermer</button>
     </div>
   </div>

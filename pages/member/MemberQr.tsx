@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Lock } from 'lucide-react';
 import { getMyMember, type MyMember } from '../../lib/memberSelfApi';
 
@@ -35,17 +34,17 @@ const MemberQr: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center py-6 space-y-5 animate-in fade-in zoom-in-95 duration-300">
-      <p className="text-[11px] font-extrabold uppercase tracking-widest text-brand">Mon accès</p>
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-brand">Mon code d'accès</p>
       <p className="text-2xl font-extrabold text-gray-900">{m.firstName} {m.lastName}</p>
-      <div className="p-5 bg-white border border-gray-100 rounded-[2rem] shadow-2xl shadow-gray-200">
-        <QRCodeSVG value={m.qrCode || m.memberNumber} size={240} level="M" />
+      <div className="w-full max-w-xs py-10 bg-white border border-gray-100 rounded-[2rem] shadow-2xl shadow-gray-200 text-center">
+        <p className="text-[52px] leading-none font-black tracking-[0.18em] text-gray-900 tabular-nums">{m.keypadCode || '——————'}</p>
       </div>
       <span className="inline-flex items-center gap-2 bg-green-50 px-3.5 py-2 rounded-xl">
         <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
         <span className="text-xs font-extrabold text-green-700">{m.subscriptionLabel ?? 'Abonnement'} · Actif</span>
       </span>
       <p className="text-[11px] text-gray-400 font-semibold text-center px-8">
-        Présente ce QR au lecteur du tourniquet · monte la luminosité de l'écran 💡
+        Tape ce code à 6 chiffres sur le clavier de la porte pour entrer 🔢
       </p>
     </div>
   );

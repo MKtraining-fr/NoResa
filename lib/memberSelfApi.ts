@@ -24,6 +24,7 @@ export interface MyMember {
   subscriptionEnd: string | null;
   joinDate: string | null;
   qrCode: string;
+  keypadCode: string | null;
   photoPath: string | null;
   referralCode: string | null;
 }
@@ -49,6 +50,7 @@ export async function getMyMember(): Promise<MyMember | null> {
     subscriptionEnd: r.subscription_end ?? null,
     joinDate: r.join_date ?? null,
     qrCode: (r.qr_code ?? r.member_number ?? '').toString().trim(),
+    keypadCode: r.keypad_code ?? null,
     photoPath: r.photo_path ?? null,
     referralCode: r.referral_code ?? null,
   };

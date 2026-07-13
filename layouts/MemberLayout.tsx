@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { MEMBER_NAV_ITEMS } from '../constants';
-import { Bell, Dumbbell, QrCode } from 'lucide-react';
+import { Bell, Dumbbell, KeyRound } from 'lucide-react';
 import { BrandProvider, useBrand } from '../lib/BrandContext';
 import { getMyMember } from '../lib/memberSelfApi';
 
@@ -64,9 +64,9 @@ const MemberShell: React.FC = () => {
       <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 px-3 pt-2 pb-2.5 flex justify-around items-end z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] rounded-t-3xl">
         {left.map(NavItem)}
 
-        <Link to="/membre/qr" className="flex flex-col items-center -mt-8 shrink-0" aria-label="Mon QR d'accès">
+        <Link to="/membre/qr" className="flex flex-col items-center -mt-8 shrink-0" aria-label="Mon code d'accès">
           <div className="w-14 h-14 rounded-2xl bg-brand text-white flex items-center justify-center shadow-lg shadow-gray-300 active:scale-95 transition-transform ring-4 ring-white">
-            <QrCode size={26} />
+            <KeyRound size={26} />
           </div>
         </Link>
 
