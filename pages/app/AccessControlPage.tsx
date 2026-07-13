@@ -35,10 +35,11 @@ const AccessControlPage: React.FC = () => {
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const [assignCard, setAssignCard] = useState<string | null>(null); // n° de badge inconnu à rattacher
 
-  // Recherche : un jour + plage horaire optionnelle
-  const [date, setDate] = useState(todayStr());
-  const [fromTime, setFromTime] = useState('');
-  const [toTime, setToTime] = useState('');
+  // Filtre : période (jour début → jour fin) + statut + recherche texte
+  const [dateFrom, setDateFrom] = useState(todayStr());
+  const [dateTo, setDateTo] = useState(todayStr());
+  const [statusFilter, setStatusFilter] = useState<'all' | 'authorized' | 'denied'>('all');
+  const [textSearch, setTextSearch] = useState('');
 
   // Filtre par groupe / sous-groupe
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
@@ -48,18 +49,18 @@ const AccessControlPage: React.FC = () => {
   const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
 
   const range = useMemo(() => {
-    const d = date || todayStr();
-    const from = new Date(`${d}T${fromTime || '00:00'}:00`);
-    const to = new Date(`${d}T${toTime || '23:59'}:59`);
-    return { from: from.toISOString(), to: to.toISOString() };
-  }, [date, fromTime, toTime]);
+    const a = dateFrom || todayStr();
+    const b = dateTo || a;
+    const lo = a <= b ? a : b, hi = a <= b ? b : a; // tolère des dates inversées
+    return { from: new Date(`${lo}T00:00:00`).toISOString(), to: new Date(`${hi}T23:59:59`).toISOString() };
+  }, [dateFrom, dateTo]);
 
   const load = useCallback(async () => {
     // Si un groupe est sélectionné, on restreint aux membres de ce groupe/sous-groupe
     let memberIds: string[] | undefined;
     if (groupName) memberIds = await getMemberIdsInGroup(groupName, subgroupName || undefined);
     const [e, p, a, b] = await Promise.all([
-      getEntriesBetween(range.from, range.to, { memberIds }),
+      getEntriesBetween(range.from, range.to, { memberIds, status: statusFilter === 'all' ? undefined : statusFilter }),
       getPresentCount(90),
       getAccessAlerts('open'),
       getBlockedMembers(),
@@ -67,7 +68,7 @@ const AccessControlPage: React.FC = () => {
     setEntries(e); setPresent(p); setAlerts(a); setBlocked(b); setLoading(false);
     const map = await resolvePhotoUrls([...e.map((x) => x.member?.photo_path), ...b.map((x) => x.photoPath)]);
     setPhotos(map);
-  }, [range.from, range.to, groupName, subgroupName]);
+  }, [range.from, range.to, groupName, subgroupName, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -81,8 +82,20 @@ const AccessControlPage: React.FC = () => {
     try { await reviewAlert(id, status); } catch { load(); }
   };
 
-  const isToday = date === todayStr() && !fromTime && !toTime;
-  const resetToday = () => { setDate(todayStr()); setFromTime(''); setToTime(''); };
+  // Recherche texte (nom / n° client / badge) — filtre côté client sur les passages chargés
+  const shownEntries = useMemo(() => {
+    const q = textSearch.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((e) => {
+      const name = `${e.member?.first_name || ''} ${e.member?.last_name || ''}`.toLowerCase();
+      return name.includes(q)
+        || (e.member?.member_number || '').toLowerCase().includes(q)
+        || (e.card_number || '').toLowerCase().includes(q);
+    });
+  }, [entries, textSearch]);
+
+  const isToday = dateFrom === todayStr() && dateTo === todayStr() && statusFilter === 'all' && !groupName && !textSearch;
+  const resetToday = () => { setDateFrom(todayStr()); setDateTo(todayStr()); setStatusFilter('all'); setGroupName(''); setSubgroupName(''); setTextSearch(''); };
 
   return (
     <div className="space-y-5">
@@ -114,7 +127,7 @@ const AccessControlPage: React.FC = () => {
             <span className="bg-gray-100 text-gray-500 p-1.5 rounded-lg"><DoorOpen size={15} /></span>
             <p className="text-xs font-medium text-gray-500">Passages affichés</p>
           </div>
-          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{entries.length}</p>
+          <p className="text-2xl font-semibold text-gray-900 tabular-nums">{shownEntries.length}</p>
           <p className="text-[11px] text-gray-400 mt-0.5">{isToday ? "aujourd'hui" : 'sur la période'}</p>
         </div>
 
@@ -143,20 +156,29 @@ const AccessControlPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Recherche */}
+      {/* Filtres */}
       <div className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-2 flex-wrap">
         <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400 px-1"><Search size={14} /> Filtrer</span>
+
+        {/* Période : du … au … */}
         <div className="flex items-center gap-1.5">
           <Calendar size={14} className="text-gray-400" />
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <span className="text-xs text-gray-400">du</span>
+          <input type="date" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <span className="text-xs text-gray-400">au</span>
+          <input type="date" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400">de</span>
-          <input type="time" value={fromTime} onChange={(e) => setFromTime(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          <span className="text-xs text-gray-400">à</span>
-          <input type="time" value={toTime} onChange={(e) => setToTime(e.target.value)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
-        </div>
-        <span className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+
+        <span className="w-px h-5 bg-gray-200 mx-0.5 hidden sm:block" />
+
+        {/* Statut du passage */}
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-indigo-500/20">
+          <option value="all">Tous les passages</option>
+          <option value="authorized">Autorisés</option>
+          <option value="denied">Refusés / erreurs</option>
+        </select>
+
+        {/* Groupe / sous-groupe */}
         <div className="flex items-center gap-1.5">
           <Layers size={14} className="text-gray-400" />
           <select value={groupName} onChange={(e) => { setGroupName(e.target.value); setSubgroupName(''); }} className="bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20">
@@ -173,21 +195,28 @@ const AccessControlPage: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* Recherche texte : nom / n° client / badge */}
+        <div className="relative flex-1 min-w-[160px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+          <input value={textSearch} onChange={(e) => setTextSearch(e.target.value)} placeholder="Nom, n° client ou badge…" className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+        </div>
+
         {!isToday && (
-          <button onClick={resetToday} className="ml-auto text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1">Aujourd'hui</button>
+          <button onClick={resetToday} className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1 shrink-0">Réinitialiser</button>
         )}
       </div>
 
       {/* Mosaïque des passages */}
       {loading && entries.length === 0 ? (
         <div className="py-16 text-center text-gray-400 text-sm">Chargement…</div>
-      ) : entries.length === 0 ? (
+      ) : shownEntries.length === 0 ? (
         <div className="py-16 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-2xl">
-          Aucun passage sur cette période.
+          {textSearch.trim() ? 'Aucun passage ne correspond à la recherche.' : 'Aucun passage sur cette période.'}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {entries.map((e) => {
+          {shownEntries.map((e) => {
             const refused = e.status === 'denied';
             const url = e.member?.photo_path ? photos[e.member.photo_path] : undefined;
             return (

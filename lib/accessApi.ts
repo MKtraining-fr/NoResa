@@ -100,15 +100,25 @@ export async function getTodayEntries(): Promise<AccessEntry[]> {
   return (data ?? []) as any;
 }
 
-/** Passages entre deux dates ISO (incluses), plus récents d'abord. */
-export async function getEntriesBetween(fromIso: string, toIso: string, limit = 1000): Promise<AccessEntry[]> {
-  const { data, error } = await supabase
+/**
+ * Passages entre deux dates ISO (incluses), plus récents d'abord.
+ * Options : restreindre à des membres (filtre groupe) et/ou à un statut (authorized|denied).
+ */
+export async function getEntriesBetween(
+  fromIso: string,
+  toIso: string,
+  opts: { memberIds?: string[]; status?: 'authorized' | 'denied'; limit?: number } = {},
+): Promise<AccessEntry[]> {
+  let q = supabase
     .from('access_logs')
     .select(ENTRY_SELECT)
     .gte('access_datetime', fromIso)
     .lte('access_datetime', toIso)
     .order('access_datetime', { ascending: false })
-    .limit(limit);
+    .limit(opts.limit ?? 1000);
+  if (opts.memberIds && opts.memberIds.length > 0) q = q.in('member_id', opts.memberIds);
+  if (opts.status) q = q.eq('status', opts.status);
+  const { data, error } = await q;
   if (error) { console.error('getEntriesBetween', error); return []; }
   return (data ?? []) as any;
 }
