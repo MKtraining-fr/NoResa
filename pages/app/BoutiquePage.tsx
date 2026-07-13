@@ -643,8 +643,8 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
 
             {/* Zone Panier POS */}
             <div className="w-full md:w-[450px] bg-white border-l border-gray-100 flex flex-col shadow-inner">
-               <div className="flex-grow p-6 flex flex-col">
-                  
+               <div className="flex-grow p-6 flex flex-col min-h-0">
+
                   {/* Sélection du client */}
                   <div className="mb-10 relative" ref={memberSearchRef}>
                     <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3 block">Attribuer à un membre</label>
@@ -721,7 +721,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
 
                   <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-5">Articles dans le panier ({cart.reduce((s,i) => s + i.quantity, 0)})</h3>
                   
-                  <div className="flex-grow overflow-y-auto space-y-3 pwa-hide-scrollbar">
+                  <div className="flex-grow overflow-y-auto space-y-3 pwa-hide-scrollbar min-h-0">
                     {cart.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full opacity-20 space-y-4">
                         <ShoppingBag size={64} strokeWidth={1} />
