@@ -59,6 +59,16 @@ export async function getBlockedMembers(): Promise<BlockedMember[]> {
 }
 
 
+/**
+ * Rattache un n° de badge inconnu à une fiche membre : renseigne son rfid_badge
+ * et relie les passages passés portant ce badge. Renvoie le nb de passages rattachés.
+ */
+export async function assignCardToMember(cardNumber: string, memberId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('assign_card_to_member', { p_card: cardNumber, p_member: memberId });
+  if (error) { console.error('assignCardToMember', error); throw error; }
+  return (data as number) ?? 0;
+}
+
 // Valeur encodée dans le QR d'un membre = son numéro d'adhérent (= card number côté ZKAccess)
 export function memberQrValue(memberNumber?: string | null): string {
   return (memberNumber ?? '').toString().trim();

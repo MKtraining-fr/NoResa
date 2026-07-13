@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight, Ban, StickyNote } from 'lucide-react';
+import { DoorOpen, AlertTriangle, RefreshCw, Check, X, ShieldCheck, Clock, Users, Search, Calendar, Layers, CornerDownRight, Ban, StickyNote, Link2, Loader2 } from 'lucide-react';
 import {
-  getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls, getBlockedMembers,
+  getEntriesBetween, getPresentCount, getAccessAlerts, reviewAlert, resolvePhotoUrls, getBlockedMembers, assignCardToMember,
   AccessEntry, AccessAlert, BlockedMember,
 } from '../../lib/accessApi';
+import { searchMembers } from '../../lib/membersApi';
+import type { Member } from '../../types';
 import { getGroupTree, getMemberIdsInGroup, GroupNode } from '../../lib/groupsApi';
 import MemberProfileModal from './MemberProfileModal';
 
@@ -31,6 +33,7 @@ const AccessControlPage: React.FC = () => {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [blockedOpen, setBlockedOpen] = useState(false);
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
+  const [assignCard, setAssignCard] = useState<string | null>(null); // n° de badge inconnu à rattacher
 
   // Recherche : un jour + plage horaire optionnelle
   const [date, setDate] = useState(todayStr());
@@ -190,10 +193,13 @@ const AccessControlPage: React.FC = () => {
             return (
               <div
                 key={e.id}
-                onClick={e.member_id ? () => setProfileMemberId(e.member_id) : undefined}
-                title={e.member_id ? 'Voir la fiche' : undefined}
-                className={`relative rounded-2xl overflow-hidden aspect-[3/4] shadow-sm transition-all ${e.member_id ? 'cursor-pointer hover:shadow-lg' : ''} ${refused ? 'ring-2 ring-red-500' : 'ring-1 ring-gray-200'}`}
+                onClick={e.member_id ? () => setProfileMemberId(e.member_id) : (e.card_number ? () => setAssignCard(e.card_number) : undefined)}
+                title={e.member_id ? 'Voir la fiche' : (e.card_number ? 'Badge inconnu — cliquer pour le rattacher à un client' : undefined)}
+                className={`relative rounded-2xl overflow-hidden aspect-[3/4] shadow-sm transition-all ${(e.member_id || e.card_number) ? 'cursor-pointer hover:shadow-lg' : ''} ${refused ? 'ring-2 ring-red-500' : 'ring-1 ring-gray-200'}`}
               >
+                {!e.member_id && e.card_number && (
+                  <span className="absolute top-2 left-2 z-10 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-lg shadow flex items-center gap-1"><Link2 size={11} /> Rattacher</span>
+                )}
                 {url ? (
                   <img src={url} alt="" className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
@@ -300,6 +306,82 @@ const AccessControlPage: React.FC = () => {
       {profileMemberId && (
         <MemberProfileModal memberId={profileMemberId} onClose={() => setProfileMemberId(null)} />
       )}
+
+      {/* Rattacher un badge inconnu à un client */}
+      {assignCard && (
+        <AssignCardModal card={assignCard} onClose={() => setAssignCard(null)} onDone={() => { setAssignCard(null); setLoading(true); load(); }} />
+      )}
+    </div>
+  );
+};
+
+// Rattache un n° de badge inconnu (vu dans les passages) à une fiche membre.
+const AssignCardModal: React.FC<{ card: string; onClose: () => void; onDone: () => void }> = ({ card, onClose, onDone }) => {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<Member[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    if (q.trim().length < 2) { setResults([]); setSearching(false); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try { const r = await searchMembers(q, 8); if (alive) setResults(r); }
+      finally { if (alive) setSearching(false); }
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [q]);
+
+  const assign = async (m: Member) => {
+    setBusy(true); setErr('');
+    try { await assignCardToMember(card, m.id); onDone(); }
+    catch (e: any) { setErr(e?.message || 'Échec du rattachement.'); setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]" onClick={(ev) => ev.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2"><Link2 size={17} className="text-indigo-600" /> Rattacher un badge</h2>
+            <p className="text-[12px] text-gray-500 mt-0.5">Badge <span className="font-mono font-bold text-gray-700">{card}</span> · choisis le client à qui il appartient</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button>
+        </div>
+        <div className="p-4">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom, prénom ou n° client…"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 pl-11 pr-4 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          </div>
+          {err && <p className="text-[12px] text-red-600 font-semibold mt-2">{err}</p>}
+        </div>
+        <div className="overflow-y-auto px-4 pb-4 space-y-1.5">
+          {searching ? (
+            <div className="py-6 flex justify-center text-gray-300"><Loader2 size={20} className="animate-spin" /></div>
+          ) : q.trim().length < 2 ? (
+            <p className="text-[12px] text-gray-400 text-center py-6">Tape au moins 2 caractères pour chercher.</p>
+          ) : results.length === 0 ? (
+            <p className="text-[12px] text-gray-400 text-center py-6">Aucun client trouvé.</p>
+          ) : results.map((m) => (
+            <button key={m.id} onClick={() => assign(m)} disabled={busy}
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-indigo-400 hover:bg-indigo-50/40 text-left transition-colors disabled:opacity-50">
+              <div className="w-9 h-9 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold uppercase shrink-0">
+                {`${(m.firstName || '?')[0] || ''}${(m.lastName || '')[0] || ''}`.toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 truncate">{m.firstName} {m.lastName}</p>
+                <p className="text-[11px] text-gray-400 font-medium">
+                  {m.memberNumber ? `N° ${m.memberNumber}` : 'Sans n°'}{(m as any).cardNumber ? ` · badge actuel ${(m as any).cardNumber}` : ''}
+                </p>
+              </div>
+              <Link2 size={15} className="text-gray-300 shrink-0" />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
