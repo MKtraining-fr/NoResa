@@ -573,16 +573,16 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
       {/* POS INTERFACE */}
       {isSelling && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[850px] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col md:flex-row border border-white/20">
-            
+          <div className="relative bg-white w-full max-w-6xl h-full max-h-[850px] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col md:flex-row border border-white/20">
+            <button onClick={() => setIsSelling(false)} aria-label="Fermer le terminal" className="absolute top-4 right-4 z-20 p-2.5 bg-white/90 hover:bg-gray-100 rounded-xl shadow-sm border border-gray-100 transition-colors"><X size={22} className="text-gray-500" /></button>
+
             {/* Zone Produits POS */}
             <div className="flex-grow p-6 overflow-y-auto bg-gray-50/50 pwa-hide-scrollbar flex flex-col">
-               <div className="flex items-center justify-between mb-10">
+               <div className="flex items-center mb-10">
                   <div className="flex items-center space-x-4">
                     <div className="bg-indigo-600 p-2.5 rounded-2xl shadow-lg"><ShoppingCart size={24} className="text-white" /></div>
                     <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Terminal de Vente</h2>
                   </div>
-                  <button onClick={() => setIsSelling(false)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors border border-transparent hover:border-gray-200"><X size={24} className="text-gray-400" /></button>
                </div>
 
                <div className="relative mb-8">
