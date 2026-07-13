@@ -35,32 +35,38 @@ const AccessControlPage: React.FC = () => {
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const [assignCard, setAssignCard] = useState<string | null>(null); // n° de badge inconnu à rattacher
 
-  // Filtre : période (jour début → jour fin) + statut + recherche texte
+  // Période/statut/groupe = BROUILLON (lié aux champs), appliqué au clic sur « Valider ».
   const [dateFrom, setDateFrom] = useState(todayStr());
   const [dateTo, setDateTo] = useState(todayStr());
   const [statusFilter, setStatusFilter] = useState<'all' | 'authorized' | 'denied'>('all');
-  const [textSearch, setTextSearch] = useState('');
-
-  // Filtre par groupe / sous-groupe
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
   const [groupName, setGroupName] = useState('');
   const [subgroupName, setSubgroupName] = useState('');
+  const [textSearch, setTextSearch] = useState(''); // recherche texte : instantanée (côté client)
   useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
   const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
 
-  const range = useMemo(() => {
-    const a = dateFrom || todayStr();
-    const b = dateTo || a;
+  const dayRange = (a: string, b: string) => {
     const lo = a <= b ? a : b, hi = a <= b ? b : a; // tolère des dates inversées
     return { from: new Date(`${lo}T00:00:00`).toISOString(), to: new Date(`${hi}T23:59:59`).toISOString() };
-  }, [dateFrom, dateTo]);
+  };
+
+  // Filtres RÉELLEMENT appliqués (utilisés par la requête). Défaut : aujourd'hui.
+  const [applied, setApplied] = useState(() => ({
+    ...dayRange(todayStr(), todayStr()),
+    status: 'all' as 'all' | 'authorized' | 'denied', groupName: '', subgroupName: '',
+  }));
+
+  const applyFilters = () => setApplied({
+    ...dayRange(dateFrom || todayStr(), dateTo || dateFrom || todayStr()),
+    status: statusFilter, groupName, subgroupName,
+  });
 
   const load = useCallback(async () => {
-    // Si un groupe est sélectionné, on restreint aux membres de ce groupe/sous-groupe
     let memberIds: string[] | undefined;
-    if (groupName) memberIds = await getMemberIdsInGroup(groupName, subgroupName || undefined);
+    if (applied.groupName) memberIds = await getMemberIdsInGroup(applied.groupName, applied.subgroupName || undefined);
     const [e, p, a, b] = await Promise.all([
-      getEntriesBetween(range.from, range.to, { memberIds, status: statusFilter === 'all' ? undefined : statusFilter }),
+      getEntriesBetween(applied.from, applied.to, { memberIds, status: applied.status === 'all' ? undefined : applied.status, limit: 5000 }),
       getPresentCount(90),
       getAccessAlerts('open'),
       getBlockedMembers(),
@@ -68,12 +74,12 @@ const AccessControlPage: React.FC = () => {
     setEntries(e); setPresent(p); setAlerts(a); setBlocked(b); setLoading(false);
     const map = await resolvePhotoUrls([...e.map((x) => x.member?.photo_path), ...b.map((x) => x.photoPath)]);
     setPhotos(map);
-  }, [range.from, range.to, groupName, subgroupName, statusFilter]);
+  }, [applied]);
 
   useEffect(() => {
     setLoading(true);
     load();
-    const t = setInterval(load, 30_000); // rafraîchissement auto 30 s
+    const t = setInterval(load, 30_000); // rafraîchissement auto 30 s (filtres appliqués)
     return () => clearInterval(t);
   }, [load]);
 
@@ -94,8 +100,17 @@ const AccessControlPage: React.FC = () => {
     });
   }, [entries, textSearch]);
 
-  const isToday = dateFrom === todayStr() && dateTo === todayStr() && statusFilter === 'all' && !groupName && !textSearch;
-  const resetToday = () => { setDateFrom(todayStr()); setDateTo(todayStr()); setStatusFilter('all'); setGroupName(''); setSubgroupName(''); setTextSearch(''); };
+  // Le brouillon diffère-t-il des filtres appliqués ? (pour activer « Valider »)
+  const draftRange = dayRange(dateFrom || todayStr(), dateTo || dateFrom || todayStr());
+  const dirty = draftRange.from !== applied.from || draftRange.to !== applied.to
+    || statusFilter !== applied.status || groupName !== applied.groupName || subgroupName !== applied.subgroupName;
+
+  const isToday = applied.from === dayRange(todayStr(), todayStr()).from && applied.to === dayRange(todayStr(), todayStr()).to
+    && applied.status === 'all' && !applied.groupName;
+  const resetToday = () => {
+    setDateFrom(todayStr()); setDateTo(todayStr()); setStatusFilter('all'); setGroupName(''); setSubgroupName(''); setTextSearch('');
+    setApplied({ ...dayRange(todayStr(), todayStr()), status: 'all', groupName: '', subgroupName: '' });
+  };
 
   return (
     <div className="space-y-5">
@@ -202,9 +217,15 @@ const AccessControlPage: React.FC = () => {
           <input value={textSearch} onChange={(e) => setTextSearch(e.target.value)} placeholder="Nom, n° client ou badge…" className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
         </div>
 
-        {!isToday && (
-          <button onClick={resetToday} className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1 shrink-0">Réinitialiser</button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={applyFilters} disabled={!dirty}
+            className={`text-xs font-bold px-4 py-1.5 rounded-lg transition-colors ${dirty ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm' : 'bg-gray-100 text-gray-400 cursor-default'}`}>
+            {dirty ? 'Valider les filtres' : 'Filtres à jour'}
+          </button>
+          {!isToday && (
+            <button onClick={resetToday} className="text-xs font-medium text-gray-500 hover:text-gray-700 px-2 py-1">Réinitialiser</button>
+          )}
+        </div>
       </div>
 
       {/* Mosaïque des passages */}
