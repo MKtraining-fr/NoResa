@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Layers, Plus, Trash2, Check, X, Edit2, CornerDownRight, Euro, Building2 } from 'lucide-react';
+import { Layers, Plus, Trash2, Check, X, Edit2, CornerDownRight, Euro, Building2, FileText, Send, Download, RefreshCw, Loader2, CheckCircle2 } from 'lucide-react';
 import { getGroupTree, getGroupsFlat, createGroup, renameGroup, deleteGroup, updateGroupBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
+import { listGroupInvoices, upsertGroupInvoiceDraft, sendGroupInvoice, setGroupInvoiceStatus, getGroupInvoicePdfUrl, monthToPeriod, GroupInvoice } from '../../lib/groupBillingApi';
 
 const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [tree, setTree] = useState<GroupNode[]>([]);
@@ -13,6 +14,56 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
   const [flat, setFlat] = useState<MemberGroup[]>([]);
   const [billingFor, setBillingFor] = useState<string | null>(null);
   const [bForm, setBForm] = useState({ billedToThirdParty: false, payerName: '', billingEmail: '', billingAddress: '', unitPrice: '', formulaLabel: '', prorata: true });
+  // Factures association
+  const [invoicesFor, setInvoicesFor] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<GroupInvoice[]>([]);
+  const [invMonth, setInvMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [invBusy, setInvBusy] = useState(false);
+  const [invSending, setInvSending] = useState<string | null>(null);
+
+  const eur = (n: number) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} €`;
+  const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const periodLabel = (iso: string) => { const d = new Date(iso.slice(0, 10) + 'T00:00:00'); return `${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`; };
+
+  const openInvoices = async (groupId: string) => {
+    if (invoicesFor === groupId) { setInvoicesFor(null); return; }
+    setInvoicesFor(groupId); setBillingFor(null);
+    setInvoices(await listGroupInvoices(groupId));
+  };
+  const reloadInvoices = async (groupId: string) => setInvoices(await listGroupInvoices(groupId));
+  const refreshDraft = async (groupId: string) => {
+    setInvBusy(true);
+    try { await upsertGroupInvoiceDraft(groupId, monthToPeriod(invMonth)); await reloadInvoices(groupId); }
+    catch (e: any) { alert(e?.message || 'Calcul du brouillon impossible.'); }
+    finally { setInvBusy(false); }
+  };
+  const sendInvoice = async (inv: GroupInvoice) => {
+    if (!window.confirm(`Générer et envoyer la facture de ${periodLabel(inv.period_start)} à ${inv.payer_name || 'l\'association'}${inv.billing_email ? ` (${inv.billing_email})` : ''} ?`)) return;
+    setInvSending(inv.id);
+    try {
+      const r = await sendGroupInvoice(inv.id, true);
+      if (!r.ok) { alert(r.error || 'Envoi impossible.'); }
+      else if (!r.emailed && r.email_reason) { alert(`Facture ${r.invoice_number || ''} générée.\n${r.email_reason}`); }
+      await reloadInvoices(inv.group_id);
+    } catch (e: any) { alert(e?.message || 'Envoi impossible.'); }
+    finally { setInvSending(null); }
+  };
+  const markPaid = async (inv: GroupInvoice) => {
+    setInvBusy(true);
+    try { await setGroupInvoiceStatus(inv.id, 'paid'); await reloadInvoices(inv.group_id); }
+    catch { alert('Mise à jour impossible.'); } finally { setInvBusy(false); }
+  };
+  const cancelInvoice = async (inv: GroupInvoice) => {
+    if (!window.confirm('Annuler cette facture ?')) return;
+    setInvBusy(true);
+    try { await setGroupInvoiceStatus(inv.id, 'cancelled'); await reloadInvoices(inv.group_id); }
+    catch { alert('Mise à jour impossible.'); } finally { setInvBusy(false); }
+  };
+  const openPdf = async (inv: GroupInvoice) => {
+    if (!inv.pdf_path) return;
+    const url = await getGroupInvoicePdfUrl(inv.pdf_path);
+    if (url) window.open(url, '_blank'); else alert('PDF indisponible.');
+  };
 
   const load = useCallback(async () => {
     const [t, f] = await Promise.all([getGroupTree(), getGroupsFlat()]);
@@ -128,7 +179,10 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                       <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md flex items-center gap-1"><Building2 size={10} /> Payeur tiers</span>
                     )}
                     <span className="text-[11px] text-gray-400">{g.subgroups.length} sous-groupe{g.subgroups.length > 1 ? 's' : ''}</span>
-                    <button onClick={() => openBilling(g.id)} title="Facturation (payeur tiers)" className={`p-1.5 rounded-lg ${billingFor === g.id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600'}`}><Euro size={14} /></button>
+                    <button onClick={() => openBilling(g.id)} title="Règle de facturation (payeur tiers)" className={`p-1.5 rounded-lg ${billingFor === g.id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600'}`}><Euro size={14} /></button>
+                    {flat.find((x) => x.id === g.id)?.billedToThirdParty && (
+                      <button onClick={() => openInvoices(g.id)} title="Factures mensuelles" className={`p-1.5 rounded-lg ${invoicesFor === g.id ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:text-emerald-600'}`}><FileText size={14} /></button>
+                    )}
                     <button onClick={() => startEdit(g.id, null, g.name)} className="p-1.5 text-gray-300 hover:text-indigo-600"><Edit2 size={14} /></button>
                     <button onClick={() => remove(g.id, g.name, true)} className="p-1.5 text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
                   </>
@@ -174,6 +228,76 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                     <button onClick={saveBilling} disabled={busy} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">Enregistrer</button>
                     <button onClick={() => setBillingFor(null)} className="text-sm font-medium text-gray-500 px-3 py-2">Fermer</button>
                     <p className="text-[11px] text-gray-400 ml-auto hidden sm:block">À l'inscription, ces règles s'appliquent automatiquement aux adhérents du groupe.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Panneau factures mensuelles */}
+              {invoicesFor === g.id && (
+                <div className="px-4 py-4 bg-emerald-50/40 border-b border-gray-100 space-y-3">
+                  {/* Brouillon du mois */}
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div>
+                      <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 block">Mois à facturer</label>
+                      <input type="month" value={invMonth} onChange={(e) => setInvMonth(e.target.value)} className="mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                    </div>
+                    <button onClick={() => refreshDraft(g.id)} disabled={invBusy} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 px-3.5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      {invBusy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Calculer le brouillon
+                    </button>
+                    <p className="text-[11px] text-gray-400 ml-auto hidden sm:block max-w-[220px]">Prix unitaire × nombre d'adhérents actifs du groupe, détaillé par sous-groupe.</p>
+                  </div>
+
+                  {invoices.length === 0 ? (
+                    <p className="text-[13px] text-gray-500 py-2">Aucune facture. Choisissez un mois puis « Calculer le brouillon ».</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {invoices.map((inv) => {
+                        const badge = inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'sent' ? 'bg-blue-100 text-blue-700' : inv.status === 'cancelled' ? 'bg-gray-200 text-gray-500' : 'bg-amber-100 text-amber-700';
+                        const label = inv.status === 'paid' ? 'Payée' : inv.status === 'sent' ? 'Envoyée' : inv.status === 'cancelled' ? 'Annulée' : 'Brouillon';
+                        return (
+                          <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-900 capitalize">{periodLabel(inv.period_start)}</span>
+                              <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${badge}`}>{label}</span>
+                              {inv.invoice_number && <span className="text-[11px] text-gray-400">{inv.invoice_number}</span>}
+                              <span className="ml-auto text-sm font-bold text-gray-900">{eur(inv.total_amount)}</span>
+                            </div>
+                            <div className="mt-1 text-[12px] text-gray-500">{inv.member_count} adhérent{inv.member_count > 1 ? 's' : ''} · {inv.payer_name || '—'}</div>
+                            {inv.breakdown.length > 0 && (
+                              <div className="mt-2 divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
+                                {inv.breakdown.map((l, i) => (
+                                  <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
+                                    <span className="text-gray-700 flex-grow truncate">{l.label} — {l.pavillon}</span>
+                                    <span className="text-gray-400">{l.count} × {eur(l.unit_price)}</span>
+                                    <span className="font-semibold text-gray-800 w-20 text-right">{eur(l.amount)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2.5">
+                              {(inv.status === 'draft' || inv.status === 'sent') && (
+                                <button onClick={() => sendInvoice(inv)} disabled={invSending === inv.id} className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                                  {invSending === inv.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} {inv.status === 'sent' ? 'Renvoyer' : 'Générer & envoyer'}
+                                </button>
+                              )}
+                              {inv.pdf_path && (
+                                <button onClick={() => openPdf(inv)} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50"><Download size={13} /> PDF</button>
+                              )}
+                              {inv.status === 'sent' && (
+                                <button onClick={() => markPaid(inv)} disabled={invBusy} className="flex items-center gap-1.5 bg-white border border-emerald-200 text-emerald-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-emerald-50 disabled:opacity-50"><CheckCircle2 size={13} /> Marquer payée</button>
+                              )}
+                              {inv.status !== 'cancelled' && inv.status !== 'paid' && (
+                                <button onClick={() => cancelInvoice(inv)} className="ml-auto text-[13px] font-medium text-gray-400 hover:text-red-600 px-2 py-1.5">Annuler</button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button onClick={() => setInvoicesFor(null)} className="text-sm font-medium text-gray-500 px-3 py-2">Fermer</button>
+                    <p className="text-[11px] text-gray-400 ml-auto hidden sm:block">Un brouillon est généré automatiquement le 1er de chaque mois.</p>
                   </div>
                 </div>
               )}
