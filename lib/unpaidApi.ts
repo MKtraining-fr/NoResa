@@ -16,6 +16,7 @@ export interface MemberDue {
   totalAmount: number;
   oldestDate: string | null;
   lastDate: string | null;
+  months: Record<string, { amount: number; count: number }>;
 }
 
 const mapDue = (r: any): MemberDue => ({
@@ -34,6 +35,7 @@ const mapDue = (r: any): MemberDue => ({
   totalAmount: Number(r.total_amount) || 0,
   oldestDate: r.oldest_date ?? null,
   lastDate: r.last_date ?? null,
+  months: (r.months && typeof r.months === 'object') ? r.months : {},
 });
 
 /** Adhérents en impayé (prélèvements SEPA en échec), plus anciens d'abord. */

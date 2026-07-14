@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download } from 'lucide-react';
 import { listMemberDues, markMemberDuesSettled, sendPaymentReminder, MemberDue } from '../../lib/unpaidApi';
 import { blockMemberAccess } from '../../lib/accessApi';
@@ -81,6 +81,21 @@ const UnpaidPage: React.FC = () => {
   const totalMembers = dues.reduce((s, d) => s + d.totalAmount, 0);
   const totalInvoices = invoices.reduce((s, i) => s + i.total_amount, 0);
 
+  // 5 derniers mois (du plus ancien au plus récent)
+  const last5 = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (4 - i), 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return { ym, label: MONTHS_FR[d.getMonth()].slice(0, 4), year: String(d.getFullYear()).slice(2) };
+    });
+  }, []);
+  const monthTotals = last5.map(({ ym }) => {
+    let amount = 0, count = 0;
+    for (const d of dues) { const m = d.months[ym]; if (m) { amount += Number(m.amount) || 0; count += Number(m.count) || 0; } }
+    return { ym, amount, count };
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -111,6 +126,20 @@ const UnpaidPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Récap 5 derniers mois */}
+      <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
+        <p className="text-sm font-bold text-gray-900 mb-3">Impayés adhérents — 5 derniers mois</p>
+        <div className="grid grid-cols-5 gap-2 sm:gap-3">
+          {monthTotals.map((m) => (
+            <div key={m.ym} className={`rounded-2xl border p-3 text-center ${m.count > 0 ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'}`}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 capitalize">{last5.find((x) => x.ym === m.ym)?.label} {last5.find((x) => x.ym === m.ym)?.year}</p>
+              <p className={`text-base sm:text-lg font-black mt-1 ${m.count > 0 ? 'text-red-700' : 'text-gray-300'}`}>{m.count > 0 ? eur(m.amount) : '—'}</p>
+              <p className="text-[10px] text-gray-400">{m.count > 0 ? `${m.count} impayé${m.count > 1 ? 's' : ''}` : 'aucun'}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Adhérents */}
       <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
@@ -137,6 +166,18 @@ const UnpaidPage: React.FC = () => {
                     <div className="mt-0.5 text-[12px] text-gray-500">
                       {m.unpaidCount} impayé{m.unpaidCount > 1 ? 's' : ''} · <span className="font-semibold text-gray-700">{eur(m.totalAmount)}</span> · plus ancien {ageLabel(m.oldestDate)}
                       {m.groupName ? ` · ${m.groupName}${m.subgroupName ? ' / ' + m.subgroupName : ''}` : ''}
+                    </div>
+                    {/* 5 derniers mois */}
+                    <div className="mt-2 grid grid-cols-5 gap-1 max-w-md">
+                      {last5.map((mo) => {
+                        const cell = m.months[mo.ym];
+                        return (
+                          <div key={mo.ym} className={`rounded-lg px-1 py-1 text-center border ${cell ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'}`}>
+                            <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-400 capitalize">{mo.label}</div>
+                            <div className={`text-[11px] font-bold ${cell ? 'text-red-700' : 'text-gray-300'}`}>{cell ? eur(Number(cell.amount)) : '—'}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
