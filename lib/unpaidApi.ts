@@ -73,6 +73,58 @@ export async function syncFailedPayments(sinceMonths = 0): Promise<{ ok: boolean
   return data as any;
 }
 
+// ---- Impayés orphelins (mandats GoCardless non rattachés à une fiche) ----
+
+export interface OrphanDue {
+  mandateId: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  customerEmail: string | null;
+  count: number;
+  total: number;
+  oldest: string | null;
+  latest: string | null;
+}
+
+const mapOrphan = (r: any): OrphanDue => ({
+  mandateId: r.mandate_id ?? null,
+  customerId: r.customer_id ?? null,
+  customerName: r.customer_name ?? null,
+  customerEmail: r.customer_email ?? null,
+  count: Number(r.cnt) || 0,
+  total: Number(r.total) || 0,
+  oldest: r.oldest ?? null,
+  latest: r.latest ?? null,
+});
+
+/** Liste des impayés orphelins, regroupés par mandat (= une personne). */
+export async function listOrphanDues(): Promise<OrphanDue[]> {
+  const { data, error } = await supabase.rpc('list_orphan_dues');
+  if (error) { console.error('listOrphanDues', error); return []; }
+  return (data ?? []).map(mapOrphan);
+}
+
+/** Nombre de mandats orphelins. */
+export async function countOrphanDues(): Promise<number> {
+  const { data, error } = await supabase.rpc('count_orphan_dues');
+  if (error) { console.error('countOrphanDues', error); return 0; }
+  return Number(data) || 0;
+}
+
+/** Rattache un mandat orphelin à une fiche : ses impayés remontent sur l'adhérent. */
+export async function attachOrphanMandate(mandateId: string, memberId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('attach_orphan_mandate', { p_mandate: mandateId, p_member: memberId });
+  if (error) { console.error('attachOrphanMandate', error); throw error; }
+  return Number(data) || 0;
+}
+
+/** Écarte un mandat orphelin (ancien client, etc.) sans le rattacher. */
+export async function dismissOrphanMandate(mandateId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('dismiss_orphan_mandate', { p_mandate: mandateId });
+  if (error) { console.error('dismissOrphanMandate', error); throw error; }
+  return Number(data) || 0;
+}
+
 /** Envoie un e-mail de relance à l'adhérent (déclenché manuellement par le staff). */
 export async function sendPaymentReminder(memberId: string): Promise<{ ok: boolean; emailed?: boolean; email_reason?: string | null; error?: string }> {
   const { data, error } = await supabase.functions.invoke('payment-reminder', { body: { member_id: memberId } });
