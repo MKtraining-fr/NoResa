@@ -61,10 +61,10 @@ export async function markMemberDuesSettled(memberId: string): Promise<number> {
 
 /**
  * Import des prélèvements SEPA en échec depuis GoCardless (rattrape ce que le webhook
- * n'a pas capté). Par défaut sur les 6 derniers mois — l'historique complet (des années)
- * n'a pas d'intérêt opérationnel.
+ * n'a pas capté). Par défaut : tout l'historique (sinceMonths = 0) pour une visibilité
+ * complète par client. Idempotent (dédup par external_reference).
  */
-export async function syncFailedPayments(sinceMonths = 6): Promise<{ ok: boolean; seen?: number; imported?: number; updated?: number; skipped_no_member?: number; error?: string }> {
+export async function syncFailedPayments(sinceMonths = 0): Promise<{ ok: boolean; seen?: number; imported?: number; updated?: number; skipped_no_member?: number; error?: string }> {
   const { data, error } = await supabase.functions.invoke('gocardless-sync-failed', { body: { since_months: sinceMonths } });
   if (error) { console.error('syncFailedPayments', error); return { ok: false, error: error.message }; }
   return data as any;

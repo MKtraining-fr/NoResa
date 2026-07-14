@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download, DownloadCloud } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download, DownloadCloud, UserRound } from 'lucide-react';
 import { listMemberDues, markMemberDuesSettled, sendPaymentReminder, syncFailedPayments, MemberDue } from '../../lib/unpaidApi';
 import { blockMemberAccess } from '../../lib/accessApi';
 import { listGroupInvoices, setGroupInvoiceStatus, sendGroupInvoice, getGroupInvoicePdfUrl, GroupInvoice } from '../../lib/groupBillingApi';
@@ -26,6 +27,8 @@ const UnpaidPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const navigate = useNavigate();
+  const openFiche = (memberId: string) => navigate(`/app/crm/membres?member=${memberId}`);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,7 +40,7 @@ const UnpaidPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const syncGoCardless = async () => {
-    if (!window.confirm("Importer depuis GoCardless les prélèvements en échec des 6 derniers mois ?\nCela peut prendre quelques instants.")) return;
+    if (!window.confirm("Importer depuis GoCardless tout l'historique des prélèvements en échec ?\nCela peut prendre jusqu'à une minute.")) return;
     setSyncing(true);
     try {
       const r = await syncFailedPayments();
@@ -178,7 +181,7 @@ const UnpaidPage: React.FC = () => {
                 <div key={m.memberId} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-grow min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900 truncate">{m.firstName} {m.lastName}</span>
+                      <button onClick={() => openFiche(m.memberId)} className="font-semibold text-gray-900 truncate hover:text-indigo-600 hover:underline">{m.firstName} {m.lastName}</button>
                       {m.memberNumber && <span className="text-[11px] text-gray-400">#{m.memberNumber}</span>}
                       {m.accessBlocked && <span className="text-[10px] font-bold uppercase tracking-wide text-white bg-gray-800 px-1.5 py-0.5 rounded-md">Bloqué</span>}
                       {conseil && !m.accessBlocked && <span className="text-[10px] font-bold uppercase tracking-wide text-red-700 bg-red-100 px-1.5 py-0.5 rounded-md flex items-center gap-1"><AlertTriangle size={10} /> Blocage conseillé</span>}
@@ -201,6 +204,9 @@ const UnpaidPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <button onClick={() => openFiche(m.memberId)} title="Ouvrir la fiche (infos, visites…)" className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50">
+                      <UserRound size={13} /> Fiche
+                    </button>
                     <button onClick={() => relancer(m)} disabled={busy === 'relance:' + m.memberId || !m.email} title={m.email ? 'Envoyer une relance e-mail' : 'Pas d\'e-mail sur la fiche'} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-40">
                       {busy === 'relance:' + m.memberId ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Relancer
                     </button>
