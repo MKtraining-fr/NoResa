@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, Filter, MoreHorizontal, UserPlus, Mail, Phone, 
   Target, UserCheck, Briefcase, X, Save, Calendar, 
@@ -178,20 +178,31 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   // On dépend de `location` (et pas seulement de `contacts`) : sinon, quand on est DÉJÀ sur la
   // page, changer le paramètre d'URL ne rechargeait pas le composant et rien ne s'ouvrait.
   const location = useLocation();
+  const navigate = useNavigate();
+  // Page d'origine à laquelle revenir en fermant la fiche (ex. ?from=/app/finance/impayes).
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const deepLinkedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (contacts.length === 0) return;
     // Le paramètre est dans le hash (HashRouter) : location.search le contient, avec repli sur le hash brut.
     const raw = location.search || (window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : '');
-    const id = new URLSearchParams(raw).get('member');
+    const params = new URLSearchParams(raw);
+    const id = params.get('member');
     if (!id) return;
     if (deepLinkedKeyRef.current === location.key) return; // navigation déjà traitée
     const found = contacts.find((c) => c.id === id);
     if (found) {
       deepLinkedKeyRef.current = location.key;
+      setReturnTo(params.get('from'));
       openContactDetails(found);
     }
   }, [contacts, location.key, location.search]);
+
+  // Ferme la fiche : revient à la page d'origine si on y est arrivé via ?from=…, sinon reste sur le CRM.
+  const closeDetail = () => {
+    setIsDetailModalOpen(false);
+    if (returnTo) { const dest = returnTo; setReturnTo(null); navigate(dest); }
+  };
 
   // Au retour de la signature du mandat GoCardless (#/app/crm?member=<id>&gcpoll=1),
   // on rafraîchit le statut quelques fois — le webhook met ~quelques secondes à synchroniser.
@@ -1386,7 +1397,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setIsDetailModalOpen(false)} className="p-3 hover:bg-white/10 rounded-2xl transition-colors relative z-10"><X size={28} /></button>
+              <button onClick={closeDetail} className="p-3 hover:bg-white/10 rounded-2xl transition-colors relative z-10"><X size={28} /></button>
             </div>
 
             {/* Onglets de navigation interne à la fiche client */}
@@ -2078,14 +2089,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                        if (!window.confirm('Archiver ce contact ? Sa fiche et toutes ses données seront conservées dans les Archivés, et restaurables à tout moment.')) return;
                        await deleteMember(selectedContact.id);
                        setContacts(await getMembers());
-                       setIsDetailModalOpen(false);
+                       closeDetail();
                      }}
                      className="text-xs font-bold text-red-500 hover:underline"
                    >
                      Archiver le contact
                    </button>
                    <div className="flex space-x-4">
-                     <button onClick={() => setIsDetailModalOpen(false)} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
+                     <button onClick={closeDetail} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
                      <button onClick={startEditing} className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
                        <Edit2 size={18} />
                        <span>Modifier la fiche</span>

@@ -28,7 +28,7 @@ const UnpaidPage: React.FC = () => {
   const [busy, setBusy] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
-  const openFiche = (memberId: string) => navigate(`/app/crm/membres?member=${memberId}`);
+  const openFiche = (memberId: string) => navigate(`/app/crm/membres?member=${memberId}&from=${encodeURIComponent('/app/finance/impayes')}`);
 
   const load = useCallback(async () => {
     setLoading(true);
