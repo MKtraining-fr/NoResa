@@ -37,7 +37,7 @@ const UnpaidPage: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const syncGoCardless = async () => {
-    if (!window.confirm("Importer depuis GoCardless tous les prélèvements en échec ?\nCela peut prendre quelques instants.")) return;
+    if (!window.confirm("Importer depuis GoCardless les prélèvements en échec des 6 derniers mois ?\nCela peut prendre quelques instants.")) return;
     setSyncing(true);
     try {
       const r = await syncFailedPayments();
