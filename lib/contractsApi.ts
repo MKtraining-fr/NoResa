@@ -178,7 +178,8 @@ export interface InscriptionData {
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
   // Formule
   formula: Formula;
-  formulaPaymentMethod: string;   // règlement de la formule (Prélèvement / Espèces / CB / Chèque / Comptant)
+  formulaPaymentMethod: string;   // règlement de la formule (Prélèvement / Espèces / CB / Chèque / Comptant / Facturé à l'association)
+  paidBy?: string;                // payeur tiers (association / entreprise) si facturation groupe
   badgePaymentMethod: string;     // règlement du badge
   services: { label: string; price: number }[];
   // Déclarations + signature
@@ -270,6 +271,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       keypadCode: keypadCode || undefined,
       groupName: d.groupName,
       subgroupName: d.subgroupName,
+      paidBy: d.paidBy,
     });
     memberId = m.id;
   }

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
-  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload,
+  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2,
 } from 'lucide-react';
 import WebcamCapture from '../../components/WebcamCapture';
 import {
@@ -10,7 +10,7 @@ import {
   submitInscription, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
 import { generateCardNumber } from '../../lib/membersApi';
-import { getGroupTree, GroupNode } from '../../lib/groupsApi';
+import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
@@ -41,8 +41,11 @@ const InscriptionPage: React.FC = () => {
   const [groupName, setGroupName] = useState('');
   const [subgroupName, setSubgroupName] = useState('');
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
-  useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
+  const [groupsFlat, setGroupsFlat] = useState<MemberGroup[]>([]);
+  useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); getGroupsFlat().then(setGroupsFlat).catch(() => {}); }, []);
   const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
+  // Règle de facturation « payeur tiers » du groupe/sous-groupe choisi (association qui paie).
+  const billingRule = useMemo(() => effectiveBillingRule(groupsFlat, groupName || null, subgroupName || null), [groupsFlat, groupName, subgroupName]);
 
   // Pré-remplissage depuis une conversion de prospect (déposé en sessionStorage).
   useEffect(() => {
@@ -104,11 +107,15 @@ const InscriptionPage: React.FC = () => {
   const [result, setResult] = useState<InscriptionResult | null>(null);
 
   const formula = useMemo<Formula | null>(() => {
+    // Groupe « payeur tiers » : formule imposée par la règle (non modifiable).
+    if (billingRule) {
+      return { key: 'assoc', label: billingRule.formulaLabel || `Accès ${groupName}`, price: billingRule.unitPrice ?? 0, recurring: false, engagement: false, periodicity: 'Mensuel (association)', group: 'Association' };
+    }
     if (formulaKey === 'libre') {
       return { key: 'libre', label: freeLabel.trim() || 'Accès — montant libre', price: Number(freeAmount) || 0, recurring: false, engagement: false, periodicity: 'Ponctuel', group: 'Sans engagement' };
     }
     return FORMULAS.find((f) => f.key === formulaKey) || null;
-  }, [formulaKey, freeAmount, freeLabel]);
+  }, [billingRule, groupName, formulaKey, freeAmount, freeLabel]);
   const chosenServices = SERVICES.filter((s) => services[s.key]);
   // Le badge n'est requis que pour un abonnement (formule "Engagement"). Pas d'abonnement = pas de badge.
   const needsBadge = formula?.group === 'Engagement';
@@ -126,6 +133,11 @@ const InscriptionPage: React.FC = () => {
       setSubEnd('');
     }
   }, [formulaKey]); // eslint-disable-line
+
+  // Groupe « payeur tiers » : mode de règlement imposé = facturé à l'association (pas de mandat).
+  useEffect(() => {
+    if (billingRule) setFormulaPaymentMethod("Facturé à l'association");
+  }, [billingRule]); // eslint-disable-line
 
   // --- Signature (canvas tactile) -------------------------------------------
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -179,7 +191,7 @@ const InscriptionPage: React.FC = () => {
   // --- Navigation entre étapes ----------------------------------------------
   const canNext = () => {
     if (step === 0) return firstName.trim() && lastName.trim();
-    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod) && (formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
+    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod) && (!!billingRule || formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
     if (step === 2) return consentCga && consentMedical;
     return true;
   };
@@ -210,6 +222,7 @@ const InscriptionPage: React.FC = () => {
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
+        paidBy: billingRule?.payerName || undefined,
         services: chosenServices.map((s) => ({ label: s.label, price: s.price })),
         consentCga, consentMedical,
         signatureDataUrl, signerName: `${firstName.trim()} ${lastName.trim()}`.trim(),
@@ -387,7 +400,23 @@ const InscriptionPage: React.FC = () => {
         {/* ÉTAPE 1 — Formule */}
         {step === 1 && (
           <div className="space-y-6">
-            {(['Engagement', 'Sans engagement'] as const).map((grp) => (
+            {billingRule ? (
+              <div className="p-4 rounded-2xl border-2 space-y-2" style={{ borderColor: RED, backgroundColor: '#fdeaea' }}>
+                <div className="flex items-center gap-2 font-bold text-gray-900">
+                  <Building2 size={18} style={{ color: RED }} /> Formule imposée par le groupe
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="font-semibold text-gray-900 text-sm">{formula?.label}</span>
+                  <span className="font-bold" style={{ color: RED }}>{eur(formula?.price ?? 0)}/mois</span>
+                </div>
+                <div className="text-[13px] text-gray-700">
+                  Réglé par <span className="font-semibold">{billingRule.payerName}</span> — facturé mensuellement à l'association (virement).
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  L'inscription est verrouillée : la formule et le mode de règlement sont définis par les règles du groupe/sous-groupe.
+                </div>
+              </div>
+            ) : (['Engagement', 'Sans engagement'] as const).map((grp) => (
               <div key={grp}>
                 <span className={label}>{grp}</span>
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -431,14 +460,16 @@ const InscriptionPage: React.FC = () => {
               {formulaKey === 'libre' && <p className="text-[11px] mt-1" style={{ color: RED }}>Date de fin obligatoire : l'accès sera automatiquement bloqué ce jour-là.</p>}
             </div>
 
-            <div>
-              <span className={label}>Règlement de la formule</span>
-              <div className="flex flex-wrap gap-2">
-                {PAYMENT_METHODS.map((m) => (
-                  <button key={m} onClick={() => setFormulaPaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${formulaPaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: formulaPaymentMethod === m ? RED : undefined }}>{m}</button>
-                ))}
+            {!billingRule && (
+              <div>
+                <span className={label}>Règlement de la formule</span>
+                <div className="flex flex-wrap gap-2">
+                  {PAYMENT_METHODS.map((m) => (
+                    <button key={m} onClick={() => setFormulaPaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${formulaPaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: formulaPaymentMethod === m ? RED : undefined }}>{m}</button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {needsBadge && (
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">

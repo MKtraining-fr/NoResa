@@ -303,6 +303,7 @@ export interface NewMemberInput {
   groupName?: string;
   subgroupName?: string;
   notes?: string;
+  paidBy?: string;   // payeur tiers (association / entreprise) — "réglé par"
 }
 
 export async function createMember(p: NewMemberInput): Promise<Member> {
@@ -337,6 +338,7 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       group_name: p.groupName || null,
       subgroup_name: p.subgroupName || null,
       notes: p.notes || null,
+      paid_by: p.paidBy || null,
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],
     })

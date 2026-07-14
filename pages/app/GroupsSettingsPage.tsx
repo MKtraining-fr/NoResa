@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Layers, Plus, Trash2, Check, X, Edit2, CornerDownRight } from 'lucide-react';
-import { getGroupTree, createGroup, renameGroup, deleteGroup, GroupNode } from '../../lib/groupsApi';
+import { Layers, Plus, Trash2, Check, X, Edit2, CornerDownRight, Euro, Building2 } from 'lucide-react';
+import { getGroupTree, getGroupsFlat, createGroup, renameGroup, deleteGroup, updateGroupBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 
 const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [tree, setTree] = useState<GroupNode[]>([]);
@@ -10,12 +10,42 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
   const [editing, setEditing] = useState<{ id: string; parentId: string | null; old: string } | null>(null);
   const [editVal, setEditVal] = useState('');
   const [busy, setBusy] = useState(false);
+  const [flat, setFlat] = useState<MemberGroup[]>([]);
+  const [billingFor, setBillingFor] = useState<string | null>(null);
+  const [bForm, setBForm] = useState({ billedToThirdParty: false, payerName: '', billingEmail: '', billingAddress: '', unitPrice: '', formulaLabel: '', prorata: true });
 
   const load = useCallback(async () => {
-    setTree(await getGroupTree());
-    setLoading(false);
+    const [t, f] = await Promise.all([getGroupTree(), getGroupsFlat()]);
+    setTree(t); setFlat(f); setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const openBilling = (groupId: string) => {
+    const r = flat.find((x) => x.id === groupId);
+    setBForm({
+      billedToThirdParty: r?.billedToThirdParty ?? false,
+      payerName: r?.payerName ?? '',
+      billingEmail: r?.billingEmail ?? '',
+      billingAddress: r?.billingAddress ?? '',
+      unitPrice: r?.unitPrice != null ? String(r.unitPrice) : '',
+      formulaLabel: r?.formulaLabel ?? '',
+      prorata: r?.prorata ?? true,
+    });
+    setBillingFor((cur) => (cur === groupId ? null : groupId));
+  };
+  const saveBilling = async () => {
+    if (!billingFor) return;
+    setBusy(true);
+    try {
+      await updateGroupBillingRule(billingFor, {
+        billedToThirdParty: bForm.billedToThirdParty,
+        payerName: bForm.payerName, billingEmail: bForm.billingEmail, billingAddress: bForm.billingAddress,
+        unitPrice: bForm.unitPrice ? Number(bForm.unitPrice) : null,
+        formulaLabel: bForm.formulaLabel, prorata: bForm.prorata,
+      });
+      setBillingFor(null); await load();
+    } catch { alert('Enregistrement impossible.'); } finally { setBusy(false); }
+  };
 
   const addGroup = async () => {
     if (!newGroup.trim() || busy) return;
@@ -94,12 +124,59 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                 ) : (
                   <>
                     <span className="flex-grow text-sm font-semibold text-gray-900">{g.name}</span>
+                    {flat.find((x) => x.id === g.id)?.billedToThirdParty && (
+                      <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md flex items-center gap-1"><Building2 size={10} /> Payeur tiers</span>
+                    )}
                     <span className="text-[11px] text-gray-400">{g.subgroups.length} sous-groupe{g.subgroups.length > 1 ? 's' : ''}</span>
+                    <button onClick={() => openBilling(g.id)} title="Facturation (payeur tiers)" className={`p-1.5 rounded-lg ${billingFor === g.id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600'}`}><Euro size={14} /></button>
                     <button onClick={() => startEdit(g.id, null, g.name)} className="p-1.5 text-gray-300 hover:text-indigo-600"><Edit2 size={14} /></button>
                     <button onClick={() => remove(g.id, g.name, true)} className="p-1.5 text-gray-300 hover:text-red-600"><Trash2 size={14} /></button>
                   </>
                 )}
               </div>
+
+              {/* Panneau facturation (payeur tiers) */}
+              {billingFor === g.id && (
+                <div className="px-4 py-4 bg-indigo-50/40 border-b border-gray-100 space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={bForm.billedToThirdParty} onChange={(e) => setBForm((f) => ({ ...f, billedToThirdParty: e.target.checked }))} className="w-4 h-4 rounded border-gray-300 text-indigo-600" />
+                    <span className="text-sm font-semibold text-gray-800">Ce groupe est réglé par un tiers (association / entreprise)</span>
+                  </label>
+                  {bForm.billedToThirdParty && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Nom du payeur</label>
+                        <input value={bForm.payerName} onChange={(e) => setBForm((f) => ({ ...f, payerName: e.target.value }))} placeholder={`ex. Association ${g.name}`} className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">E-mail de facturation</label>
+                        <input type="email" value={bForm.billingEmail} onChange={(e) => setBForm((f) => ({ ...f, billingEmail: e.target.value }))} placeholder="compta@association.fr" className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Adresse de facturation</label>
+                        <input value={bForm.billingAddress} onChange={(e) => setBForm((f) => ({ ...f, billingAddress: e.target.value }))} placeholder="Adresse postale (pour la facture)" className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Prix / mois / adhérent (€)</label>
+                        <input type="number" step="0.01" min="0" value={bForm.unitPrice} onChange={(e) => setBForm((f) => ({ ...f, unitPrice: e.target.value }))} placeholder="20.00" className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Libellé de formule (imposé)</label>
+                        <input value={bForm.formulaLabel} onChange={(e) => setBForm((f) => ({ ...f, formulaLabel: e.target.value }))} placeholder={`Accès ${g.name}`} className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                      </div>
+                      <label className="sm:col-span-2 flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={bForm.prorata} onChange={(e) => setBForm((f) => ({ ...f, prorata: e.target.checked }))} className="w-4 h-4 rounded border-gray-300 text-indigo-600" />
+                        <span className="text-[12px] text-gray-600">Facturer au prorata pour les entrées/sorties en cours de mois</span>
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button onClick={saveBilling} disabled={busy} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50">Enregistrer</button>
+                    <button onClick={() => setBillingFor(null)} className="text-sm font-medium text-gray-500 px-3 py-2">Fermer</button>
+                    <p className="text-[11px] text-gray-400 ml-auto hidden sm:block">À l'inscription, ces règles s'appliquent automatiquement aux adhérents du groupe.</p>
+                  </div>
+                </div>
+              )}
 
               {/* Sous-groupes */}
               <div className="px-4 py-2 space-y-1.5">
