@@ -11,6 +11,8 @@ import TrialSessionModal from './TrialSessionModal';
 import { createMember, patchMember, getGymId, uploadMemberPhoto, getDashboardStats, DashboardStats, getExpiringSubscriptions, ExpiringMember } from '../../lib/membersApi';
 import { getProducts } from '../../lib/boutiqueApi';
 import { startMandateSetup, getGocardlessStats, GocardlessStats } from '../../lib/gocardless';
+import { countMemberDues } from '../../lib/unpaidApi';
+import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 
 const AdminDashboard: React.FC = () => {
@@ -50,10 +52,13 @@ const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [gc, setGc] = useState<GocardlessStats | null>(null);
   const [expiring, setExpiring] = useState<ExpiringMember[]>([]);
+  const [duesCount, setDuesCount] = useState(0);
+  const navigate = useNavigate();
   useEffect(() => {
     getDashboardStats().then(setStats).catch(() => {});
     getGocardlessStats().then(setGc).catch(() => {});
     getExpiringSubscriptions(30).then(setExpiring).catch(() => {});
+    countMemberDues().then(setDuesCount).catch(() => {});
   }, []);
 
   const fmtEUR = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
@@ -219,6 +224,18 @@ const AdminDashboard: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Alerte impayés */}
+      {duesCount > 0 && (
+        <button onClick={() => navigate('/app/finance/impayes')} className="w-full flex items-center gap-3 bg-red-50 border border-red-200 text-left px-5 py-3.5 rounded-2xl hover:bg-red-100 transition-colors">
+          <span className="bg-red-100 text-red-600 p-2 rounded-xl"><AlertTriangle size={18} /></span>
+          <div className="flex-grow">
+            <p className="text-sm font-bold text-red-800">{duesCount} adhérent{duesCount > 1 ? 's' : ''} en impayé</p>
+            <p className="text-[12px] text-red-600/80">Prélèvements en échec — relancer ou bloquer l'accès.</p>
+          </div>
+          <span className="text-[12px] font-bold text-red-700 uppercase tracking-wide">Voir →</span>
+        </button>
+      )}
 
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

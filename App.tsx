@@ -43,6 +43,7 @@ const AdminDashboard = lazy(() => import('./pages/app/AdminDashboard'));
 const CRMPage = lazy(() => import('./pages/app/CRMPage'));
 const PlanningPage = lazy(() => import('./pages/app/PlanningPage'));
 const FinancePage = lazy(() => import('./pages/app/FinancePage'));
+const UnpaidPage = lazy(() => import('./pages/app/UnpaidPage'));
 const BoutiquePage = lazy(() => import('./pages/app/BoutiquePage'));
 const TeamPage = lazy(() => import('./pages/app/TeamPage'));
 const SettingsPage = lazy(() => import('./pages/app/SettingsPage'));
@@ -115,6 +116,7 @@ const App: React.FC = () => {
             <Route path="finance" element={<FinancePage />} />
             <Route path="finance/abonnements" element={<FinancePage view="abonnements" />} />
             <Route path="finance/paiements" element={<FinancePage view="paiements" />} />
+            <Route path="finance/impayes" element={<UnpaidPage />} />
 
             {/* Boutique Sub-routes */}
             <Route path="boutique" element={<BoutiquePage />} />

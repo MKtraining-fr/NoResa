@@ -26,6 +26,25 @@ export async function enqueueAccessCommand(p: {
   if (error) { console.error('enqueueAccessCommand', error); throw error; }
 }
 
+/**
+ * Bloque l'accès d'un membre : marque la fiche « bloquée » (motif) et envoie la commande
+ * de blocage au contrôleur via le pont. Réutilisé par le CRM et l'écran Impayés.
+ */
+export async function blockMemberAccess(
+  m: { id: string; memberNumber?: string | null; cardNumber?: string | null; keypadCode?: string | null; firstName?: string | null; lastName?: string | null },
+  reason: string,
+): Promise<void> {
+  const pin = m.memberNumber ? String(m.memberNumber) : '';
+  if (!pin) throw new Error("Ce membre n'a pas de numéro d'adhérent.");
+  await patchMember(m.id, { access_blocked: true, access_block_reason: reason || null, access_blocked_at: new Date().toISOString() });
+  await enqueueAccessCommand({
+    memberId: m.id, pin,
+    cardNumber: m.cardNumber ?? null, keypadCode: m.keypadCode ?? null,
+    name: `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() || null,
+    action: 'block',
+  });
+}
+
 export interface BlockedMember {
   id: string;
   firstName: string;
