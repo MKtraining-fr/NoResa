@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download, DownloadCloud, UserRound } from 'lucide-react';
-import { listMemberDues, markMemberDuesSettled, sendPaymentReminder, syncFailedPayments, MemberDue } from '../../lib/unpaidApi';
+import { listMemberDues, dismissMemberDues, sendPaymentReminder, syncFailedPayments, MemberDue } from '../../lib/unpaidApi';
 import { blockMemberAccess } from '../../lib/accessApi';
 import { listGroupInvoices, setGroupInvoiceStatus, sendGroupInvoice, getGroupInvoicePdfUrl, GroupInvoice } from '../../lib/groupBillingApi';
 
@@ -72,10 +72,10 @@ const UnpaidPage: React.FC = () => {
     } catch (e: any) { alert(e?.message || 'Blocage impossible.'); }
     finally { setBusy(null); }
   };
-  const regulariser = async (m: MemberDue) => {
-    if (!window.confirm(`Marquer les impayés de ${m.firstName} ${m.lastName} comme réglés ?\n(${m.unpaidCount} prélèvement(s), ${eur(m.totalAmount)})`)) return;
+  const ecarter = async (m: MemberDue) => {
+    if (!window.confirm(`Écarter les impayés de ${m.firstName} ${m.lastName} de la liste ?\n(${m.unpaidCount} prélèvement(s), ${eur(m.totalAmount)})\n\nAucun encaissement n'est enregistré : le montant n'entre pas dans le chiffre d'affaires.`)) return;
     setBusy('settle:' + m.memberId);
-    try { await markMemberDuesSettled(m.memberId); await load(); }
+    try { await dismissMemberDues(m.memberId); await load(); }
     catch (e: any) { alert(e?.message || 'Mise à jour impossible.'); }
     finally { setBusy(null); }
   };
@@ -215,8 +215,8 @@ const UnpaidPage: React.FC = () => {
                         {busy === 'block:' + m.memberId ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />} Bloquer
                       </button>
                     )}
-                    <button onClick={() => regulariser(m)} disabled={busy === 'settle:' + m.memberId} className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-emerald-700 disabled:opacity-50">
-                      {busy === 'settle:' + m.memberId ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Régularisé
+                    <button onClick={() => ecarter(m)} disabled={busy === 'settle:' + m.memberId} title="Retirer de la liste sans encaissement (n'entre pas dans le CA)" className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-50">
+                      {busy === 'settle:' + m.memberId ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />} Écarter
                     </button>
                   </div>
                 </div>

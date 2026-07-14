@@ -52,10 +52,13 @@ export async function countMemberDues(): Promise<number> {
   return Number(data) || 0;
 }
 
-/** Régularise manuellement les impayés d'un adhérent (passe en « payé »). */
-export async function markMemberDuesSettled(memberId: string): Promise<number> {
+/**
+ * Écarte les impayés d'un adhérent de la liste (statut neutre 'cancelled').
+ * Aucun encaissement n'est enregistré : le montant n'entre pas dans le CA.
+ */
+export async function dismissMemberDues(memberId: string): Promise<number> {
   const { data, error } = await supabase.rpc('mark_member_dues_settled', { p_member: memberId });
-  if (error) { console.error('markMemberDuesSettled', error); throw error; }
+  if (error) { console.error('dismissMemberDues', error); throw error; }
   return Number(data) || 0;
 }
 
