@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download } from 'lucide-react';
-import { listMemberDues, markMemberDuesSettled, sendPaymentReminder, MemberDue } from '../../lib/unpaidApi';
+import { AlertTriangle, Send, Ban, CheckCircle2, Building2, Users, Loader2, RefreshCw, Download, DownloadCloud } from 'lucide-react';
+import { listMemberDues, markMemberDuesSettled, sendPaymentReminder, syncFailedPayments, MemberDue } from '../../lib/unpaidApi';
 import { blockMemberAccess } from '../../lib/accessApi';
 import { listGroupInvoices, setGroupInvoiceStatus, sendGroupInvoice, getGroupInvoicePdfUrl, GroupInvoice } from '../../lib/groupBillingApi';
 
@@ -25,6 +25,7 @@ const UnpaidPage: React.FC = () => {
   const [invoices, setInvoices] = useState<GroupInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,6 +35,20 @@ const UnpaidPage: React.FC = () => {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const syncGoCardless = async () => {
+    if (!window.confirm("Importer depuis GoCardless tous les prélèvements en échec ?\nCela peut prendre quelques instants.")) return;
+    setSyncing(true);
+    try {
+      const r = await syncFailedPayments();
+      if (!r.ok) { alert(r.error || 'Import impossible.'); }
+      else {
+        alert(`Import terminé.\n${r.imported ?? 0} échec(s) importé(s), ${r.updated ?? 0} mis à jour.\n${r.skipped_no_member ?? 0} non rattaché(s) à une fiche (mandat inconnu).`);
+        await load();
+      }
+    } catch (e: any) { alert(e?.message || 'Import impossible.'); }
+    finally { setSyncing(false); }
+  };
 
   const relancer = async (m: MemberDue) => {
     setBusy('relance:' + m.memberId);
@@ -103,9 +118,14 @@ const UnpaidPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Impayés</h1>
           <p className="text-sm text-gray-500">Prélèvements en échec et factures association non réglées.</p>
         </div>
-        <button onClick={load} disabled={loading} className="flex items-center gap-2 self-start bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 disabled:opacity-50">
-          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Actualiser
-        </button>
+        <div className="flex items-center gap-2 self-start">
+          <button onClick={syncGoCardless} disabled={syncing} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50">
+            {syncing ? <Loader2 size={16} className="animate-spin" /> : <DownloadCloud size={16} />} {syncing ? 'Import…' : 'Importer GoCardless'}
+          </button>
+          <button onClick={load} disabled={loading} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 disabled:opacity-50">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Actualiser
+          </button>
+        </div>
       </div>
 
       {/* Compteurs */}

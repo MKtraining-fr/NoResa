@@ -59,6 +59,13 @@ export async function markMemberDuesSettled(memberId: string): Promise<number> {
   return Number(data) || 0;
 }
 
+/** Import initial des paiements SEPA en échec depuis GoCardless (rattrape l'historique). */
+export async function syncFailedPayments(): Promise<{ ok: boolean; seen?: number; imported?: number; updated?: number; skipped_no_member?: number; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('gocardless-sync-failed', { body: {} });
+  if (error) { console.error('syncFailedPayments', error); return { ok: false, error: error.message }; }
+  return data as any;
+}
+
 /** Envoie un e-mail de relance à l'adhérent (déclenché manuellement par le staff). */
 export async function sendPaymentReminder(memberId: string): Promise<{ ok: boolean; emailed?: boolean; email_reason?: string | null; error?: string }> {
   const { data, error } = await supabase.functions.invoke('payment-reminder', { body: { member_id: memberId } });
