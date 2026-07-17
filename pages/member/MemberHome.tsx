@@ -9,7 +9,8 @@ import {
   getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus, getMemberFormulas,
   type MyMember, type HourOccupancy, type MyGym, type MyPackStatus, type MemberFormula,
 } from '../../lib/memberSelfApi';
-import { startInstantPayment, startMemberMandate } from '../../lib/gocardless';
+import { startMemberMandate } from '../../lib/gocardless';
+import { startStripePayment } from '../../lib/stripe';
 
 /**
  * Accueil de l'espace adhérent : pass d'accès QR, solde de carnet + recharge,
@@ -288,9 +289,9 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     try {
       const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
       let res: { authorisation_url: string };
-      if (sel.kind === 'noeng') res = await startInstantPayment(sel.key, redirect);
-      else if (sel.kind === 'annual1') res = await startInstantPayment('annee', redirect);
-      else res = await startMemberMandate(sel.label, sel.price, redirect); // eng | annual3
+      if (sel.kind === 'noeng') res = await startStripePayment(sel.key, redirect);
+      else if (sel.kind === 'annual1') res = await startStripePayment('annee', redirect);
+      else res = await startMemberMandate(sel.label, sel.price, redirect); // eng | annual3 -> mandat SEPA GoCardless
       const w = window.open(res.authorisation_url, '_blank');
       if (!w) window.location.href = res.authorisation_url;
       onClose();
