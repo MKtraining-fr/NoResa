@@ -27,6 +27,7 @@ export interface MyMember {
   keypadCode: string | null;
   photoPath: string | null;
   referralCode: string | null;
+  accessBlocked: boolean;   // accès retiré du contrôleur (carnet épuisé, blocage staff…)
 }
 
 export async function getMyMember(): Promise<MyMember | null> {
@@ -53,6 +54,7 @@ export async function getMyMember(): Promise<MyMember | null> {
     keypadCode: r.keypad_code ?? null,
     photoPath: r.photo_path ?? null,
     referralCode: r.referral_code ?? null,
+    accessBlocked: r.access_blocked === true,
   };
 }
 

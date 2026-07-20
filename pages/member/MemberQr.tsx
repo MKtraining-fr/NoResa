@@ -39,12 +39,21 @@ const MemberQr: React.FC = () => {
       <div className="w-full max-w-xs py-10 bg-white border border-gray-100 rounded-[2rem] shadow-2xl shadow-gray-200 text-center">
         <p className="text-[52px] leading-none font-black tracking-[0.18em] text-gray-900 tabular-nums">{m.keypadCode || '——————'}</p>
       </div>
-      <span className="inline-flex items-center gap-2 bg-green-50 px-3.5 py-2 rounded-xl">
-        <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
-        <span className="text-xs font-extrabold text-green-700">{m.subscriptionLabel ?? 'Abonnement'} · Actif</span>
-      </span>
+      {m.accessBlocked ? (
+        <span className="inline-flex items-center gap-2 bg-orange-50 px-3.5 py-2 rounded-xl">
+          <span className="w-2 h-2 bg-orange-500 rounded-full" />
+          <span className="text-xs font-extrabold text-orange-700">{m.subscriptionLabel ?? 'Abonnement'} · Accès suspendu</span>
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-2 bg-green-50 px-3.5 py-2 rounded-xl">
+          <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
+          <span className="text-xs font-extrabold text-green-700">{m.subscriptionLabel ?? 'Abonnement'} · Actif</span>
+        </span>
+      )}
       <p className="text-[11px] text-gray-400 font-semibold text-center px-8">
-        Tape ce code à 6 chiffres sur le clavier de la porte pour entrer 🔢
+        {m.accessBlocked
+          ? 'Ce code ne fonctionne plus : recharge une séance ou rapproche-toi de la salle.'
+          : 'Tape ce code à 6 chiffres sur le clavier de la porte pour entrer 🔢'}
       </p>
     </div>
   );

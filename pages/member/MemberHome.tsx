@@ -118,7 +118,7 @@ const MemberHome: React.FC = () => {
             <p className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">Mon accès</p>
             <p className="text-lg font-extrabold leading-tight mt-0.5 truncate">{member.firstName} {member.lastName}</p>
             <p className="text-xs opacity-90 font-semibold truncate">
-              {member.subscriptionLabel ?? 'Abonnement'} · {active ? 'Actif' : 'Inactif'}
+              {member.subscriptionLabel ?? 'Abonnement'} · {!active ? 'Inactif' : (member.accessBlocked ? 'Accès suspendu' : 'Actif')}
             </p>
             {status.label && (
               <span className="inline-flex items-center gap-1.5 bg-white/20 px-2.5 py-1 rounded-lg mt-2 backdrop-blur">
@@ -484,7 +484,7 @@ const QrOverlay: React.FC<{ member: MyMember; active: boolean; onClose: () => vo
       </div>
       <span className="inline-flex items-center gap-2 bg-green-50 px-3.5 py-2 rounded-xl">
         <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
-        <span className="text-xs font-extrabold text-green-700">{member.subscriptionLabel ?? 'Abonnement'} · {active ? 'Actif' : 'Inactif'}</span>
+        <span className="text-xs font-extrabold text-green-700">{member.subscriptionLabel ?? 'Abonnement'} · {!active ? 'Inactif' : (member.accessBlocked ? 'Accès suspendu' : 'Actif')}</span>
       </span>
       <p className="text-[11px] text-gray-400 font-semibold mt-3">Tape ce code au clavier de la porte 🔢</p>
       <button onClick={onClose} className="mt-5 w-full bg-gray-900 text-white py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2"><X size={16} /> Fermer</button>
