@@ -216,7 +216,7 @@ const RachatCard: React.FC<{ pack: MyPackStatus; onRecharge: () => void }> = ({ 
         <span className="text-[12px] font-extrabold text-gray-900 whitespace-nowrap">{pack.remaining} / {pack.total}</span>
       </div>
       <button onClick={onRecharge} className="w-full bg-gray-900 text-white py-3 rounded-2xl font-extrabold text-[13.5px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
-        <Plus size={16} strokeWidth={2.4} /> Recharger mon carnet — 45,00 €
+        <Plus size={16} strokeWidth={2.4} /> Recharger
       </button>
     </div>
   );

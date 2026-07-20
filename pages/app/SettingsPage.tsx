@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers, HelpCircle, Smartphone } from 'lucide-react';
 import { getGyms, updateGym, ExtendedGym } from '../../utils/storage';
+import { getOpeningHours, saveOpeningHours, defaultOpeningHours, dayLabel, DayHours } from '../../lib/messagesApi';
 import GroupsSettingsPage from './GroupsSettingsPage';
 import FaqSettingsPage from './FaqSettingsPage';
 import AppIdentitySection from './AppIdentitySection';
@@ -49,6 +50,19 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
   
   // Hours and Features Lists State
   const [gymHours, setGymHours] = useState<{ [key: string]: string }>({});
+  // Horaires d'ouverture — vraie source : colonne gyms.opening_hours (et non le stockage local).
+  const [hours, setHours] = useState<DayHours[]>(defaultOpeningHours());
+  const [hoursBusy, setHoursBusy] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
+  useEffect(() => { getOpeningHours().then(setHours).catch(() => {}); }, []);
+  const patchDay = (day: number, patch: Partial<DayHours>) =>
+    setHours((prev) => prev.map((h) => (h.day === day ? { ...h, ...patch } : h)));
+  const saveHours = async () => {
+    setHoursBusy(true);
+    try { await saveOpeningHours(hours); setHoursSaved(true); setTimeout(() => setHoursSaved(false), 3000); }
+    catch { alert("Enregistrement des horaires impossible."); }
+    finally { setHoursBusy(false); }
+  };
   const [gymFeatures, setGymFeatures] = useState<string[]>([]);
   const [newFeatureText, setNewFeatureText] = useState('');
 
@@ -452,18 +466,47 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Configurez la grille d'ouverture hebdomadaire de votre club</p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {Object.entries(gymHours).map(([day, hr]) => (
-                   <div key={day} className="flex items-center justify-between p-4 bg-slate-50/50 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-colors">
-                      <span className="text-xs font-semibold text-gray-700 capitalize">{day}</span>
-                      <input 
-                        type="text" 
-                        value={hr} 
-                        onChange={(e) => handleHourChange(day, e.target.value)}
-                        className="bg-white border border-slate-150 rounded-xl px-3 py-1.5 text-xs font-semibold text-indigo-600 text-right focus:ring-4 focus:ring-indigo-500/10 w-36 outline-none" 
-                      />
-                   </div>
-                 ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => {
+                  const h = hours.find((x) => x.day === d) ?? { day: d, closed: true, open: '09:00', close: '20:00' };
+                  return (
+                    <div key={d} className="flex items-center gap-3 p-4 bg-slate-50/50 hover:bg-slate-50 rounded-2xl border border-slate-100 transition-colors">
+                      <span className="text-xs font-semibold text-gray-700 w-20 shrink-0">{dayLabel(d)}</span>
+                      <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={!h.closed}
+                          onChange={(e) => patchDay(d, { closed: !e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-indigo-600"
+                        />
+                        <span className="text-[11px] font-semibold text-gray-500">Ouvert</span>
+                      </label>
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        <input
+                          type="time" value={h.open} disabled={h.closed}
+                          onChange={(e) => patchDay(d, { open: e.target.value })}
+                          className="bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-indigo-600 outline-none disabled:opacity-40 focus:ring-4 focus:ring-indigo-500/10"
+                        />
+                        <span className="text-xs text-gray-400">–</span>
+                        <input
+                          type="time" value={h.close} disabled={h.closed}
+                          onChange={(e) => patchDay(d, { close: e.target.value })}
+                          className="bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-indigo-600 outline-none disabled:opacity-40 focus:ring-4 focus:ring-indigo-500/10"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-3 mt-4">
+                <button
+                  onClick={saveHours} disabled={hoursBusy}
+                  className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {hoursBusy ? 'Enregistrement…' : 'Enregistrer les horaires'}
+                </button>
+                {hoursSaved && <span className="text-sm font-semibold text-green-600 flex items-center gap-1"><Check size={16} /> Horaires enregistrés</span>}
+                <p className="text-[11px] text-gray-400 ml-auto hidden sm:block">Visibles par les adhérents dans l'app (onglet Infos).</p>
               </div>
             </div>
           </>
