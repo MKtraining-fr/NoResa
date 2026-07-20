@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Phone, MapPin, LogOut, ChevronRight, Pencil, Check, X, Loader2, BadgeCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, LogOut, ChevronRight, Pencil, Check, X, Loader2, BadgeCheck, Bell } from 'lucide-react';
+import { isPushSupported, isPushEnabled, enablePush, disablePush, pushPermission } from '../../lib/pushApi';
 import { useNavigate } from 'react-router-dom';
 import { getMyMember, updateMyProfile, type MyMember } from '../../lib/memberSelfApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -26,6 +27,21 @@ const MemberProfile: React.FC = () => {
     try { setMember(await getMyMember()); } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+
+  // Notifications : état réel de l'abonnement de cet appareil.
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => { isPushEnabled().then(setPushOn); }, []);
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (pushOn) { await disablePush(); setPushOn(false); }
+      else {
+        const r = await enablePush();
+        if (r.ok) setPushOn(true); else alert(r.error);
+      }
+    } finally { setPushBusy(false); }
+  };
 
   const logout = async () => {
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
@@ -92,6 +108,27 @@ const MemberProfile: React.FC = () => {
       <div className="space-y-3">
         <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Compte</h4>
         <div className="bg-white rounded-[2rem] border border-gray-100 divide-y divide-gray-50 overflow-hidden shadow-sm">
+          {isPushSupported() && (
+            <button onClick={togglePush} disabled={pushBusy || pushPermission() === 'denied'}
+              className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors disabled:opacity-60">
+              <div className="flex items-center space-x-4">
+                <div className={`p-2 rounded-xl shrink-0 ${pushOn ? 'bg-brand-soft text-brand' : 'bg-gray-100 text-gray-400'}`}>
+                  {pushBusy ? <Loader2 size={18} className="animate-spin" /> : <Bell size={18} />}
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-bold text-gray-900 block">Notifications</span>
+                  <span className="text-[11px] font-semibold text-gray-400">
+                    {pushPermission() === 'denied'
+                      ? 'Bloquées dans les réglages du navigateur'
+                      : pushOn ? 'Annonces de la salle activées' : 'Être prévenu des annonces'}
+                  </span>
+                </div>
+              </div>
+              <span className={`w-11 h-6 rounded-full shrink-0 relative transition-colors ${pushOn ? 'bg-brand' : 'bg-gray-200'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${pushOn ? 'left-[22px]' : 'left-0.5'}`} />
+              </span>
+            </button>
+          )}
           <button onClick={logout} className="w-full flex items-center justify-between p-5 hover:bg-red-50 transition-colors group">
             <div className="flex items-center space-x-4">
               <div className="bg-red-50 p-2 rounded-xl text-red-500 shrink-0"><LogOut size={18} /></div>

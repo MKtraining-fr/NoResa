@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Bell, ChevronLeft, Loader2, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getMyAnnouncements, markAnnouncementsRead, MyAnnouncement, AnnouncementCategory } from '../../lib/announcementsApi';
-import { enablePush, pushPermission } from '../../lib/pushApi';
 
 const STYLE: Record<AnnouncementCategory, { icon: React.ElementType; tint: string; ring: string }> = {
   info:  { icon: Info,          tint: 'text-blue-600',    ring: 'bg-blue-50' },
@@ -25,23 +24,6 @@ const MemberNotifications: React.FC = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<MyAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
-  // L'invitation ne s'affiche que si la permission n'a jamais été accordée.
-  // Accordée -> abonnement silencieux géré par le layout, plus rien à afficher.
-  // Refusée -> seul le navigateur peut revenir en arrière, on n'insiste pas.
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [pushBusy, setPushBusy] = useState(false);
-
-  useEffect(() => { setShowPrompt(pushPermission() === 'default'); }, []);
-
-  const activate = async () => {
-    setPushBusy(true);
-    try {
-      const r = await enablePush();
-      if (r.ok) setShowPrompt(false);
-      else { alert(r.error); setShowPrompt(pushPermission() === 'default'); }
-    } finally { setPushBusy(false); }
-  };
-
   useEffect(() => {
     let alive = true;
     getMyAnnouncements().then(async (list) => {
@@ -63,21 +45,6 @@ const MemberNotifications: React.FC = () => {
         <h2 className="text-2xl font-extrabold text-gray-900">Annonces</h2>
       </div>
 
-      {/* Invitation unique : une fois les notifications acceptées, ce bloc disparaît
-          définitivement (le réabonnement se fait ensuite tout seul, en silence). */}
-      {showPrompt && (
-        <button onClick={activate} disabled={pushBusy}
-          className="w-full flex items-center gap-3 p-4 rounded-3xl border border-brand/30 bg-brand-soft disabled:opacity-60">
-          <div className="p-2.5 rounded-2xl shrink-0 bg-white text-brand">
-            {pushBusy ? <Loader2 size={18} className="animate-spin" /> : <Bell size={18} />}
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-extrabold text-[14px] text-gray-900">Activer les notifications</p>
-            <p className="text-[11px] text-gray-500 font-semibold">Sois prévenu dès qu'une annonce est publiée.</p>
-          </div>
-          <span className="text-[11px] font-extrabold text-brand uppercase tracking-wide shrink-0">Activer</span>
-        </button>
-      )}
 
       {loading ? (
         <div className="py-20 flex justify-center text-gray-300"><Loader2 className="animate-spin" /></div>

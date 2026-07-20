@@ -5,7 +5,8 @@ import { Bell, Dumbbell, KeyRound } from 'lucide-react';
 import { BrandProvider, useBrand } from '../lib/BrandContext';
 import { getMyMember } from '../lib/memberSelfApi';
 import { getUnreadAnnouncements } from '../lib/announcementsApi';
-import { ensurePushSubscribed } from '../lib/pushApi';
+import { ensurePushSubscribed, isPushSupported, pushPermission } from '../lib/pushApi';
+import PushPrompt, { PUSH_PROMPT_KEY } from '../components/PushPrompt';
 
 const initialsOf = (f?: string, l?: string) =>
   (`${(f || '').trim()[0] || ''}${(l || '').trim()[0] || ''}`).toUpperCase() || '·';
@@ -21,6 +22,18 @@ const MemberShell: React.FC = () => {
   // Réabonnement silencieux : si l'adhérent a déjà accepté les notifications,
   // l'abonnement est recréé tout seul (nouvel appareil, réinstallation…).
   useEffect(() => { ensurePushSubscribed().catch(() => {}); }, []);
+
+  // Proposition unique, à la première connexion (les navigateurs imposent un geste
+  // explicite). Ensuite le réglage vit dans le profil.
+  const [showPush, setShowPush] = useState(false);
+  useEffect(() => {
+    let seen = false;
+    try { seen = localStorage.getItem(PUSH_PROMPT_KEY) === '1'; } catch { /* noop */ }
+    if (!seen && isPushSupported() && pushPermission() === 'default') {
+      const t = setTimeout(() => setShowPush(true), 1200); // laisse l'app s'afficher d'abord
+      return () => clearTimeout(t);
+    }
+  }, []);
   // Recalculé à chaque navigation : la pastille retombe après lecture des annonces.
   useEffect(() => { getUnreadAnnouncements().then(setUnread).catch(() => {}); }, [location.pathname]);
 
@@ -84,6 +97,8 @@ const MemberShell: React.FC = () => {
 
         {right.map(NavItem)}
       </nav>
+
+      {showPush && <PushPrompt onClose={() => setShowPush(false)} />}
     </div>
   );
 };
