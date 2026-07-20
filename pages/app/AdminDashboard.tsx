@@ -529,7 +529,7 @@ const AdminDashboard: React.FC = () => {
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Notes additionnelles</label>
-                    <textarea rows={4} value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Motivation, limitations physiques, parrainage..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
+                    <textarea rows={4} value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Motivation, limitations physiques, objectifs..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
                   </div>
                 </div>
               </div>

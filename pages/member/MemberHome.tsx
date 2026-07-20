@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  QrCode, FileText, MapPin, Gift, Megaphone, X, Maximize2,
+  QrCode, FileText, MapPin, Megaphone, X, Maximize2,
   Package, Calendar, Plus, ChevronRight, MessageCircle,
   Dumbbell, TrendingUp, BookOpen,
 } from 'lucide-react';
@@ -176,7 +176,6 @@ const MemberHome: React.FC = () => {
       <div className="grid grid-cols-2 gap-3">
         <QuickAction to="/membre/dossier" icon={FileText} tint="indigo" title="Mon dossier" sub="Contrat & factures" />
         <QuickAction to="/membre/infos" icon={MapPin} tint="green" title="Infos salle" sub="Accès & contact" />
-        <QuickAction to="/membre/parrainage" icon={Gift} tint="purple" title="Parrainage" sub="1 mois offert" />
         <QuickAction to="/membre/notifications" icon={Megaphone} tint="orange" title="Annonces" sub="Nouveautés" />
       </div>
 

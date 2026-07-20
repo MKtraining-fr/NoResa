@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Phone, MapPin, LogOut, ChevronRight, Share2, Pencil, Check, X, Loader2, BadgeCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, LogOut, ChevronRight, Pencil, Check, X, Loader2, BadgeCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getMyMember, updateMyProfile, type MyMember } from '../../lib/memberSelfApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -92,13 +92,6 @@ const MemberProfile: React.FC = () => {
       <div className="space-y-3">
         <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Compte</h4>
         <div className="bg-white rounded-[2rem] border border-gray-100 divide-y divide-gray-50 overflow-hidden shadow-sm">
-          <button onClick={() => navigate('/membre/parrainage')} className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors group">
-            <div className="flex items-center space-x-4">
-              <div className="bg-brand-soft p-2 rounded-xl text-brand shrink-0"><Share2 size={18} /></div>
-              <span className="text-sm font-bold text-gray-900">Parrainer un ami</span>
-            </div>
-            <ChevronRight size={18} className="text-gray-300" />
-          </button>
           <button onClick={logout} className="w-full flex items-center justify-between p-5 hover:bg-red-50 transition-colors group">
             <div className="flex items-center space-x-4">
               <div className="bg-red-50 p-2 rounded-xl text-red-500 shrink-0"><LogOut size={18} /></div>

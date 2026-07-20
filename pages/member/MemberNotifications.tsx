@@ -33,7 +33,7 @@ const MemberNotifications: React.FC = () => {
         <NotificationCard 
           icon={<Gift className="text-amber-600" />}
           title="Nouveau Challenge !"
-          desc="Participez au challenge 'Leg Day Master' et gagnez des points de parrainage."
+          desc="Participez au challenge 'Leg Day Master' et grimpez au classement de la salle."
           time="8 Mars 2024"
           unread={false}
         />
