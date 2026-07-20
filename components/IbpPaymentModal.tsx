@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Loader2, Check, Copy, ExternalLink, Mail, Smartphone, AlertCircle } from 'lucide-react';
-import { startStaffPayment, posOrderStatus } from '../lib/gocardless';
+import { posOrderStatus } from '../lib/gocardless';
+import { startStaffStripePayment } from '../lib/stripe';
 
 /**
  * Encaissement Instant Bank Pay au comptoir : génère un paiement (QR + lien),
@@ -31,7 +32,7 @@ const IbpPaymentModal: React.FC<{
     let alive = true;
     (async () => {
       try {
-        const r = await startStaffPayment({ label, amount, product, memberId, email, recordPayment });
+        const r = await startStaffStripePayment({ label, amount, product, memberId, email, recordPayment });
         if (!alive) return;
         setUrl(r.authorisation_url); setOrderId(r.order_id); setAmountCents(r.amount_cents); setLoading(false);
       } catch (e: any) {
@@ -82,7 +83,7 @@ const IbpPaymentModal: React.FC<{
             </div>
           ) : (
             <div className="text-center">
-              <p className="text-sm text-gray-500 mb-3">Le client <b>scanne ce QR</b> avec son téléphone et paie via sa banque.</p>
+              <p className="text-sm text-gray-500 mb-3">Le client <b>scanne ce QR</b> avec son téléphone et paie par carte (ou Apple&nbsp;Pay&nbsp;/ Google&nbsp;Pay).</p>
               <div className="inline-block p-4 bg-white border border-gray-100 rounded-2xl shadow-inner">
                 <QRCodeSVG value={url} size={200} level="M" />
               </div>
