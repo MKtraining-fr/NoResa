@@ -7,6 +7,7 @@ import { getGymInfo, saveGymInfo } from '../../lib/gymApi';
 import GroupsSettingsPage from './GroupsSettingsPage';
 import FaqSettingsPage from './FaqSettingsPage';
 import AppIdentitySection from './AppIdentitySection';
+import AppQrPoster from '../../components/AppQrPoster';
 
 interface SettingsPageProps {
   section?: string;
@@ -244,7 +245,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
         ) : activeSection === 'faq' ? (
           <FaqSettingsPage embedded />
         ) : activeSection === 'app' ? (
-          <AppIdentitySection />
+          <div className="space-y-6">
+            <AppIdentitySection />
+            <AppQrPoster />
+          </div>
         ) : activeSection === 'salle' ? (
           <>
             {/* Gym Selector & Base Info Card */}
