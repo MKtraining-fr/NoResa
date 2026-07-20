@@ -40,6 +40,43 @@ async function getPublicKey(): Promise<string | null> {
   return (init as any)?.public_key ?? null;
 }
 
+/** Permission actuelle du navigateur : 'granted' | 'denied' | 'default'. */
+export function pushPermission(): NotificationPermission | 'unsupported' {
+  if (!isPushSupported()) return 'unsupported';
+  return Notification.permission;
+}
+
+/**
+ * Abonnement SILENCIEUX : ne demande jamais rien à l'utilisateur.
+ * Si la permission a déjà été accordée, on (ré)enregistre l'abonnement sans UI —
+ * c'est ce qui rend les notifications « actives par défaut » une fois acceptées,
+ * y compris après une réinstallation ou un changement d'appareil.
+ */
+export async function ensurePushSubscribed(): Promise<boolean> {
+  if (!isPushSupported() || Notification.permission !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.register(SW_URL);
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const key = await getPublicKey();
+      if (!key) return false;
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+    }
+    const j: any = sub.toJSON();
+    await supabase.rpc('save_push_subscription', {
+      p_endpoint: sub.endpoint,
+      p_p256dh: j.keys?.p256dh,
+      p_auth: j.keys?.auth,
+      p_user_agent: navigator.userAgent.slice(0, 200),
+    });
+    return true;
+  } catch (e) { console.error('ensurePushSubscribed', e); return false; }
+}
+
 /** Cet appareil est-il déjà abonné ? */
 export async function isPushEnabled(): Promise<boolean> {
   if (!isPushSupported()) return false;

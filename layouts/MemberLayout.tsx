@@ -5,6 +5,7 @@ import { Bell, Dumbbell, KeyRound } from 'lucide-react';
 import { BrandProvider, useBrand } from '../lib/BrandContext';
 import { getMyMember } from '../lib/memberSelfApi';
 import { getUnreadAnnouncements } from '../lib/announcementsApi';
+import { ensurePushSubscribed } from '../lib/pushApi';
 
 const initialsOf = (f?: string, l?: string) =>
   (`${(f || '').trim()[0] || ''}${(l || '').trim()[0] || ''}`).toUpperCase() || '·';
@@ -17,6 +18,9 @@ const MemberShell: React.FC = () => {
   const isActive = (path: string) => location.pathname === path;
 
   useEffect(() => { getMyMember().then((m) => { if (m) setInitials(initialsOf(m.firstName, m.lastName)); }); }, []);
+  // Réabonnement silencieux : si l'adhérent a déjà accepté les notifications,
+  // l'abonnement est recréé tout seul (nouvel appareil, réinstallation…).
+  useEffect(() => { ensurePushSubscribed().catch(() => {}); }, []);
   // Recalculé à chaque navigation : la pastille retombe après lecture des annonces.
   useEffect(() => { getUnreadAnnouncements().then(setUnread).catch(() => {}); }, [location.pathname]);
 
