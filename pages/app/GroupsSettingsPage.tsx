@@ -71,6 +71,32 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Tarif propre à un pavillon (sous-groupe). Seuls le prix et le libellé se
+  // surchargent : le payeur et l'e-mail restent définis au niveau du groupe.
+  const [subBillingFor, setSubBillingFor] = useState<string | null>(null);
+  const [sForm, setSForm] = useState({ unitPrice: '', formulaLabel: '' });
+  const openSubBilling = (subId: string) => {
+    const r = flat.find((x) => x.id === subId);
+    setSForm({
+      unitPrice: r?.unitPrice != null ? String(r.unitPrice) : '',
+      formulaLabel: r?.formulaLabel ?? '',
+    });
+    setBillingFor(null);
+    setSubBillingFor((cur) => (cur === subId ? null : subId));
+  };
+  const saveSubBilling = async () => {
+    if (!subBillingFor) return;
+    setBusy(true);
+    try {
+      await updateGroupBillingRule(subBillingFor, {
+        billedToThirdParty: false, // porté par le groupe parent
+        unitPrice: sForm.unitPrice ? Number(sForm.unitPrice) : null,
+        formulaLabel: sForm.formulaLabel,
+      });
+      setSubBillingFor(null); await load();
+    } catch { alert('Enregistrement impossible.'); } finally { setBusy(false); }
+  };
+
   const openBilling = (groupId: string) => {
     const r = flat.find((x) => x.id === groupId);
     setBForm({
@@ -82,6 +108,7 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
       formulaLabel: r?.formulaLabel ?? '',
       prorata: r?.prorata ?? true,
     });
+    setSubBillingFor(null);
     setBillingFor((cur) => (cur === groupId ? null : groupId));
   };
   const saveBilling = async () => {
@@ -305,7 +332,8 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
               {/* Sous-groupes */}
               <div className="px-4 py-2 space-y-1.5">
                 {g.subgroups.map((s) => (
-                  <div key={s.id} className="flex items-center gap-2 pl-1">
+                  <div key={s.id}>
+                  <div className="flex items-center gap-2 pl-1">
                     <CornerDownRight size={13} className="text-gray-300 shrink-0" />
                     {editing?.id === s.id ? (
                       <>
@@ -316,10 +344,48 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                     ) : (
                       <>
                         <span className="flex-grow text-sm text-gray-700">{s.name}</span>
+                        {(() => { const r = flat.find((x) => x.id === s.id); return r?.unitPrice != null ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
+                            {Number(r.unitPrice).toFixed(2).replace('.', ',')} €
+                          </span>
+                        ) : null; })()}
+                        {flat.find((x) => x.id === g.id)?.billedToThirdParty && (
+                          <button onClick={() => openSubBilling(s.id)} title="Tarif propre à ce pavillon"
+                            className={`p-1.5 rounded-lg ${subBillingFor === s.id ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600'}`}><Euro size={13} /></button>
+                        )}
                         <button onClick={() => startEdit(s.id, g.id, s.name)} className="p-1.5 text-gray-300 hover:text-indigo-600"><Edit2 size={13} /></button>
                         <button onClick={() => remove(s.id, s.name, false)} className="p-1.5 text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
                       </>
                     )}
+                  </div>
+
+                  {subBillingFor === s.id && (
+                    <div className="ml-6 mt-2 mb-1 p-3 rounded-xl bg-indigo-50/40 border border-gray-100 space-y-2.5">
+                      <p className="text-[11px] text-gray-500">
+                        Laisse vide pour appliquer le tarif du groupe <b>{g.name}</b>.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Prix / mois / adhérent (€)</label>
+                          <input type="number" step="0.01" min="0" value={sForm.unitPrice}
+                            onChange={(e) => setSForm((f) => ({ ...f, unitPrice: e.target.value }))}
+                            placeholder="tarif du groupe"
+                            className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Libellé sur la facture</label>
+                          <input value={sForm.formulaLabel}
+                            onChange={(e) => setSForm((f) => ({ ...f, formulaLabel: e.target.value }))}
+                            placeholder={`Accès ${s.name}`}
+                            className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={saveSubBilling} disabled={busy} className="bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50">Enregistrer</button>
+                        <button onClick={() => setSubBillingFor(null)} className="text-[13px] font-medium text-gray-500 px-2 py-1.5">Fermer</button>
+                      </div>
+                    </div>
+                  )}
                   </div>
                 ))}
                 {/* Ajout sous-groupe */}
