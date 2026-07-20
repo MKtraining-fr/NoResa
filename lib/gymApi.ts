@@ -48,6 +48,65 @@ export async function saveGymBranding(p: {
   if (error) { console.error('gymApi.saveGymBranding', error); throw error; }
 }
 
+/**
+ * Informations de la salle (onglet « Salle » des Réglages).
+ * Ces champs étaient auparavant stockés en localStorage et n'atteignaient jamais la base :
+ * les modifications semblaient enregistrées mais restaient invisibles côté adhérent.
+ */
+export interface GymInfo {
+  name: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  phone: string;
+  email: string;
+  description: string;
+  pricing: string;
+  bannerImage: string;
+  features: string[];
+}
+
+export async function getGymInfo(): Promise<GymInfo | null> {
+  const gymId = await getGymId();
+  if (!gymId) return null;
+  const { data, error } = await supabase
+    .from('gyms')
+    .select('name, address, city, postal_code, phone, email, description, pricing, banner_image, features')
+    .eq('id', gymId)
+    .single();
+  if (error) { console.error('gymApi.getGymInfo', error); return null; }
+  return {
+    name: data?.name ?? '',
+    address: data?.address ?? '',
+    city: data?.city ?? '',
+    postalCode: data?.postal_code ?? '',
+    phone: data?.phone ?? '',
+    email: data?.email ?? '',
+    description: data?.description ?? '',
+    pricing: data?.pricing ?? '',
+    bannerImage: data?.banner_image ?? '',
+    features: Array.isArray(data?.features) ? (data!.features as string[]) : [],
+  };
+}
+
+export async function saveGymInfo(p: GymInfo): Promise<void> {
+  const gymId = await getGymId();
+  if (!gymId) throw new Error('gym_id introuvable');
+  const { error } = await supabase.from('gyms').update({
+    name: p.name.trim() || null,
+    address: p.address.trim() || null,
+    city: p.city.trim() || null,
+    postal_code: p.postalCode.trim() || null,
+    phone: p.phone.trim() || null,
+    email: p.email.trim() || null,
+    description: p.description.trim() || null,
+    pricing: p.pricing.trim() || null,
+    banner_image: p.bannerImage.trim() || null,
+    features: p.features,
+  }).eq('id', gymId);
+  if (error) { console.error('gymApi.saveGymInfo', error); throw error; }
+}
+
 /** Téléverse un logo dans le bucket public gym-logos et renvoie son URL publique. */
 export async function uploadGymLogo(file: File): Promise<string> {
   const gymId = await getGymId();

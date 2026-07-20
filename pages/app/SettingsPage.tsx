@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Bell, Shield, MapPin, Clock, Globe, User, ShieldCheck, Camera, ExternalLink, Sparkles, Plus, Trash2, Check, Phone, Mail, Layers, HelpCircle, Smartphone } from 'lucide-react';
 import { getGyms, updateGym, ExtendedGym } from '../../utils/storage';
 import { getOpeningHours, saveOpeningHours, defaultOpeningHours, dayLabel, DayHours } from '../../lib/messagesApi';
+import { getGymInfo, saveGymInfo } from '../../lib/gymApi';
 import GroupsSettingsPage from './GroupsSettingsPage';
 import FaqSettingsPage from './FaqSettingsPage';
 import AppIdentitySection from './AppIdentitySection';
@@ -42,11 +43,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
   // Form Fields State
   const [gymName, setGymName] = useState('');
   const [gymAddress, setGymAddress] = useState('');
+  const [gymCity, setGymCity] = useState('');
+  const [gymPostalCode, setGymPostalCode] = useState('');
   const [gymDescription, setGymDescription] = useState('');
   const [gymPhone, setGymPhone] = useState('');
   const [gymEmail, setGymEmail] = useState('');
   const [gymPricing, setGymPricing] = useState('');
   const [gymBanner, setGymBanner] = useState('');
+  const [infoBusy, setInfoBusy] = useState(false);
   
   // Hours and Features Lists State
   const [gymHours, setGymHours] = useState<{ [key: string]: string }>({});
@@ -81,18 +85,26 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
     }
   }, []);
 
-  const loadGymData = (gym: ExtendedGym) => {
-    setSelectedGym(gym);
-    setGymName(gym.name);
-    setGymAddress(gym.address);
-    setGymDescription(gym.description || '');
-    setGymPhone(gym.phone || '');
-    setGymEmail(gym.email || '');
-    setGymPricing(gym.pricing || '');
-    setGymBanner(gym.bannerImage || '');
-    setGymHours(gym.hours || {});
-    setGymFeatures(gym.features || []);
-  };
+  // La liste locale ne sert plus qu'au sélecteur / lien d'aperçu : les champs du
+  // formulaire viennent de la base (table gyms) via getGymInfo ci-dessous.
+  const loadGymData = (gym: ExtendedGym) => setSelectedGym(gym);
+
+  // Source de vérité : la table gyms.
+  useEffect(() => {
+    getGymInfo().then((info) => {
+      if (!info) return;
+      setGymName(info.name);
+      setGymAddress(info.address);
+      setGymCity(info.city);
+      setGymPostalCode(info.postalCode);
+      setGymDescription(info.description);
+      setGymPhone(info.phone);
+      setGymEmail(info.email);
+      setGymPricing(info.pricing);
+      setGymBanner(info.bannerImage);
+      setGymFeatures(info.features);
+    }).catch(() => {});
+  }, []);
 
   const handleGymSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const gym = gyms.find(g => g.id === e.target.value);
@@ -119,33 +131,28 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
     setGymFeatures(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    if (!selectedGym) return;
-
-    const updated: ExtendedGym = {
-      ...selectedGym,
-      name: gymName,
-      address: gymAddress,
-      description: gymDescription,
-      phone: gymPhone,
-      email: gymEmail,
-      pricing: gymPricing,
-      bannerImage: gymBanner,
-      hours: gymHours,
-      features: gymFeatures
-    };
-
-    updateGym(updated);
-    
-    // Refresh gyms list
-    const refreshedList = getGyms();
-    setGyms(refreshedList);
-    const updatedSelected = refreshedList.find(g => g.id === selectedGym.id) || updated;
-    setSelectedGym(updatedSelected);
-
-    // Show success banner
-    setSaveStatus('saved');
-    setTimeout(() => setSaveStatus('idle'), 3000);
+  const handleSave = async () => {
+    setInfoBusy(true);
+    try {
+      await saveGymInfo({
+        name: gymName,
+        address: gymAddress,
+        city: gymCity,
+        postalCode: gymPostalCode,
+        phone: gymPhone,
+        email: gymEmail,
+        description: gymDescription,
+        pricing: gymPricing,
+        bannerImage: gymBanner,
+        features: gymFeatures,
+      });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch {
+      alert("Enregistrement impossible.");
+    } finally {
+      setInfoBusy(false);
+    }
   };
 
   return (
@@ -170,10 +177,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
             )}
             <button
               onClick={handleSave}
-              className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold text-xs hover:bg-indigo-700 transition-colors"
+              disabled={infoBusy}
+              className="flex items-center space-x-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold text-xs hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
               <Save size={16} />
-              <span>Sauvegarder</span>
+              <span>{infoBusy ? 'Enregistrement…' : 'Sauvegarder'}</span>
             </button>
           </div>
         )}
@@ -307,8 +315,32 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                     type="text" 
                     value={gymAddress}
                     onChange={(e) => setGymAddress(e.target.value)}
-                    placeholder="12 rue de Rivoli, Paris"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none" 
+                    placeholder="3 route de Mazères"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
+                    <MapPin size={10} /> <span>Code postal</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={gymPostalCode}
+                    onChange={(e) => setGymPostalCode(e.target.value)}
+                    placeholder="11400"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
+                    <MapPin size={10} /> <span>Ville</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={gymCity}
+                    onChange={(e) => setGymCity(e.target.value)}
+                    placeholder="Villeneuve la Comptal"
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none"
                   />
                 </div>
                 <div className="space-y-2">
