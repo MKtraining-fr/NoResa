@@ -40,7 +40,7 @@ export const APP_NAV_ITEMS = [
   { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
   { label: 'CRM', path: '/app/crm', icon: Users, subItems: ['Membres', 'Prospects', 'Partenaires'] },
   { label: 'Planning', path: '/app/planning', icon: Calendar, subItems: ['Cours'] },
-  { label: 'Finance', path: '/app/finance', icon: Wallet, subItems: ['Abonnements', 'Paiements', { label: 'Impayés', slug: 'impayes' }] },
+  { label: 'Finance', path: '/app/finance', icon: Wallet, subItems: ['Abonnements', 'Paiements', { label: 'Impayés', slug: 'impayes' }, { label: 'Résiliations', slug: 'resiliations' }] },
   { label: 'Boutique', path: '/app/boutique', icon: ShoppingBag, subItems: ['Produits', 'Ventes', 'Fournisseurs'] },
   { label: 'Contrôle d\'Accès', path: '/app/acces', icon: DoorOpen },
   { label: 'Musique', path: '/app/musique', icon: Radio },

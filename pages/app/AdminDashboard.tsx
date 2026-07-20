@@ -12,6 +12,7 @@ import { createMember, patchMember, getGymId, uploadMemberPhoto, getDashboardSta
 import { getProducts } from '../../lib/boutiqueApi';
 import { startMandateSetup, getGocardlessStats, GocardlessStats } from '../../lib/gocardless';
 import { countMemberDues } from '../../lib/unpaidApi';
+import { countPendingCancellations } from '../../lib/cancellationApi';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 
@@ -53,12 +54,14 @@ const AdminDashboard: React.FC = () => {
   const [gc, setGc] = useState<GocardlessStats | null>(null);
   const [expiring, setExpiring] = useState<ExpiringMember[]>([]);
   const [duesCount, setDuesCount] = useState(0);
+  const [cancelCount, setCancelCount] = useState(0);
   const navigate = useNavigate();
   useEffect(() => {
     getDashboardStats().then(setStats).catch(() => {});
     getGocardlessStats().then(setGc).catch(() => {});
     getExpiringSubscriptions(30).then(setExpiring).catch(() => {});
     countMemberDues().then(setDuesCount).catch(() => {});
+    countPendingCancellations().then(setCancelCount).catch(() => {});
   }, []);
 
   const fmtEUR = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
@@ -234,6 +237,18 @@ const AdminDashboard: React.FC = () => {
             <p className="text-[12px] text-red-600/80">Prélèvements en échec — relancer ou bloquer l'accès.</p>
           </div>
           <span className="text-[12px] font-bold text-red-700 uppercase tracking-wide">Voir →</span>
+        </button>
+      )}
+
+      {/* Alerte résiliations à traiter */}
+      {cancelCount > 0 && (
+        <button onClick={() => navigate('/app/finance/resiliations')} className="w-full flex items-center gap-3 bg-indigo-50 border border-indigo-200 text-left px-5 py-3.5 rounded-2xl hover:bg-indigo-100 transition-colors">
+          <span className="bg-indigo-100 text-indigo-600 p-2 rounded-xl"><ClipboardCheck size={18} /></span>
+          <div className="flex-grow">
+            <p className="text-sm font-bold text-indigo-800">{cancelCount} demande{cancelCount > 1 ? 's' : ''} de résiliation à traiter</p>
+            <p className="text-[12px] text-indigo-600/80">Envoyée{cancelCount > 1 ? 's' : ''} par vos adhérents depuis l'app.</p>
+          </div>
+          <span className="text-[12px] font-bold text-indigo-700 uppercase tracking-wide">Voir →</span>
         </button>
       )}
 
