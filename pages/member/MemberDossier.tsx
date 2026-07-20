@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Receipt, Download, Loader2, FileSignature } from 'lucide-react';
+import { FileText, Receipt, Download, Loader2, FileSignature, LogOut } from 'lucide-react';
+import CancellationCard from '../../components/CancellationCard';
 import {
   getMyContracts, getMyInvoices, signedPdfUrl,
   type MyContract, type MyInvoice,
@@ -86,6 +87,12 @@ const MemberDossier: React.FC = () => {
             </button>
           </div>
         ))}
+      </section>
+
+      {/* Résiliation — éligibilité, préavis et validation gérés côté salle */}
+      <section className="space-y-2">
+        <h3 className="text-[11px] font-extrabold uppercase tracking-wide text-gray-400 flex items-center gap-1.5"><LogOut size={13} /> Mon abonnement</h3>
+        <CancellationCard />
       </section>
     </div>
   );

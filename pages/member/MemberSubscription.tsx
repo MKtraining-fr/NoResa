@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { CreditCard, History, Download, ShieldCheck } from 'lucide-react';
-import CancellationCard from '../../components/CancellationCard';
 
 const MemberSubscription: React.FC = () => {
   return (
@@ -58,9 +57,6 @@ const MemberSubscription: React.FC = () => {
       <button className="w-full py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl hover:bg-gray-200 transition-colors">
         Modifier mon mode de paiement
       </button>
-
-      {/* Résiliation (éligibilité et préavis gérés côté serveur) */}
-      <CancellationCard />
     </div>
   );
 };
