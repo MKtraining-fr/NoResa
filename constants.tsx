@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Calendar, Wallet, ShoppingBag, Settings, UserCircle, Bell, QrCode, CreditCard, HelpCircle, ArrowRightLeft, Cctv, DoorOpen, MessageSquare, Home, FileText, Radio, Snowflake } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Wallet, ShoppingBag, Settings, UserCircle, Bell, QrCode, CreditCard, HelpCircle, ArrowRightLeft, Cctv, DoorOpen, MessageSquare, Home, FileText, Radio, Snowflake, Megaphone } from 'lucide-react';
 
 export const MOCK_REVENUE_DATA = [
   { name: 'Jan', revenue: 4500 },
@@ -48,6 +48,7 @@ export const APP_NAV_ITEMS = [
   { label: 'Surveillance', path: '/app/surveillance', icon: Cctv },
   { label: 'Equipe', path: '/app/equipe', icon: ArrowRightLeft },
   { label: 'Messagerie', path: '/app/messagerie', icon: MessageSquare },
+  { label: 'Annonces', path: '/app/annonces', icon: Megaphone },
   { label: 'Paramètres', path: '/app/parametres', icon: Settings },
 ];
 

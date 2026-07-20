@@ -45,6 +45,7 @@ const PlanningPage = lazy(() => import('./pages/app/PlanningPage'));
 const FinancePage = lazy(() => import('./pages/app/FinancePage'));
 const UnpaidPage = lazy(() => import('./pages/app/UnpaidPage'));
 const CancellationsPage = lazy(() => import('./pages/app/CancellationsPage'));
+const AnnouncementsPage = lazy(() => import('./pages/app/AnnouncementsPage'));
 const BoutiquePage = lazy(() => import('./pages/app/BoutiquePage'));
 const TeamPage = lazy(() => import('./pages/app/TeamPage'));
 const SettingsPage = lazy(() => import('./pages/app/SettingsPage'));
@@ -141,6 +142,7 @@ const App: React.FC = () => {
 
             {/* Settings Sub-routes */}
             <Route path="messagerie" element={<MessageriePage />} />
+            <Route path="annonces" element={<AnnouncementsPage />} />
             <Route path="parametres" element={<SettingsPage />} />
             <Route path="parametres/groupes" element={<SettingsPage section="groupes" />} />
             <Route path="parametres/faq" element={<SettingsPage section="faq" />} />

@@ -4,6 +4,7 @@ import { MEMBER_NAV_ITEMS } from '../constants';
 import { Bell, Dumbbell, KeyRound } from 'lucide-react';
 import { BrandProvider, useBrand } from '../lib/BrandContext';
 import { getMyMember } from '../lib/memberSelfApi';
+import { getUnreadAnnouncements } from '../lib/announcementsApi';
 
 const initialsOf = (f?: string, l?: string) =>
   (`${(f || '').trim()[0] || ''}${(l || '').trim()[0] || ''}`).toUpperCase() || '·';
@@ -12,9 +13,12 @@ const MemberShell: React.FC = () => {
   const location = useLocation();
   const { displayName, logoUrl } = useBrand();
   const [initials, setInitials] = useState('');
+  const [unread, setUnread] = useState(0);
   const isActive = (path: string) => location.pathname === path;
 
   useEffect(() => { getMyMember().then((m) => { if (m) setInitials(initialsOf(m.firstName, m.lastName)); }); }, []);
+  // Recalculé à chaque navigation : la pastille retombe après lecture des annonces.
+  useEffect(() => { getUnreadAnnouncements().then(setUnread).catch(() => {}); }, [location.pathname]);
 
   const left = MEMBER_NAV_ITEMS.slice(0, 2);
   const right = MEMBER_NAV_ITEMS.slice(2);
@@ -47,7 +51,11 @@ const MemberShell: React.FC = () => {
         <div className="flex items-center gap-2 shrink-0">
           <Link to="/membre/notifications" className="relative p-2 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
             <Bell size={19} className="text-gray-600" />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-brand rounded-full ring-2 ring-white"></span>
+            {unread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-brand text-white text-[10px] font-extrabold rounded-full ring-2 ring-white flex items-center justify-center">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
           </Link>
           <Link to="/membre/profil" className="w-9 h-9 rounded-full bg-brand-soft text-brand flex items-center justify-center font-extrabold text-xs shrink-0">
             {initials}
