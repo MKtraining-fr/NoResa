@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Megaphone, Plus, Loader2, RefreshCw, Trash2, Send, Pencil, X, Check, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
 import { listAnnouncements, saveAnnouncement, deleteAnnouncement, Announcement, AnnouncementCategory } from '../../lib/announcementsApi';
+import { sendPush } from '../../lib/pushApi';
 
 const CATEGORIES: { key: AnnouncementCategory; label: string; icon: React.ElementType; tint: string }[] = [
   { key: 'info', label: 'Information', icon: Info, tint: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -33,12 +34,22 @@ const AnnouncementsPage: React.FC = () => {
     setEditing(true);
   };
 
+  // Diffuse la notification push. Non bloquant : l'annonce reste publiée même si l'envoi échoue.
+  const notifyMembers = async (title: string, body: string) => {
+    const r = await sendPush(title, body.slice(0, 160), '/#/membre/notifications');
+    if (!r.ok) alert(`Annonce publiée, mais l'envoi des notifications a échoué :
+${r.error}`);
+    else if ((r.total ?? 0) === 0) alert("Annonce publiée. Aucun adhérent n'a encore activé les notifications.");
+    else alert(`Annonce publiée et notification envoyée à ${r.sent}/${r.total} appareil(s).`);
+  };
+
   const save = async (publish: boolean) => {
     if (!form.title.trim() || !form.body.trim()) { alert('Titre et message sont obligatoires.'); return; }
     if (publish && !window.confirm("Publier cette annonce ?\n\nElle apparaîtra immédiatement dans l'app de tous vos adhérents.")) return;
     setBusy(true);
     try {
       await saveAnnouncement({ id: form.id, title: form.title, body: form.body, category: form.category, publish });
+      if (publish) await notifyMembers(form.title, form.body);
       setEditing(false); setForm({ ...EMPTY });
       await load();
     } catch (e: any) { alert(e?.message || 'Enregistrement impossible.'); }
@@ -48,7 +59,11 @@ const AnnouncementsPage: React.FC = () => {
   const publishExisting = async (a: Announcement) => {
     if (!window.confirm(`Publier « ${a.title} » ?\n\nElle apparaîtra immédiatement dans l'app de tous vos adhérents.`)) return;
     setBusy(true);
-    try { await saveAnnouncement({ id: a.id, title: a.title, body: a.body, category: a.category, publish: true }); await load(); }
+    try {
+      await saveAnnouncement({ id: a.id, title: a.title, body: a.body, category: a.category, publish: true });
+      await notifyMembers(a.title, a.body);
+      await load();
+    }
     catch (e: any) { alert(e?.message || 'Publication impossible.'); }
     finally { setBusy(false); }
   };

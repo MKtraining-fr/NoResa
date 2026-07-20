@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, ChevronLeft, Loader2, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
+import { Bell, BellOff, ChevronLeft, Loader2, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getMyAnnouncements, markAnnouncementsRead, MyAnnouncement, AnnouncementCategory } from '../../lib/announcementsApi';
+import { isPushSupported, isPushEnabled, enablePush, disablePush } from '../../lib/pushApi';
 
 const STYLE: Record<AnnouncementCategory, { icon: React.ElementType; tint: string; ring: string }> = {
   info:  { icon: Info,          tint: 'text-blue-600',    ring: 'bg-blue-50' },
@@ -24,6 +25,21 @@ const MemberNotifications: React.FC = () => {
   const navigate = useNavigate();
   const [items, setItems] = useState<MyAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => { isPushEnabled().then(setPushOn); }, []);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try {
+      if (pushOn) { await disablePush(); setPushOn(false); }
+      else {
+        const r = await enablePush();
+        if (r.ok) setPushOn(true); else alert(r.error);
+      }
+    } finally { setPushBusy(false); }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -45,6 +61,27 @@ const MemberNotifications: React.FC = () => {
         </button>
         <h2 className="text-2xl font-extrabold text-gray-900">Annonces</h2>
       </div>
+
+      {/* Notifications push : un appareil = un abonnement */}
+      {isPushSupported() && (
+        <button onClick={togglePush} disabled={pushBusy}
+          className={`w-full flex items-center gap-3 p-4 rounded-3xl border transition-colors ${pushOn ? 'bg-brand-soft border-brand/30' : 'bg-white border-gray-100'} disabled:opacity-60`}>
+          <div className={`p-2.5 rounded-2xl shrink-0 ${pushOn ? 'bg-white text-brand' : 'bg-gray-100 text-gray-400'}`}>
+            {pushBusy ? <Loader2 size={18} className="animate-spin" /> : pushOn ? <Bell size={18} /> : <BellOff size={18} />}
+          </div>
+          <div className="flex-1 text-left">
+            <p className="font-extrabold text-[14px] text-gray-900">
+              {pushOn ? 'Notifications activées' : 'Activer les notifications'}
+            </p>
+            <p className="text-[11px] text-gray-500 font-semibold">
+              {pushOn ? 'Tu es prévenu dès qu\'une annonce est publiée.' : 'Sois prévenu des annonces de la salle.'}
+            </p>
+          </div>
+          <span className={`w-11 h-6 rounded-full shrink-0 relative transition-colors ${pushOn ? 'bg-brand' : 'bg-gray-200'}`}>
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${pushOn ? 'left-[22px]' : 'left-0.5'}`} />
+          </span>
+        </button>
+      )}
 
       {loading ? (
         <div className="py-20 flex justify-center text-gray-300"><Loader2 className="animate-spin" /></div>
