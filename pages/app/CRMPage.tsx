@@ -406,12 +406,17 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!pin) { alert("Ce membre n'a pas de numéro d'adhérent."); return; }
     setAccessBusy(true);
     try {
+      // Si la fiche porte une date de fin d'abonnement, on la transmet au contrôleur :
+      // il expire alors l'accès tout seul (le job nocturne reste le filet de sécurité).
+      const subEnd = (selectedContact as any).subscriptionEnd as string | undefined;
+      const endTime = subEnd ? subEnd.slice(0, 10).replace(/-/g, '') : null;
       await enqueueAccessCommand({
         memberId: selectedContact.id, pin,
         cardNumber: selectedContact.cardNumber || null,
         keypadCode: (selectedContact as any).keypadCode || null,
         name: `${selectedContact.firstName || ''} ${selectedContact.lastName || ''}`.trim(),
         action,
+        endTime,
       });
       // Activer / Débloquer lèvent le statut « bloqué »
       if (action === 'grant' || action === 'unblock') {
