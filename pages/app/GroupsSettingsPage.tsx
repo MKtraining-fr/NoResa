@@ -386,10 +386,25 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                             ) : inv.breakdown.length > 0 ? (
                               <div className="mt-2 divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
                                 {inv.breakdown.map((l, i) => (
-                                  <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
-                                    <span className="text-gray-700 flex-grow truncate">{l.label} — {l.pavillon}</span>
-                                    <span className="text-gray-400">{l.count} × {eur(l.unit_price)}</span>
-                                    <span className="font-semibold text-gray-800 w-20 text-right">{eur(l.amount)}</span>
+                                  <div key={i} className="px-2.5 py-1.5">
+                                    <div className="flex items-center gap-2 text-[12px]">
+                                      <span className="text-gray-800 font-semibold flex-grow truncate">{l.label} — {l.pavillon}</span>
+                                      <span className="text-gray-400">{l.count} × {eur(l.unit_price)}</span>
+                                      <span className="font-semibold text-gray-800 w-20 text-right">{eur(l.amount)}</span>
+                                    </div>
+                                    {Array.isArray(l.members) && l.members.length > 0 && (
+                                      <ul className="mt-1 ml-2 space-y-0.5">
+                                        {l.members.map((m, k) => (
+                                          <li key={k} className="flex items-center gap-2 text-[11px] text-gray-500">
+                                            <span className="text-gray-300">•</span>
+                                            <span className="truncate">{m.name || '—'}{m.number ? ` (n° ${m.number})` : ''}</span>
+                                            <span className={`ml-auto shrink-0 ${m.visits ? 'text-gray-400' : 'text-amber-600'}`}>
+                                              {m.visits ? `${m.visits} passage${m.visits > 1 ? 's' : ''}` : 'aucun passage'}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
                                   </div>
                                 ))}
                               </div>

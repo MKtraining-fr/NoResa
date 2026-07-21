@@ -8,6 +8,8 @@ export interface GroupInvoiceLine {
   amount: number;
   /** Ligne complémentaire (frais, remise…) : exclue du nombre d'adhérents facturés. */
   is_extra?: boolean;
+  /** Adhérents facturés sur cette ligne (nom, n°, passages du mois). */
+  members?: { name: string | null; number: string | null; visits?: number }[];
 }
 
 export interface GroupInvoice {
