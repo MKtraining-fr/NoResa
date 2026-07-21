@@ -42,6 +42,8 @@ export interface Product {
   category: string;
   image?: string;
   vatRate?: number;
+  /** Prix d'achat (coûtant) — utilisé pour les achats perso. */
+  costPrice?: number;
   sku?: string;
   supplier?: string;
   minStockAlert?: number | null;

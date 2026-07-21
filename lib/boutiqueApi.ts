@@ -22,6 +22,7 @@ export async function getProducts(): Promise<Product[]> {
     category: r.category?.name || 'Divers',
     image: r.image_url || undefined,
     vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0,
+    costPrice: r.cost_price != null ? Number(r.cost_price) : undefined,
     sku: r.sku || undefined,
     supplier: r.supplier?.name || undefined,
   }));
@@ -57,11 +58,14 @@ export async function recordSale(
   memberId: string | null,
   paymentMethod: string,
   lines: SaleLine[],
+  /** Achat perso : articles au prix coûtant, vente exclue du chiffre d'affaires. */
+  personal = false,
 ): Promise<SaleResult> {
   const { data, error } = await supabase.rpc('record_sale', {
     p_member: memberId,
     p_payment_method: paymentMethod,
     p_lines: lines,
+    p_personal: personal,
   });
   if (error) {
     console.error('boutiqueApi.recordSale', error);

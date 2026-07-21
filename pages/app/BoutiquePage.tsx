@@ -31,6 +31,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   
   const memberSearchRef = useRef<HTMLDivElement>(null);
   const [cart, setCart] = useState<{ product: Product, quantity: number }[]>([]);
+  const [personalPurchase, setPersonalPurchase] = useState(false);
   const [saleStep, setSaleStep] = useState<'cart' | 'payment' | 'success'>('cart');
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -132,15 +133,22 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
     }));
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  // Achat perso : les articles sont valorisés au prix d'achat (pas de marge)
+  // et la vente n'entre pas dans le chiffre d'affaires.
+  const unitPriceOf = (p: any) =>
+    personalPurchase && !p.__free ? (Number(p.costPrice) || p.price) : p.price;
+
+  const cartTotal = cart.reduce((sum, item) => sum + (unitPriceOf(item.product) * item.quantity), 0);
   const cartTva = cart.reduce((sum, item) => {
-    const lineTtc = item.product.price * item.quantity;
+    const lineTtc = unitPriceOf(item.product) * item.quantity;
     const rate = item.product.vatRate || 0;
     return sum + (lineTtc - lineTtc / (1 + rate));
   }, 0);
+  const cartSavings = cart.reduce((sum, item) => sum + ((item.product.price - unitPriceOf(item.product)) * item.quantity), 0);
 
   const resetSale = () => {
     setCart([]);
+    setPersonalPurchase(false);
     setSelectedMember(null);
     setMemberSearchTerm('');
     setPaymentMethod(null);
@@ -161,6 +169,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
         cart.map(i => (i.product as any).__free
           ? { label: i.product.name, unit_price: i.product.price, quantity: i.quantity }
           : { product_id: i.product.id, quantity: i.quantity }),
+        personalPurchase,
       );
       setSaleResult(res);
       setSaleStep('success');
@@ -752,6 +761,21 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                </div>
 
                <div className="p-6 border-t border-gray-50 bg-gray-50/20">
+                  {/* Achat perso : prix coûtant, hors chiffre d'affaires */}
+                  <label className={`flex items-start gap-3 p-3.5 mb-5 rounded-2xl border cursor-pointer transition-colors ${personalPurchase ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100 hover:bg-gray-50'}`}>
+                    <input type="checkbox" checked={personalPurchase}
+                      onChange={(e) => setPersonalPurchase(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-gray-300 text-amber-600 shrink-0" />
+                    <span className="flex-1">
+                      <span className="block text-xs font-bold text-gray-900">Achat perso (prix coûtant)</span>
+                      <span className="block text-[11px] text-gray-500 mt-0.5">
+                        {personalPurchase
+                          ? `Articles au prix d'achat · ${cartSavings.toFixed(2).replace('.', ',')} € de marge non facturée · vente hors CA`
+                          : "Sans marge, et la vente ne compte pas dans le chiffre d'affaires."}
+                      </span>
+                    </span>
+                  </label>
+
                   <div className="space-y-3 mb-8">
                     <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-wide">
                        <span>Total HT</span>
@@ -762,8 +786,8 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                        <span>{cartTva.toFixed(2).replace('.', ',')} €</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                       <span className="text-sm font-semibold tracking-wide uppercase">Total à payer</span>
-                       <span className="text-4xl font-semibold text-indigo-600">{cartTotal.toFixed(2).replace('.', ',')} €</span>
+                       <span className="text-sm font-semibold tracking-wide uppercase">{personalPurchase ? 'Total coûtant' : 'Total à payer'}</span>
+                       <span className={`text-4xl font-semibold ${personalPurchase ? 'text-amber-600' : 'text-indigo-600'}`}>{cartTotal.toFixed(2).replace('.', ',')} €</span>
                     </div>
                   </div>
 
