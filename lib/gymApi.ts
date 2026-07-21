@@ -64,6 +64,20 @@ export interface GymInfo {
   pricing: string;
   bannerImage: string;
   features: string[];
+  // Mentions légales et coordonnées bancaires — reprises sur les factures PDF.
+  legalName: string;
+  legalForm: string;
+  siret: string;
+  apeNaf: string;
+  rcsCity: string;
+  vatNumber: string;
+  vatExempt: boolean;
+  vatExemptMention: string;
+  iban: string;
+  bic: string;
+  invoicePaymentTerms: string;
+  invoiceLatePenalty: string;
+  invoiceFooter: string;
 }
 
 export async function getGymInfo(): Promise<GymInfo | null> {
@@ -71,7 +85,7 @@ export async function getGymInfo(): Promise<GymInfo | null> {
   if (!gymId) return null;
   const { data, error } = await supabase
     .from('gyms')
-    .select('name, address, city, postal_code, phone, email, description, pricing, banner_image, features')
+    .select('name, address, city, postal_code, phone, email, description, pricing, banner_image, features, legal_name, legal_form, siret, ape_naf, rcs_city, vat_number, vat_exempt, vat_exempt_mention, iban, bic, invoice_payment_terms, invoice_late_penalty, invoice_footer')
     .eq('id', gymId)
     .single();
   if (error) { console.error('gymApi.getGymInfo', error); return null; }
@@ -86,6 +100,19 @@ export async function getGymInfo(): Promise<GymInfo | null> {
     pricing: data?.pricing ?? '',
     bannerImage: data?.banner_image ?? '',
     features: Array.isArray(data?.features) ? (data!.features as string[]) : [],
+    legalName: data?.legal_name ?? '',
+    legalForm: data?.legal_form ?? '',
+    siret: data?.siret ?? '',
+    apeNaf: data?.ape_naf ?? '',
+    rcsCity: data?.rcs_city ?? '',
+    vatNumber: data?.vat_number ?? '',
+    vatExempt: data?.vat_exempt !== false,
+    vatExemptMention: data?.vat_exempt_mention ?? '',
+    iban: data?.iban ?? '',
+    bic: data?.bic ?? '',
+    invoicePaymentTerms: data?.invoice_payment_terms ?? '',
+    invoiceLatePenalty: data?.invoice_late_penalty ?? '',
+    invoiceFooter: data?.invoice_footer ?? '',
   };
 }
 
@@ -103,6 +130,19 @@ export async function saveGymInfo(p: GymInfo): Promise<void> {
     pricing: p.pricing.trim() || null,
     banner_image: p.bannerImage.trim() || null,
     features: p.features,
+    legal_name: p.legalName.trim() || null,
+    legal_form: p.legalForm.trim() || null,
+    siret: p.siret.replace(/\s+/g, '') || null,
+    ape_naf: p.apeNaf.trim() || null,
+    rcs_city: p.rcsCity.trim() || null,
+    vat_number: p.vatNumber.replace(/\s+/g, '') || null,
+    vat_exempt: p.vatExempt,
+    vat_exempt_mention: p.vatExemptMention.trim() || null,
+    iban: p.iban.replace(/\s+/g, '').toUpperCase() || null,
+    bic: p.bic.replace(/\s+/g, '').toUpperCase() || null,
+    invoice_payment_terms: p.invoicePaymentTerms.trim() || null,
+    invoice_late_penalty: p.invoiceLatePenalty.trim() || null,
+    invoice_footer: p.invoiceFooter.trim() || null,
   }).eq('id', gymId);
   if (error) { console.error('gymApi.saveGymInfo', error); throw error; }
 }

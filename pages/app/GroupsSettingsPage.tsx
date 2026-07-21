@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Layers, Plus, Trash2, Check, X, Edit2, CornerDownRight, Euro, Building2, FileText, Send, Download, RefreshCw, Loader2, CheckCircle2 } from 'lucide-react';
 import { getGroupTree, getGroupsFlat, createGroup, renameGroup, deleteGroup, updateGroupBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
-import { listGroupInvoices, upsertGroupInvoiceDraft, sendGroupInvoice, setGroupInvoiceStatus, getGroupInvoicePdfUrl, monthToPeriod, GroupInvoice } from '../../lib/groupBillingApi';
+import { listGroupInvoices, upsertGroupInvoiceDraft, sendGroupInvoice, setGroupInvoiceStatus, getGroupInvoicePdfUrl, previewGroupInvoice, updateGroupInvoiceBreakdown, monthToPeriod, GroupInvoice, GroupInvoiceLine } from '../../lib/groupBillingApi';
 
 const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [tree, setTree] = useState<GroupNode[]>([]);
@@ -24,6 +24,42 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
   const eur = (n: number) => `${(Number(n) || 0).toFixed(2).replace('.', ',')} €`;
   const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   const periodLabel = (iso: string) => { const d = new Date(iso.slice(0, 10) + 'T00:00:00'); return `${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`; };
+
+  // Édition du détail d'un brouillon (ajustement d'effectif, tarif, ligne libre)
+  const [editLines, setEditLines] = useState<GroupInvoiceLine[] | null>(null);
+  const [editFor, setEditFor] = useState<string | null>(null);
+  const startEditLines = (inv: GroupInvoice) => {
+    setEditFor(inv.id);
+    setEditLines(inv.breakdown.map((l) => ({ ...l })));
+  };
+  const patchLine = (i: number, patch: Partial<GroupInvoiceLine>) =>
+    setEditLines((prev) => prev ? prev.map((l, idx) => idx === i ? { ...l, ...patch } : l) : prev);
+  const addLine = () =>
+    setEditLines((prev) => [...(prev ?? []), { pavillon: '—', label: 'Ligne complémentaire', count: 1, unit_price: 0, amount: 0, is_extra: true }]);
+  const removeLine = (i: number) =>
+    setEditLines((prev) => prev ? prev.filter((_, idx) => idx !== i) : prev);
+  const editTotal = (editLines ?? []).reduce((s2, l) => s2 + (Number(l.count) || 0) * (Number(l.unit_price) || 0), 0);
+  const saveLines = async (inv: GroupInvoice) => {
+    if (!editLines) return;
+    setInvBusy(true);
+    try {
+      await updateGroupInvoiceBreakdown(inv.id, editLines);
+      setEditFor(null); setEditLines(null);
+      await reloadInvoices(inv.group_id);
+    } catch (e: any) { alert(e?.message || 'Enregistrement impossible.'); }
+    finally { setInvBusy(false); }
+  };
+  const openPreview = async (inv: GroupInvoice) => {
+    setInvSending(inv.id);
+    try {
+      const r = await previewGroupInvoice(inv.id);
+      if (!r.ok || !r.pdf_path) { alert(r.error || 'Aperçu impossible.'); return; }
+      const url = await getGroupInvoicePdfUrl(r.pdf_path);
+      if (url) window.open(url, '_blank'); else alert('PDF indisponible.');
+      await reloadInvoices(inv.group_id);
+    } catch (e: any) { alert(e?.message || 'Aperçu impossible.'); }
+    finally { setInvSending(null); }
+  };
 
   const openInvoices = async (groupId: string) => {
     if (invoicesFor === groupId) { setInvoicesFor(null); return; }
@@ -290,7 +326,50 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                               <span className="ml-auto text-sm font-bold text-gray-900">{eur(inv.total_amount)}</span>
                             </div>
                             <div className="mt-1 text-[12px] text-gray-500">{inv.member_count} adhérent{inv.member_count > 1 ? 's' : ''} · {inv.payer_name || '—'}</div>
-                            {inv.breakdown.length > 0 && (
+                            {editFor === inv.id && editLines ? (
+                              <div className="mt-2 border border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/30">
+                                <div className="px-2.5 py-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50">Modification du détail</div>
+                                <div className="divide-y divide-indigo-100/60">
+                                  {editLines.map((l, i) => (
+                                    <div key={i} className="flex flex-wrap items-center gap-1.5 px-2.5 py-2">
+                                      <input value={l.label} onChange={(e) => patchLine(i, { label: e.target.value })}
+                                        placeholder="Libellé"
+                                        className="flex-1 min-w-[110px] bg-white border border-gray-200 rounded-md px-2 py-1 text-[12px] outline-none" />
+                                      <input value={l.pavillon} onChange={(e) => patchLine(i, { pavillon: e.target.value })}
+                                        placeholder="Pavillon"
+                                        className="w-28 bg-white border border-gray-200 rounded-md px-2 py-1 text-[12px] outline-none" />
+                                      <input type="number" min="0" value={l.count}
+                                        onChange={(e) => patchLine(i, { count: Number(e.target.value) })}
+                                        className="w-16 bg-white border border-gray-200 rounded-md px-2 py-1 text-[12px] text-right outline-none" />
+                                      <span className="text-gray-400 text-[12px]">×</span>
+                                      <input type="number" step="0.01" min="0" value={l.unit_price}
+                                        onChange={(e) => patchLine(i, { unit_price: Number(e.target.value) })}
+                                        className="w-20 bg-white border border-gray-200 rounded-md px-2 py-1 text-[12px] text-right outline-none" />
+                                      <span className="font-semibold text-gray-800 w-20 text-right text-[12px]">
+                                        {eur((Number(l.count) || 0) * (Number(l.unit_price) || 0))}
+                                      </span>
+                                      <label className="flex items-center gap-1 text-[11px] text-gray-500 cursor-pointer" title="Ligne complémentaire : exclue du nombre d'adhérents facturés">
+                                        <input type="checkbox" checked={!!l.is_extra}
+                                          onChange={(e) => patchLine(i, { is_extra: e.target.checked })}
+                                          className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600" />
+                                        hors effectif
+                                      </label>
+                                      <button onClick={() => removeLine(i)} className="p-1 text-gray-300 hover:text-red-600"><Trash2 size={13} /></button>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 px-2.5 py-2 border-t border-indigo-100">
+                                  <button onClick={addLine} className="flex items-center gap-1 text-[12px] font-semibold text-indigo-600 hover:underline"><Plus size={13} /> Ajouter une ligne</button>
+                                  <span className="ml-auto text-[13px] font-bold text-gray-900">Total : {eur(editTotal)}</span>
+                                </div>
+                                <div className="flex items-center gap-2 px-2.5 pb-2.5">
+                                  <button onClick={() => saveLines(inv)} disabled={invBusy}
+                                    className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-indigo-700 disabled:opacity-50">Enregistrer</button>
+                                  <button onClick={() => { setEditFor(null); setEditLines(null); }}
+                                    className="text-[13px] font-medium text-gray-500 px-2 py-1.5">Annuler</button>
+                                </div>
+                              </div>
+                            ) : inv.breakdown.length > 0 ? (
                               <div className="mt-2 divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
                                 {inv.breakdown.map((l, i) => (
                                   <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[12px]">
@@ -300,8 +379,20 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                                   </div>
                                 ))}
                               </div>
-                            )}
-                            <div className="flex items-center gap-2 mt-2.5">
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                              {inv.status === 'draft' && editFor !== inv.id && (
+                                <button onClick={() => startEditLines(inv)} disabled={invBusy}
+                                  className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50 disabled:opacity-50">
+                                  <Edit2 size={13} /> Modifier
+                                </button>
+                              )}
+                              {inv.status === 'draft' && (
+                                <button onClick={() => openPreview(inv)} disabled={invSending === inv.id}
+                                  className="flex items-center gap-1.5 bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-indigo-50 disabled:opacity-50">
+                                  {invSending === inv.id ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} Aperçu PDF
+                                </button>
+                              )}
                               {(inv.status === 'draft' || inv.status === 'sent') && (
                                 <button onClick={() => sendInvoice(inv)} disabled={invSending === inv.id} className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-emerald-700 disabled:opacity-50">
                                   {invSending === inv.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} {inv.status === 'sent' ? 'Renvoyer' : 'Générer & envoyer'}

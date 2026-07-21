@@ -6,6 +6,8 @@ export interface GroupInvoiceLine {
   unit_price: number;
   label: string;
   amount: number;
+  /** Ligne complémentaire (frais, remise…) : exclue du nombre d'adhérents facturés. */
+  is_extra?: boolean;
 }
 
 export interface GroupInvoice {
@@ -56,6 +58,22 @@ export async function upsertGroupInvoiceDraft(groupId: string, period: string): 
 }
 
 /** Génère le PDF, le stocke et l'envoie par e-mail à l'association (via edge function). */
+/** Génère un PDF d'aperçu (sans numéro définitif ni envoi) pour vérification. */
+export async function previewGroupInvoice(invoiceId: string): Promise<{ ok: boolean; pdf_path?: string; error?: string }> {
+  const { data, error } = await supabase.functions.invoke('group-invoice', { body: { invoice_id: invoiceId, preview: true } });
+  if (error) { console.error('previewGroupInvoice', error); return { ok: false, error: error.message }; }
+  if ((data as any)?.error) return { ok: false, error: (data as any).error };
+  return { ok: true, pdf_path: (data as any)?.pdf_path };
+}
+
+/** Remplace le détail d'un brouillon (total et effectif recalculés côté base). */
+export async function updateGroupInvoiceBreakdown(invoiceId: string, lines: GroupInvoiceLine[]): Promise<GroupInvoice | null> {
+  const { data, error } = await supabase.rpc('update_group_invoice_breakdown', { p_id: invoiceId, p_breakdown: lines });
+  if (error) { console.error('updateGroupInvoiceBreakdown', error); throw error; }
+  const r = Array.isArray(data) ? data[0] : data;
+  return r ? mapRow(r) : null;
+}
+
 export async function sendGroupInvoice(invoiceId: string, email = true): Promise<{ ok: boolean; invoice_number?: string; emailed?: boolean; email_reason?: string | null; error?: string }> {
   const { data, error } = await supabase.functions.invoke('group-invoice', { body: { invoice_id: invoiceId, email } });
   if (error) { console.error('sendGroupInvoice', error); return { ok: false, error: error.message }; }

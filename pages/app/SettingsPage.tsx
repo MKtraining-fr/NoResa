@@ -36,6 +36,8 @@ const COVER_PRESETS = [
   }
 ];
 
+const FIELD = 'w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 disabled:opacity-50';
+
 const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
   const [activeSection, setActiveSection] = useState(section);
   const [gyms, setGyms] = useState<ExtendedGym[]>([]);
@@ -52,6 +54,12 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
   const [gymPricing, setGymPricing] = useState('');
   const [gymBanner, setGymBanner] = useState('');
   const [infoBusy, setInfoBusy] = useState(false);
+  // Mentions légales / bancaires (reprises sur les factures PDF)
+  const [legal, setLegal] = useState({
+    legalName: '', legalForm: '', siret: '', apeNaf: '', rcsCity: '', vatNumber: '',
+    vatExempt: true, vatExemptMention: '', iban: '', bic: '',
+    invoicePaymentTerms: '', invoiceLatePenalty: '', invoiceFooter: '',
+  });
   
   // Hours and Features Lists State
   const [gymHours, setGymHours] = useState<{ [key: string]: string }>({});
@@ -104,6 +112,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
       setGymPricing(info.pricing);
       setGymBanner(info.bannerImage);
       setGymFeatures(info.features);
+      setLegal({
+        legalName: info.legalName, legalForm: info.legalForm, siret: info.siret,
+        apeNaf: info.apeNaf, rcsCity: info.rcsCity, vatNumber: info.vatNumber,
+        vatExempt: info.vatExempt, vatExemptMention: info.vatExemptMention,
+        iban: info.iban, bic: info.bic,
+        invoicePaymentTerms: info.invoicePaymentTerms,
+        invoiceLatePenalty: info.invoiceLatePenalty, invoiceFooter: info.invoiceFooter,
+      });
     }).catch(() => {});
   }, []);
 
@@ -146,6 +162,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
         pricing: gymPricing,
         bannerImage: gymBanner,
         features: gymFeatures,
+        ...legal,
       });
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -491,6 +508,102 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ section = 'salle' }) => {
                   <span>Ajouter</span>
                 </button>
               </div>
+            </div>
+
+            {/* Mentions légales & coordonnées bancaires (reprises sur les factures PDF) */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+              <div className="flex items-center space-x-3">
+                <div className="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl"><ShieldCheck size={20} /></div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Facturation & mentions légales</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Ces informations apparaissent sur vos factures PDF</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Raison sociale</label>
+                  <input type="text" value={legal.legalName} onChange={(e) => setLegal(v => ({ ...v, legalName: e.target.value }))}
+                    placeholder="A.R.A.P.S" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Forme juridique</label>
+                  <input type="text" value={legal.legalForm} onChange={(e) => setLegal(v => ({ ...v, legalForm: e.target.value }))}
+                    placeholder="Association loi 1901" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">SIRET</label>
+                  <input type="text" value={legal.siret} onChange={(e) => setLegal(v => ({ ...v, siret: e.target.value }))}
+                    placeholder="123 456 789 00012" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Code APE / NAF</label>
+                  <input type="text" value={legal.apeNaf} onChange={(e) => setLegal(v => ({ ...v, apeNaf: e.target.value }))}
+                    placeholder="9311Z" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Ville du RCS (si société)</label>
+                  <input type="text" value={legal.rcsCity} onChange={(e) => setLegal(v => ({ ...v, rcsCity: e.target.value }))}
+                    placeholder="Carcassonne" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">N° TVA intracom. (si assujetti)</label>
+                  <input type="text" value={legal.vatNumber} onChange={(e) => setLegal(v => ({ ...v, vatNumber: e.target.value }))}
+                    placeholder="FR12345678900" className={FIELD} disabled={legal.vatExempt} />
+                </div>
+              </div>
+
+              <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-slate-50/60 border border-slate-100 cursor-pointer">
+                <input type="checkbox" checked={legal.vatExempt}
+                  onChange={(e) => setLegal(v => ({ ...v, vatExempt: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 shrink-0" />
+                <span className="flex-1">
+                  <span className="block text-xs font-bold text-gray-900">Non assujetti à la TVA</span>
+                  <span className="block text-[11px] text-gray-500 mt-0.5">Cas courant des associations. La mention légale est imprimée sur la facture.</span>
+                </span>
+              </label>
+
+              {legal.vatExempt && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mention d'exonération</label>
+                  <input type="text" value={legal.vatExemptMention} onChange={(e) => setLegal(v => ({ ...v, vatExemptMention: e.target.value }))}
+                    placeholder="TVA non applicable, art. 293 B du CGI" className={FIELD} />
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-50">
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">IBAN (pour les virements)</label>
+                  <input type="text" value={legal.iban} onChange={(e) => setLegal(v => ({ ...v, iban: e.target.value }))}
+                    placeholder="FR76 1234 5678 9012 3456 7890 123" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">BIC</label>
+                  <input type="text" value={legal.bic} onChange={(e) => setLegal(v => ({ ...v, bic: e.target.value }))}
+                    placeholder="AGRIFRPP123" className={FIELD} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Conditions de règlement</label>
+                  <input type="text" value={legal.invoicePaymentTerms} onChange={(e) => setLegal(v => ({ ...v, invoicePaymentTerms: e.target.value }))}
+                    placeholder="Paiement à 30 jours par virement" className={FIELD} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pénalités de retard</label>
+                  <input type="text" value={legal.invoiceLatePenalty} onChange={(e) => setLegal(v => ({ ...v, invoiceLatePenalty: e.target.value }))}
+                    placeholder="Pénalités de retard : 3× le taux d'intérêt légal…" className={FIELD} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Pied de page de la facture</label>
+                <textarea rows={2} value={legal.invoiceFooter} onChange={(e) => setLegal(v => ({ ...v, invoiceFooter: e.target.value }))}
+                  placeholder="Mentions complémentaires affichées en bas de facture" className={FIELD + ' resize-none'} />
+              </div>
+
+              <p className="text-[11px] text-gray-400">Enregistrez avec le bouton « Sauvegarder » en haut de page.</p>
             </div>
 
             {/* Hours Customization Grid */}
