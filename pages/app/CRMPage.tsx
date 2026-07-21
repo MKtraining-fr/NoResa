@@ -34,6 +34,34 @@ interface CRMPageProps {
   tab?: string;
 }
 
+
+/** Minuscules + accents supprimés, pour comparer sans se soucier de la saisie. */
+const norm = (v: string) =>
+  (v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+/** Distance de Levenshtein bornée : sert à rattraper une faute de frappe. */
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/** Tolérance proportionnelle : 1 faute dès 4 caractères, 2 dès 8. */
+function closeEnough(token: string, word: string): boolean {
+  if (word.length < 4) return token.startsWith(word);
+  if (token.startsWith(word.slice(0, Math.max(3, word.length - 2)))) return true;
+  const allowed = word.length >= 8 ? 2 : 1;
+  return editDistance(token, word) <= allowed;
+}
+
 const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [activeTab, setActiveTab] = useState(tab);
   const [selectedContact, setSelectedContact] = useState<any | null>(null);
@@ -865,15 +893,18 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     }
 
     if (searchTerm.trim() !== '') {
-      const query = searchTerm.toLowerCase();
-      filtered = filtered.filter(m => 
-        m.firstName.toLowerCase().includes(query) || 
-        m.lastName.toLowerCase().includes(query) ||
-        (m.memberNumber && m.memberNumber.toLowerCase().includes(query)) ||
-        (m.email && m.email.toLowerCase().includes(query)) ||
-        (m.phone && m.phone.toLowerCase().includes(query)) ||
-        (m.notes && m.notes.toLowerCase().includes(query))
-      );
+      // Recherche souple : accents ignorés, groupe/sous-groupe inclus, et
+      // rattrapage des fautes de frappe (distance de Levenshtein sur les mots).
+      const words = norm(searchTerm).split(/\s+/).filter(Boolean);
+      filtered = filtered.filter((m) => {
+        const hay = norm([
+          m.firstName, m.lastName, m.memberNumber, m.email, m.phone, m.notes,
+          (m as any).groupName, (m as any).subgroupName, (m as any).cardNumber,
+        ].filter(Boolean).join(' '));
+        const tokens = hay.split(/\s+/).filter((t) => t.length > 2);
+        return words.every((w) =>
+          hay.includes(w) || tokens.some((t) => closeEnough(t, w)));
+      });
     }
 
     if (filterGroup) {

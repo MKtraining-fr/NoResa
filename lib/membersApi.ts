@@ -499,10 +499,20 @@ export async function getPhotoUrl(path?: string | null): Promise<string | null> 
 // --- Recherche --------------------------------------------------------------
 
 /** Recherche de membres par mot partiel : nom, prénom, email, téléphone ou n° client. */
+/**
+ * Recherche d'adhérents, tolérante : insensible aux accents et à la casse,
+ * tolérante aux fautes de frappe, et étendue au groupe / sous-groupe
+ * (taper « anras » remonte tous les adhérents rattachés).
+ * Le classement par pertinence est calculé côté base (search_member_ids).
+ */
 export async function searchMembers(query: string, limit = 8): Promise<Member[]> {
-  const q = query.trim().replace(/,/g, ' ');
+  const q = query.trim();
   if (!q) return [];
-  const like = `%${q}%`;
+  const { data: ids, error: idErr } = await supabase.rpc('search_member_ids', { p_query: q, p_limit: limit });
+  if (idErr) { console.error('membersApi.searchMembers', idErr); return []; }
+  const order: string[] = (ids ?? []).map((r: any) => r.id);
+  if (order.length === 0) return [];
+
   const { data, error } = await supabase
     .from('members')
     .select(
@@ -511,16 +521,12 @@ export async function searchMembers(query: string, limit = 8): Promise<Member[]>
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
     )
-    .or(
-      `first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},member_number.ilike.${like}`
-    )
-    .is('archived_at', null)
-    .limit(limit);
-  if (error) {
-    console.error('membersApi.searchMembers', error);
-    return [];
-  }
-  return (data ?? []).map(rowToMember);
+    .in('id', order);
+  if (error) { console.error('membersApi.searchMembers', error); return []; }
+
+  // On respecte l'ordre de pertinence renvoyé par la base.
+  const byId = new Map((data ?? []).map((r: any) => [r.id, rowToMember(r)]));
+  return order.map((id) => byId.get(id)).filter(Boolean) as Member[];
 }
 
 export interface DashboardStats {
