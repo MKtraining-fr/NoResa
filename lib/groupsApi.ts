@@ -13,6 +13,8 @@ export interface MemberGroup {
   unitPrice?: number | null;
   formulaLabel?: string | null;
   prorata?: boolean;
+  /** Ne facturer que les adhérents venus au moins une fois dans le mois facturé. */
+  billOnlyAttendees?: boolean;
 }
 
 /** Règle de facturation effective d'un membre (sous-groupe surcharge le groupe). */
@@ -35,7 +37,7 @@ export interface GroupNode {
 export async function getGroupsFlat(): Promise<MemberGroup[]> {
   const { data, error } = await supabase
     .from('member_groups')
-    .select('id, name, parent_id, billed_to_third_party, payer_name, billing_email, billing_address, unit_price, formula_label, prorata')
+    .select('id, name, parent_id, billed_to_third_party, payer_name, billing_email, billing_address, unit_price, formula_label, prorata, bill_only_attendees')
     .order('name', { ascending: true });
   if (error) { console.error('getGroupsFlat', error); return []; }
   return (data ?? []).map((r: any) => ({
@@ -47,6 +49,7 @@ export async function getGroupsFlat(): Promise<MemberGroup[]> {
     unitPrice: r.unit_price != null ? Number(r.unit_price) : null,
     formulaLabel: r.formula_label ?? null,
     prorata: r.prorata ?? true,
+    billOnlyAttendees: r.bill_only_attendees ?? false,
   }));
 }
 
@@ -54,6 +57,7 @@ export async function getGroupsFlat(): Promise<MemberGroup[]> {
 export async function updateGroupBillingRule(id: string, rule: {
   billedToThirdParty: boolean; payerName?: string | null; billingEmail?: string | null;
   billingAddress?: string | null; unitPrice?: number | null; formulaLabel?: string | null; prorata?: boolean;
+  billOnlyAttendees?: boolean;
 }): Promise<void> {
   const { error } = await supabase.from('member_groups').update({
     billed_to_third_party: rule.billedToThirdParty,
@@ -63,6 +67,7 @@ export async function updateGroupBillingRule(id: string, rule: {
     unit_price: rule.unitPrice ?? null,
     formula_label: rule.formulaLabel?.trim() || null,
     prorata: rule.prorata ?? true,
+    bill_only_attendees: rule.billOnlyAttendees ?? false,
   }).eq('id', id);
   if (error) { console.error('updateGroupBillingRule', error); throw error; }
 }

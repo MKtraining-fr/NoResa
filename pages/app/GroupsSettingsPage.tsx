@@ -13,7 +13,7 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
   const [busy, setBusy] = useState(false);
   const [flat, setFlat] = useState<MemberGroup[]>([]);
   const [billingFor, setBillingFor] = useState<string | null>(null);
-  const [bForm, setBForm] = useState({ billedToThirdParty: false, payerName: '', billingEmail: '', billingAddress: '', unitPrice: '', formulaLabel: '', prorata: true });
+  const [bForm, setBForm] = useState({ billedToThirdParty: false, payerName: '', billingEmail: '', billingAddress: '', unitPrice: '', formulaLabel: '', prorata: true, billOnlyAttendees: false });
   // Factures association
   const [invoicesFor, setInvoicesFor] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<GroupInvoice[]>([]);
@@ -143,6 +143,7 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
       unitPrice: r?.unitPrice != null ? String(r.unitPrice) : '',
       formulaLabel: r?.formulaLabel ?? '',
       prorata: r?.prorata ?? true,
+      billOnlyAttendees: r?.billOnlyAttendees ?? false,
     });
     setSubBillingFor(null);
     setBillingFor((cur) => (cur === groupId ? null : groupId));
@@ -156,6 +157,7 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
         payerName: bForm.payerName, billingEmail: bForm.billingEmail, billingAddress: bForm.billingAddress,
         unitPrice: bForm.unitPrice ? Number(bForm.unitPrice) : null,
         formulaLabel: bForm.formulaLabel, prorata: bForm.prorata,
+        billOnlyAttendees: bForm.billOnlyAttendees,
       });
       setBillingFor(null); await load();
     } catch { alert('Enregistrement impossible.'); } finally { setBusy(false); }
@@ -281,6 +283,18 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                         <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Libellé de formule (imposé)</label>
                         <input value={bForm.formulaLabel} onChange={(e) => setBForm((f) => ({ ...f, formulaLabel: e.target.value }))} placeholder={`Accès ${g.name}`} className="w-full mt-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
                       </div>
+                      <label className="sm:col-span-2 flex items-start gap-2 cursor-pointer p-2.5 rounded-xl bg-white border border-gray-200">
+                        <input type="checkbox" checked={bForm.billOnlyAttendees}
+                          onChange={(e) => setBForm((f) => ({ ...f, billOnlyAttendees: e.target.checked }))}
+                          className="mt-0.5 w-4 h-4 rounded border-gray-300 text-indigo-600 shrink-0" />
+                        <span>
+                          <span className="block text-[12px] font-bold text-gray-800">Facturer à la fréquentation</span>
+                          <span className="block text-[11px] text-gray-500">
+                            Seuls les adhérents ayant badgé au moins une fois dans le mois sont facturés.
+                            La facture est alors établie à mois échu (le 1er, pour le mois précédent).
+                          </span>
+                        </span>
+                      </label>
                       <label className="sm:col-span-2 flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={bForm.prorata} onChange={(e) => setBForm((f) => ({ ...f, prorata: e.target.checked }))} className="w-4 h-4 rounded border-gray-300 text-indigo-600" />
                         <span className="text-[12px] text-gray-600">Facturer au prorata pour les entrées/sorties en cours de mois</span>
