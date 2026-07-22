@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { norm, closeEnough } from '../../lib/fuzzy';
 import { 
   Search, Filter, MoreHorizontal, UserPlus, Mail, Phone, 
   Target, UserCheck, Briefcase, X, Save, Calendar, 
@@ -34,33 +35,6 @@ interface CRMPageProps {
   tab?: string;
 }
 
-
-/** Minuscules + accents supprimés, pour comparer sans se soucier de la saisie. */
-const norm = (v: string) =>
-  (v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-
-/** Distance de Levenshtein bornée : sert à rattraper une faute de frappe. */
-function editDistance(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  if (!m) return n; if (!n) return m;
-  let prev = Array.from({ length: n + 1 }, (_, i) => i);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    }
-    prev = cur;
-  }
-  return prev[n];
-}
-
-/** Tolérance proportionnelle : 1 faute dès 4 caractères, 2 dès 8. */
-function closeEnough(token: string, word: string): boolean {
-  if (word.length < 4) return token.startsWith(word);
-  if (token.startsWith(word.slice(0, Math.max(3, word.length - 2)))) return true;
-  const allowed = word.length >= 8 ? 2 : 1;
-  return editDistance(token, word) <= allowed;
-}
 
 const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [activeTab, setActiveTab] = useState(tab);

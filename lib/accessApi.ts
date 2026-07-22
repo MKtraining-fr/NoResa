@@ -101,10 +101,10 @@ export interface AccessEntry {
   qr_code: string | null;
   device_sn: string | null;
   member_id: string | null;
-  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null; notes: string | null } | null;
+  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null; notes: string | null; group_name: string | null; subgroup_name: string | null } | null;
 }
 
-const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path, notes)';
+const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path, notes, group_name, subgroup_name)';
 
 /** Entrées du jour (passages enregistrés depuis minuit), plus récentes d'abord. */
 export async function getTodayEntries(): Promise<AccessEntry[]> {
@@ -135,7 +135,8 @@ export async function getEntriesBetween(
     .lte('access_datetime', toIso)
     .order('access_datetime', { ascending: false })
     .limit(opts.limit ?? 1000);
-  if (opts.memberIds && opts.memberIds.length > 0) q = q.in('member_id', opts.memberIds);
+  // Liste fournie mais vide (groupe sans adhérent) => aucun passage, et surtout pas « tous ».
+  if (opts.memberIds) q = q.in('member_id', opts.memberIds);
   if (opts.status) q = q.eq('status', opts.status);
   const { data, error } = await q;
   if (error) { console.error('getEntriesBetween', error); return []; }

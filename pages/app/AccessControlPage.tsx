@@ -7,6 +7,7 @@ import {
 import { searchMembers } from '../../lib/membersApi';
 import type { Member } from '../../types';
 import { getGroupTree, getMemberIdsInGroup, GroupNode } from '../../lib/groupsApi';
+import { fuzzyMatch } from '../../lib/fuzzy';
 import MemberProfileModal from './MemberProfileModal';
 
 const fmtTime = (s: string) => new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -88,16 +89,15 @@ const AccessControlPage: React.FC = () => {
     try { await reviewAlert(id, status); } catch { load(); }
   };
 
-  // Recherche texte (nom / n° client / badge) — filtre côté client sur les passages chargés
+  // Recherche texte — côté client sur les passages chargés. Souple (accents et
+  // fautes de frappe tolérés) et étendue au groupe / sous-groupe : taper « anras »
+  // remonte tous les passages des adhérents rattachés.
   const shownEntries = useMemo(() => {
-    const q = textSearch.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter((e) => {
-      const name = `${e.member?.first_name || ''} ${e.member?.last_name || ''}`.toLowerCase();
-      return name.includes(q)
-        || (e.member?.member_number || '').toLowerCase().includes(q)
-        || (e.card_number || '').toLowerCase().includes(q);
-    });
+    if (!textSearch.trim()) return entries;
+    return entries.filter((e) => fuzzyMatch(textSearch, [
+      e.member?.first_name, e.member?.last_name, e.member?.member_number,
+      e.member?.group_name, e.member?.subgroup_name, e.card_number,
+    ]));
   }, [entries, textSearch]);
 
   // Le brouillon diffère-t-il des filtres appliqués ? (pour activer « Valider »)
@@ -214,7 +214,7 @@ const AccessControlPage: React.FC = () => {
         {/* Recherche texte : nom / n° client / badge */}
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-          <input value={textSearch} onChange={(e) => setTextSearch(e.target.value)} placeholder="Nom, n° client ou badge…" className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <input value={textSearch} onChange={(e) => setTextSearch(e.target.value)} placeholder="Nom, n° client, badge ou groupe…" className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -232,8 +232,15 @@ const AccessControlPage: React.FC = () => {
       {loading && entries.length === 0 ? (
         <div className="py-16 text-center text-gray-400 text-sm">Chargement…</div>
       ) : shownEntries.length === 0 ? (
-        <div className="py-16 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-2xl">
-          {textSearch.trim() ? 'Aucun passage ne correspond à la recherche.' : 'Aucun passage sur cette période.'}
+        <div className="py-16 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-2xl space-y-1">
+          <p>{textSearch.trim() ? 'Aucun passage ne correspond à la recherche.' : 'Aucun passage sur cette période.'}</p>
+          {/* Un groupe filtré sur une seule journée donne souvent 0 : on le dit plutôt que de laisser croire à un bug. */}
+          {!textSearch.trim() && applied.groupName && (
+            <p className="text-[12px]">
+              Filtre actif : {applied.groupName}{applied.subgroupName ? ` › ${applied.subgroupName}` : ''}.
+              Élargis la période si tu attendais des passages.
+            </p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
