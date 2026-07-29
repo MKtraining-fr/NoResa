@@ -164,14 +164,38 @@ export async function getPresentCount(windowMinutes = 90): Promise<number> {
   return seen.size;
 }
 
+// Cache des URL signées, partagé entre les rafraîchissements. Sans lui, chaque
+// appel régénère une URL différente pour la même photo : le navigateur ne peut
+// plus réutiliser son cache et re-télécharge toutes les images (grosse consommation
+// d'egress sur un écran qui se rafraîchit toutes les 30 s). On réutilise l'URL tant
+// qu'il lui reste une marge confortable de validité.
+const SIGNED_TTL_S = 3600;
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
 /** Résout en une fois les URL (signées) d'un lot de chemins de photos. */
 export async function resolvePhotoUrls(paths: (string | null | undefined)[]): Promise<Record<string, string>> {
   const unique = Array.from(new Set(paths.filter((p): p is string => !!p)));
-  if (unique.length === 0) return {};
-  const { data, error } = await supabase.storage.from('member-photos').createSignedUrls(unique, 3600);
   const map: Record<string, string> = {};
+  if (unique.length === 0) return map;
+
+  const now = Date.now();
+  const toFetch: string[] = [];
+  for (const p of unique) {
+    const hit = signedUrlCache.get(p);
+    // Encore valable plus de 5 min → on garde la même URL (cache navigateur préservé).
+    if (hit && hit.expiresAt - now > 5 * 60_000) map[p] = hit.url;
+    else toFetch.push(p);
+  }
+  if (toFetch.length === 0) return map;
+
+  const { data, error } = await supabase.storage.from('member-photos').createSignedUrls(toFetch, SIGNED_TTL_S);
   if (error) { console.error('resolvePhotoUrls', error); return map; }
-  (data ?? []).forEach((d: any) => { if (d?.path && d?.signedUrl) map[d.path] = d.signedUrl; });
+  (data ?? []).forEach((d: any) => {
+    if (d?.path && d?.signedUrl) {
+      map[d.path] = d.signedUrl;
+      signedUrlCache.set(d.path, { url: d.signedUrl, expiresAt: now + SIGNED_TTL_S * 1000 });
+    }
+  });
   return map;
 }
 
