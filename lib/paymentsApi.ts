@@ -23,3 +23,23 @@ export async function getMemberPayments(memberId: string, limit = 50): Promise<M
   if (error) { console.error('getMemberPayments', error); return []; }
   return (data ?? []) as MemberPayment[];
 }
+
+/** Modes de régularisation proposés (libellé → code stocké, conforme à la contrainte payments). */
+export const REGULARIZE_METHODS: { code: 'cash' | 'credit_card' | 'bank_transfer'; label: string }[] = [
+  { code: 'cash', label: 'Espèces' },
+  { code: 'credit_card', label: 'CB' },
+  { code: 'bank_transfer', label: 'Virement' },
+];
+
+/**
+ * Régularise un ou plusieurs impayés (paiements en échec) : marque l'échec comme
+ * régularisé (conservé en historique) et crée la ligne encaissée (mode + date choisis),
+ * qui entre alors dans le CA. Renvoie le nombre de lignes régularisées.
+ */
+export async function regularizePayments(
+  ids: string[], method: 'cash' | 'credit_card' | 'bank_transfer', date: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc('regularize_payments', { p_ids: ids, p_method: method, p_date: date });
+  if (error) { console.error('regularizePayments', error); throw error; }
+  return (data as number) ?? 0;
+}

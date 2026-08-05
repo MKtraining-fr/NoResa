@@ -15,7 +15,7 @@ import {
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
-import { getMemberPayments, type MemberPayment } from '../../lib/paymentsApi';
+import { getMemberPayments, regularizePayments, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
@@ -48,6 +48,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [memberSales, setMemberSales] = useState<any[]>([]);
   const [memberContracts, setMemberContracts] = useState<any[]>([]);
   const [memberPayments, setMemberPayments] = useState<MemberPayment[]>([]);
+  // Régularisation des impayés : sélection de lignes + mode/date d'encaissement.
+  const [regulSel, setRegulSel] = useState<Set<string>>(new Set<string>());
+  const [regulMethod, setRegulMethod] = useState<'cash' | 'credit_card' | 'bank_transfer'>('cash');
+  const [regulDate, setRegulDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [regulBusy, setRegulBusy] = useState(false);
   const [memberGcPayments, setMemberGcPayments] = useState<GocardlessPayment[]>([]);
   const [gcPaymentsLoading, setGcPaymentsLoading] = useState(false);
   const [memberVisits, setMemberVisits] = useState<MemberVisit[]>([]);
@@ -374,6 +379,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [blockReason, setBlockReason] = useState('');
   const openBlockModal = () => { setBlockReason((selectedContact as any)?.accessBlockReason || ''); setBlockModalOpen(true); };
 
+  // Régularise les impayés sélectionnés (encaissement enregistré au mode + date choisis).
+  const regularizeSelected = async () => {
+    if (!selectedContact || regulSel.size === 0) return;
+    const ids = memberPayments.filter((p) => regulSel.has(p.id)).map((p) => p.id);
+    setRegulBusy(true);
+    try {
+      const n = await regularizePayments(ids, regulMethod, regulDate);
+      setRegulSel(new Set<string>());
+      setMemberPayments(await getMemberPayments(selectedContact.id));
+      const mLabel = REGULARIZE_METHODS.find((m) => m.code === regulMethod)?.label || '';
+      alert(`${n} impayé(s) régularisé(s) (${mLabel}, ${new Date(regulDate).toLocaleDateString('fr-FR')}).`);
+    } catch (e: any) {
+      alert(e?.message || 'Régularisation impossible.');
+    } finally { setRegulBusy(false); }
+  };
+
   const sendAccess = async (action: 'grant' | 'unblock' | 'revoke') => {
     if (!selectedContact) return;
     const pin = selectedContact.memberNumber ? String(selectedContact.memberNumber) : '';
@@ -504,6 +525,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   // Charge l'historique d'achats du client
   useEffect(() => {
     let active = true;
+    setRegulSel(new Set<string>()); // repart d'une sélection vide à chaque fiche
     if (selectedContact?.id) {
       getMemberSales(selectedContact.id).then((s) => { if (active) setMemberSales(s); });
       getMemberContracts(selectedContact.id).then((c) => { if (active) setMemberContracts(c); });
@@ -1865,23 +1887,55 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {/* Paiements */}
                   <div className="space-y-3">
                     <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
+
+                    {/* Barre de régularisation des impayés cochés */}
+                    {regulSel.size > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-2xl px-3 py-2.5">
+                        <span className="text-[11px] font-bold text-indigo-700">{regulSel.size} impayé(s) — régulariser en</span>
+                        <select value={regulMethod} onChange={(e) => setRegulMethod(e.target.value as any)} className="bg-white border border-indigo-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none">
+                          {REGULARIZE_METHODS.map((m) => <option key={m.code} value={m.code}>{m.label}</option>)}
+                        </select>
+                        <span className="text-[11px] font-bold text-indigo-700">le</span>
+                        <input type="date" value={regulDate} onChange={(e) => setRegulDate(e.target.value)} className="bg-white border border-indigo-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none" />
+                        <button type="button" onClick={regularizeSelected} disabled={regulBusy} className="ml-auto flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50">
+                          <CheckCircle2 size={13} /> {regulBusy ? 'Validation…' : 'Valider'}
+                        </button>
+                        <button type="button" onClick={() => setRegulSel(new Set<string>())} className="text-[11px] font-bold text-indigo-400 hover:text-indigo-600 px-1">Annuler</button>
+                      </div>
+                    )}
+
                     {memberPayments.length === 0 ? (
                       <p className="text-xs font-bold text-gray-400 px-1">Aucun paiement enregistré pour ce membre.</p>
                     ) : (
                       <div className="space-y-2">
                         {memberPayments.map((pay) => {
-                          const ok = (pay.status || '').toLowerCase() === 'paid' || (pay.status || '').toLowerCase() === 'completed' || (pay.status || '').toLowerCase() === 'confirmed';
-                          const failed = (pay.status || '').toLowerCase() === 'failed' || (pay.status || '').toLowerCase() === 'cancelled';
+                          const st = (pay.status || '').toLowerCase();
+                          const ok = st === 'succeeded' || st === 'paid' || st === 'completed' || st === 'confirmed';
+                          const impaye = st === 'failed';                 // seul l'impayé est régularisable
+                          const history = st === 'cancelled';             // régularisé / écarté : conservé en historique
+                          const selected = regulSel.has(pay.id);
+                          const method = ({ cash: 'Espèces', credit_card: 'CB', sepa_debit: 'Prélèvement', bank_transfer: 'Virement', stripe: 'Carte' } as Record<string, string>)[pay.payment_method || ''] || pay.payment_method;
+                          const badge = ok ? { c: 'bg-green-100 text-green-700', t: 'Payé' }
+                            : impaye ? { c: 'bg-red-100 text-red-700', t: 'Impayé' }
+                            : history ? { c: 'bg-gray-100 text-gray-500', t: 'Historique' }
+                            : { c: 'bg-amber-100 text-amber-700', t: pay.status || '' };
                           return (
-                            <div key={pay.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl gap-3">
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-gray-900 capitalize truncate">{pay.payment_type || 'Paiement'}{pay.payment_method ? ` · ${pay.payment_method}` : ''}</p>
-                                <p className="text-[11px] font-bold text-gray-400">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}</p>
+                            <div key={pay.id} className={`flex items-center justify-between p-4 bg-white border rounded-2xl gap-3 ${impaye && selected ? 'border-indigo-300 ring-2 ring-indigo-500/10' : 'border-gray-100'}`}>
+                              <div className="flex items-center gap-3 min-w-0">
+                                {impaye && (
+                                  <input type="checkbox" checked={selected} title="Sélectionner pour régulariser"
+                                    onChange={() => setRegulSel((prev) => { const s = new Set(prev); if (s.has(pay.id)) s.delete(pay.id); else s.add(pay.id); return s; })}
+                                    className="w-4 h-4 accent-indigo-600 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className={`text-sm font-semibold capitalize truncate ${history ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{pay.payment_type || 'Paiement'}{method ? ` · ${method}` : ''}</p>
+                                  <p className="text-[11px] font-bold text-gray-400 truncate">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}{history && pay.notes ? ` · ${pay.notes}` : ''}</p>
+                                </div>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-base font-semibold text-gray-900">{pay.amount != null ? `${Number(pay.amount).toFixed(2).replace('.', ',')} €` : '—'}</span>
+                                <span className={`text-base font-semibold ${history ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{pay.amount != null ? `${Number(pay.amount).toFixed(2).replace('.', ',')} €` : '—'}</span>
                                 {pay.status && (
-                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${ok ? 'bg-green-100 text-green-700' : failed ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{pay.status}</span>
+                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${badge.c}`}>{badge.t}</span>
                                 )}
                                 {pay.invoice_url && (
                                   <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100"><FileText size={13} /> Reçu</a>
