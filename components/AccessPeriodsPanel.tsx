@@ -85,7 +85,7 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
   };
 
   const doCancel = async (p: AccessPeriod) => {
-    if (!window.confirm(`Annuler la passe « ${p.label} » ?${p.status === 'active' ? "\n\nL'accès sera coupé si rien d'autre ne le couvre." : ''}`)) return;
+    if (!window.confirm(`Annuler « ${p.label} » ?${p.status === 'active' ? "\n\nL'accès sera coupé si rien d'autre ne le couvre." : ''}`)) return;
     setBusy(true);
     try { await cancelAccessPeriod(p.id); await load(); onChanged?.(); }
     catch (e: any) { setMsg(e?.message || 'Échec.'); }
@@ -96,12 +96,12 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
     <div className="bg-white border border-gray-200 rounded-2xl p-3 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
-          <CalendarClock size={13} /> Accès à durée déterminée
+          <CalendarClock size={13} /> Ventes à la période
         </span>
         {!open && (
           <button type="button" onClick={() => setOpen(true)}
             className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
-            <Plus size={13} /> Ajouter une passe
+            <Plus size={13} /> Nouvelle vente
           </button>
         )}
       </div>
@@ -110,7 +110,7 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
       {loading ? (
         <div className="py-3 flex justify-center text-gray-300"><Loader2 size={16} className="animate-spin" /></div>
       ) : periods.length === 0 ? (
-        <p className="text-[12px] text-gray-400">Aucune passe. Utilise « Ajouter une passe » pour une entrée à la semaine, etc.</p>
+        <p className="text-[12px] text-gray-400">Aucune vente à la période. Utilise « Nouvelle vente » pour une entrée à la semaine, etc.</p>
       ) : (
         <div className="space-y-1.5">
           {periods.map((p) => {

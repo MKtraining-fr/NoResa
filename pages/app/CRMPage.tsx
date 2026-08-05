@@ -1639,21 +1639,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     </button>
                   )}
 
-                  {/* Accès à durée déterminée (passes datées : entrée semaine, etc.) */}
-                  {(selectedContact as any).id && (
-                    <AccessPeriodsPanel
-                      memberId={(selectedContact as any).id}
-                      onChanged={async () => {
-                        try {
-                          const list = await getMembers();
-                          setContacts(list);
-                          const mem: any = list.find((x: any) => x.id === (selectedContact as any).id);
-                          if (mem) setSelectedContact((prev: any) => (prev && prev.id === mem.id ? { ...prev, ...mem } : prev));
-                        } catch { /* noop */ }
-                      }}
-                    />
-                  )}
-
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
@@ -1858,6 +1843,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {/* Encaisser par Instant Bank Pay (séance/carnet/mois ou montant libre) */}
                   <button type="button" onClick={() => setIbpChargeOpen(true)} className="w-full sm:w-fit flex items-center justify-center gap-1.5 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={13} /> Encaisser (Instant Bank Pay)</button>
+
+                  {/* Vente à la période (entrée semaine, etc.) — accès ouvert/coupé selon les dates */}
+                  {(selectedContact as any).id && (
+                    <AccessPeriodsPanel
+                      memberId={(selectedContact as any).id}
+                      onChanged={async () => {
+                        try {
+                          const list = await getMembers();
+                          setContacts(list);
+                          const mem: any = list.find((x: any) => x.id === (selectedContact as any).id);
+                          if (mem) setSelectedContact((prev: any) => (prev && prev.id === mem.id ? { ...prev, ...mem } : prev));
+                        } catch { /* noop */ }
+                      }}
+                    />
+                  )}
 
                   {/* Sous-onglets finance */}
                   <div className="flex items-center gap-2 flex-wrap">
