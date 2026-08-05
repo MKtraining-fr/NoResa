@@ -258,7 +258,7 @@ const FirstSeanceCard: React.FC<{ onBuy: () => void }> = ({ onBuy }) => (
 type ActivSel =
   | { kind: 'noeng'; key: 'seance' | 'carnet' | 'mois'; price: number }
   | { kind: 'eng'; label: string; price: number }
-  | { kind: 'annual1'; label: string; price: number }   // annuel réglé en 1 fois (IBP)
+  | { kind: 'annual1'; label: string; price: number }   // annuel réglé en 1 fois (carte Stripe)
   | { kind: 'annual3'; label: string; price: number };  // annuel réglé en 3 fois (mandat SEPA)
 
 const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -315,7 +315,7 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-brand">Activer mon accès</p>
         <p className="font-black text-xl text-gray-900 mt-0.5">Choisis ta formule</p>
 
-        {/* Sans engagement — paiement instantané (Instant Bank Pay) */}
+        {/* Sans engagement — paiement instantané (carte Stripe) */}
         <p className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400 mt-4 mb-2">Sans engagement · paiement instantané</p>
         <div className="flex flex-col gap-2">
           {NOENG.map((p) => Row(

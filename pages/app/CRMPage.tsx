@@ -20,7 +20,6 @@ import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../l
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import WebcamCapture from '../../components/WebcamCapture';
-import IbpChargeModal from '../../components/IbpChargeModal';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
 
@@ -694,7 +693,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
   // Cible de la capture webcam : fiche membre existant ou formulaire d'ajout
   const [webcamFor, setWebcamFor] = useState<null | 'member' | 'add'>(null);
-  const [ibpChargeOpen, setIbpChargeOpen] = useState(false);
 
   const resetAddForm = () => {
     setAddFirstName(''); setAddLastName(''); setAddEmail(''); setAddPhone('');
@@ -1841,9 +1839,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     })()}
                   </div>
 
-                  {/* Encaisser par Instant Bank Pay (séance/carnet/mois ou montant libre) */}
-                  <button type="button" onClick={() => setIbpChargeOpen(true)} className="w-full sm:w-fit flex items-center justify-center gap-1.5 bg-amber-500 text-white px-5 py-2.5 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-amber-600"><Zap size={13} /> Encaisser (Instant Bank Pay)</button>
-
                   {/* Vente à la période (entrée semaine, etc.) — accès ouvert/coupé selon les dates */}
                   {(selectedContact as any).id && (
                     <AccessPeriodsPanel
@@ -2202,10 +2197,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       )}
 
       {webcamFor && <WebcamCapture onCapture={(f) => { if (webcamFor === 'member') applyFichePhoto(f); else applyAddPhoto(f); }} onClose={() => setWebcamFor(null)} />}
-
-      {ibpChargeOpen && selectedContact && (
-        <IbpChargeModal memberId={selectedContact.id} email={selectedContact.email || undefined} onClose={() => setIbpChargeOpen(false)} onPaid={async () => { setMemberPayments(await getMemberPayments(selectedContact.id)); }} />
-      )}
     </div>
   );
 };

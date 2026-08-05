@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 
 /**
  * Paiement instantané (carte / Apple Pay / Google Pay) via Stripe Checkout depuis l'espace membre.
- * Même contrat que l'ancien Instant Bank Pay : renvoie l'URL de la page de paiement hébergée.
+ * Renvoie l'URL de la page de paiement Stripe hébergée.
  * Le webhook Stripe déclenche `apply_recharge` (code d'accès + activation) à la confirmation.
  */
 export interface StaffPaymentResult { authorisation_url: string; order_id: string; billing_request_id: string; amount_cents: number; label: string; }
