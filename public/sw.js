@@ -13,7 +13,10 @@ self.addEventListener('push', (event) => {
   const options = {
     body: data.body || '',
     icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
+    // Badge (petite icône barre d'état Android) : silhouette transparente monochrome.
+    // L'ancien badge réutilisait l'icône pleine → Android n'en gardait que l'alpha
+    // et affichait un carré blanc. Le badge dédié donne un glyphe net.
+    badge: '/icons/badge-96.png',
     lang: 'fr',
     tag: data.tag || 'annonce',
     renotify: true,
