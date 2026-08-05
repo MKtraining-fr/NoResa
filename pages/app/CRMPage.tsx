@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { norm, closeEnough } from '../../lib/fuzzy';
+import AccessPeriodsPanel from '../../components/AccessPeriodsPanel';
 import { 
   Search, Filter, MoreHorizontal, UserPlus, Mail, Phone, 
   Target, UserCheck, Briefcase, X, Save, Calendar, 
@@ -1636,6 +1637,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <button type="button" onClick={() => setScheduleOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-amber-600">
                       <Clock size={13} /> Programmer un blocage à une date
                     </button>
+                  )}
+
+                  {/* Accès à durée déterminée (passes datées : entrée semaine, etc.) */}
+                  {(selectedContact as any).id && (
+                    <AccessPeriodsPanel
+                      memberId={(selectedContact as any).id}
+                      onChanged={async () => {
+                        try {
+                          const list = await getMembers();
+                          setContacts(list);
+                          const mem: any = list.find((x: any) => x.id === (selectedContact as any).id);
+                          if (mem) setSelectedContact((prev: any) => (prev && prev.id === mem.id ? { ...prev, ...mem } : prev));
+                        } catch { /* noop */ }
+                      }}
+                    />
                   )}
 
                   {/* Contact + abonnement résumé */}
