@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from 'react';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from './lib/supabaseClient';
@@ -80,6 +81,7 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <RecoveryHandler />
+      <AppErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
@@ -167,6 +169,7 @@ const App: React.FC = () => {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      </AppErrorBoundary>
     </HashRouter>
   );
 };
