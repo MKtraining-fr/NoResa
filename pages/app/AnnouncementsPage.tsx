@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Megaphone, Plus, Loader2, RefreshCw, Trash2, Send, Pencil, X, Check, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
+import { Megaphone, Plus, Loader2, RefreshCw, Trash2, Send, Pencil, X, Check, Info, Calendar, AlertTriangle, Tag, Film } from 'lucide-react';
 import { listAnnouncements, saveAnnouncement, deleteAnnouncement, Announcement, AnnouncementCategory } from '../../lib/announcementsApi';
 import { sendPush } from '../../lib/pushApi';
+import { parseVideo } from '../../lib/videoEmbed';
 
 const CATEGORIES: { key: AnnouncementCategory; label: string; icon: React.ElementType; tint: string }[] = [
   { key: 'info', label: 'Information', icon: Info, tint: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -12,7 +13,7 @@ const CATEGORIES: { key: AnnouncementCategory; label: string; icon: React.Elemen
 const catOf = (k: AnnouncementCategory) => CATEGORIES.find((c) => c.key === k) ?? CATEGORIES[0];
 const dt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
-const EMPTY = { id: null as string | null, title: '', body: '', category: 'info' as AnnouncementCategory };
+const EMPTY = { id: null as string | null, title: '', body: '', category: 'info' as AnnouncementCategory, mediaUrl: '' };
 
 const AnnouncementsPage: React.FC = () => {
   const [rows, setRows] = useState<Announcement[]>([]);
@@ -30,7 +31,7 @@ const AnnouncementsPage: React.FC = () => {
 
   const openNew = () => { setForm({ ...EMPTY }); setEditing(true); };
   const openEdit = (a: Announcement) => {
-    setForm({ id: a.id, title: a.title, body: a.body, category: a.category });
+    setForm({ id: a.id, title: a.title, body: a.body, category: a.category, mediaUrl: a.mediaUrl ?? '' });
     setEditing(true);
   };
 
@@ -43,12 +44,16 @@ ${r.error}`);
     else alert(`Annonce publiée et notification envoyée à ${r.sent}/${r.total} appareil(s).`);
   };
 
+  const media = parseVideo(form.mediaUrl);
+  const mediaInvalid = form.mediaUrl.trim() !== '' && media.kind === 'none';
+
   const save = async (publish: boolean) => {
     if (!form.title.trim() || !form.body.trim()) { alert('Titre et message sont obligatoires.'); return; }
+    if (mediaInvalid) { alert("Le lien vidéo n'est pas valide (attendu : YouTube, Vimeo ou un lien se terminant par .mp4)."); return; }
     if (publish && !window.confirm("Publier cette annonce ?\n\nElle apparaîtra immédiatement dans l'app de tous vos adhérents.")) return;
     setBusy(true);
     try {
-      await saveAnnouncement({ id: form.id, title: form.title, body: form.body, category: form.category, publish });
+      await saveAnnouncement({ id: form.id, title: form.title, body: form.body, category: form.category, publish, mediaUrl: form.mediaUrl });
       if (publish) await notifyMembers(form.title, form.body);
       setEditing(false); setForm({ ...EMPTY });
       await load();
@@ -60,7 +65,7 @@ ${r.error}`);
     if (!window.confirm(`Publier « ${a.title} » ?\n\nElle apparaîtra immédiatement dans l'app de tous vos adhérents.`)) return;
     setBusy(true);
     try {
-      await saveAnnouncement({ id: a.id, title: a.title, body: a.body, category: a.category, publish: true });
+      await saveAnnouncement({ id: a.id, title: a.title, body: a.body, category: a.category, publish: true, mediaUrl: a.mediaUrl });
       await notifyMembers(a.title, a.body);
       await load();
     }
@@ -127,6 +132,20 @@ ${r.error}`);
               className="w-full mt-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none resize-none focus:ring-2 focus:ring-indigo-500/20" />
           </div>
 
+          <div>
+            <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex items-center gap-1.5"><Film size={12} /> Lien vidéo (facultatif)</label>
+            <input value={form.mediaUrl} onChange={(e) => setForm((f) => ({ ...f, mediaUrl: e.target.value }))}
+              placeholder="https://youtu.be/… ou https://vimeo.com/… ou un lien .mp4"
+              className={`w-full mt-1 bg-gray-50 border rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 ${mediaInvalid ? 'border-red-300 focus:ring-red-500/20' : 'border-gray-200 focus:ring-indigo-500/20'}`} />
+            {mediaInvalid ? (
+              <p className="text-[11px] font-semibold text-red-600 mt-1">Lien non reconnu — attendu : YouTube, Vimeo ou un lien se terminant par .mp4</p>
+            ) : media.kind !== 'none' ? (
+              <p className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1"><Check size={12} /> Vidéo {media.kind === 'file' ? 'MP4' : media.kind === 'link' ? 'externe' : media.kind} — lecteur intégré dans l'annonce</p>
+            ) : (
+              <p className="text-[10.5px] text-gray-400 mt-1">Déposez la vidéo sur YouTube/Vimeo (en « non répertorié » si besoin) puis collez le lien. Elle se lira dans l'app, sans quitter NoResa.</p>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => save(true)} disabled={busy}
               className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50">
@@ -165,6 +184,9 @@ ${r.error}`);
                         <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md">Publiée</span>
                       ) : (
                         <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md">Brouillon</span>
+                      )}
+                      {a.mediaUrl && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md flex items-center gap-1"><Film size={11} /> Vidéo</span>
                       )}
                     </div>
                     <p className="mt-1 text-[13px] text-gray-600 whitespace-pre-line line-clamp-3">{a.body}</p>

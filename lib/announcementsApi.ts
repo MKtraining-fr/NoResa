@@ -9,6 +9,7 @@ export interface Announcement {
   title: string;
   body: string;
   category: AnnouncementCategory;
+  mediaUrl: string | null;
   published: boolean;
   publishedAt: string | null;
   createdAt: string;
@@ -19,6 +20,7 @@ const map = (r: any): Announcement => ({
   title: r.title ?? '',
   body: r.body ?? '',
   category: (r.category ?? 'info') as AnnouncementCategory,
+  mediaUrl: r.media_url ?? null,
   published: r.published === true,
   publishedAt: r.published_at ?? null,
   createdAt: r.created_at,
@@ -34,9 +36,11 @@ export async function listAnnouncements(): Promise<Announcement[]> {
 
 export async function saveAnnouncement(p: {
   id?: string | null; title: string; body: string; category: AnnouncementCategory; publish: boolean;
+  mediaUrl?: string | null;
 }): Promise<Announcement | null> {
   const { data, error } = await supabase.rpc('save_announcement', {
     p_id: p.id ?? null, p_title: p.title, p_body: p.body, p_category: p.category, p_publish: p.publish,
+    p_media_url: p.mediaUrl ?? null,
   });
   if (error) { console.error('saveAnnouncement', error); throw error; }
   const r = Array.isArray(data) ? data[0] : data;
@@ -55,6 +59,7 @@ export interface MyAnnouncement {
   title: string;
   body: string;
   category: AnnouncementCategory;
+  mediaUrl: string | null;
   publishedAt: string | null;
   read: boolean;
 }
@@ -67,6 +72,7 @@ export async function getMyAnnouncements(): Promise<MyAnnouncement[]> {
     title: r.title ?? '',
     body: r.body ?? '',
     category: (r.category ?? 'info') as AnnouncementCategory,
+    mediaUrl: r.media_url ?? null,
     publishedAt: r.published_at ?? null,
     read: r.read === true,
   }));

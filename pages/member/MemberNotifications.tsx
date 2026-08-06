@@ -1,7 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, ChevronLeft, Loader2, Info, Calendar, AlertTriangle, Tag } from 'lucide-react';
+import { Bell, ChevronLeft, Loader2, Info, Calendar, AlertTriangle, Tag, PlayCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getMyAnnouncements, markAnnouncementsRead, MyAnnouncement, AnnouncementCategory } from '../../lib/announcementsApi';
+import { parseVideo } from '../../lib/videoEmbed';
+
+/** Lecteur vidéo intégré à l'annonce : YouTube/Vimeo en iframe, MP4 en natif, sinon lien. */
+const AnnouncementVideo: React.FC<{ url: string; title: string }> = ({ url, title }) => {
+  const v = parseVideo(url);
+  if (v.kind === 'youtube' || v.kind === 'vimeo') {
+    return (
+      <div className="mt-3 aspect-video w-full rounded-2xl overflow-hidden bg-black">
+        <iframe src={v.embedUrl} title={title} loading="lazy" className="w-full h-full" frameBorder={0}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen />
+      </div>
+    );
+  }
+  if (v.kind === 'file') {
+    return <video controls preload="metadata" src={v.fileUrl} className="mt-3 w-full rounded-2xl bg-black" />;
+  }
+  if (v.kind === 'link') {
+    return (
+      <a href={v.fileUrl} target="_blank" rel="noreferrer"
+        className="mt-3 inline-flex items-center gap-2 bg-brand/10 text-brand px-4 py-2.5 rounded-2xl text-[13px] font-bold">
+        <PlayCircle size={16} /> Voir la vidéo
+      </a>
+    );
+  }
+  return null;
+};
 
 const STYLE: Record<AnnouncementCategory, { icon: React.ElementType; tint: string; ring: string }> = {
   info:  { icon: Info,          tint: 'text-blue-600',    ring: 'bg-blue-50' },
@@ -69,6 +96,7 @@ const MemberNotifications: React.FC = () => {
                       {!a.read && <span className="w-2 h-2 rounded-full bg-brand shrink-0" />}
                     </div>
                     <p className="text-[13px] text-gray-600 mt-1 leading-relaxed whitespace-pre-line">{a.body}</p>
+                    {a.mediaUrl && <AnnouncementVideo url={a.mediaUrl} title={a.title} />}
                     <p className="text-[11px] text-gray-400 font-semibold mt-2">{ago(a.publishedAt)}</p>
                   </div>
                 </div>
