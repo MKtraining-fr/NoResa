@@ -1,88 +1,116 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { UserPlus, X, Loader2, RefreshCw, Trash2, ShieldCheck, IdCard, Mail, Phone } from 'lucide-react';
+import { listStaff, createMember, patchMember } from '../../lib/membersApi';
+import type { Member } from '../../types';
 
-import React, { useState } from 'react';
-import { UserPlus, Mail, Shield, MoreVertical, X, Save, Lock } from 'lucide-react';
+const initials = (f?: string, l?: string) => (`${(f || '')[0] || ''}${(l || '')[0] || ''}`).toUpperCase() || '·';
 
 const TeamPage: React.FC = () => {
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [staff, setStaff] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', cardNumber: '' });
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setStaff(await listStaff());
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const reset = () => { setForm({ firstName: '', lastName: '', email: '', phone: '', cardNumber: '' }); setErr(''); setOpen(false); };
+
+  const add = async () => {
+    if (!form.firstName.trim() || !form.lastName.trim()) { setErr('Prénom et nom obligatoires.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await createMember({
+        firstName: form.firstName.trim(), lastName: form.lastName.trim(),
+        email: form.email.trim() || undefined, phone: form.phone.trim() || undefined,
+        cardNumber: form.cardNumber.trim() || undefined,
+        staff: true,
+      });
+      reset(); await load();
+    } catch (e: any) { setErr(e?.message || 'Création impossible.'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (m: Member) => {
+    if (!window.confirm(`Retirer ${m.firstName} ${m.lastName} de l'équipe ?`)) return;
+    setBusy(true);
+    try { await patchMember(m.id, { archived_at: new Date().toISOString() }); await load(); }
+    catch (e: any) { alert(e?.message || 'Suppression impossible.'); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Équipe & Staff</h1>
-          <p className="text-sm text-gray-500">Gérez les membres de votre équipe et leurs accès.</p>
+          <p className="text-sm text-gray-500">Vos collaborateurs. Ils badgent pour entrer mais n'apparaissent pas dans le contrôle d'accès ni les listes membres. Ils sont proposés comme commercial à l'inscription.</p>
         </div>
-        <button 
-          onClick={() => setIsInviteModalOpen(true)}
-          className="flex items-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-        >
-          <UserPlus size={18} />
-          <span>Inviter un collaborateur</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={load} disabled={loading} className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 disabled:opacity-50">
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />} Actualiser
+          </button>
+          <button onClick={() => setOpen(true)} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700">
+            <UserPlus size={18} /> Ajouter un collaborateur
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          { name: 'Marc Power', role: 'Manager', email: 'marc@ironparadise.com', img: 'https://picsum.photos/seed/marc/100/100' },
-          { name: 'Sarah Zen', role: 'Coach Yoga', email: 'sarah@ironparadise.com', img: 'https://picsum.photos/seed/sarah/100/100' },
-          { name: 'David Strong', role: 'Coach CrossFit', email: 'david@ironparadise.com', img: 'https://picsum.photos/seed/david/100/100' },
-        ].map((staff, i) => (
-          <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group">
-            <div className="flex justify-between items-start mb-6">
-              <img src={staff.img} className="w-16 h-16 rounded-2xl shadow-inner border border-gray-100" />
-              <button className="p-2 text-gray-300 hover:text-indigo-600 transition-colors"><MoreVertical size={20} /></button>
-            </div>
-            <div className="space-y-1 mb-6">
-              <h3 className="text-lg font-bold text-gray-900">{staff.name}</h3>
-              <p className="text-sm font-bold text-indigo-600">{staff.role}</p>
-              <div className="flex items-center text-xs text-gray-400 space-x-2">
-                <Mail size={12} />
-                <span>{staff.email}</span>
+      {open && (
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4 max-w-2xl">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-900">Nouveau collaborateur</h2>
+            <button onClick={reset} className="p-2 hover:bg-gray-100 rounded-lg"><X size={18} /></button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} placeholder="Prénom" className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            <input value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} placeholder="Nom" className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email (facultatif)" className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Téléphone (facultatif)" className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            <input value={form.cardNumber} onChange={(e) => setForm((f) => ({ ...f, cardNumber: e.target.value }))} placeholder="N° de badge (facultatif)" className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 sm:col-span-2" />
+          </div>
+          {err && <p className="text-[12px] font-semibold text-red-600">{err}</p>}
+          <div className="flex items-center gap-2">
+            <button onClick={add} disabled={busy} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50">
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />} Ajouter
+            </button>
+            <button onClick={reset} className="text-sm font-semibold text-gray-400 px-3">Annuler</button>
+          </div>
+          <p className="text-[11px] text-gray-400">Un n° de collaborateur et un code d'accès sont générés automatiquement (comme un membre), mais ce profil reste masqué des vues membres.</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-16 flex justify-center text-gray-300"><Loader2 size={22} className="animate-spin" /></div>
+      ) : staff.length === 0 ? (
+        <div className="py-16 text-center text-gray-400 text-sm border border-dashed border-gray-200 rounded-3xl">
+          Aucun collaborateur. Ajoutez votre équipe pour pouvoir l'attribuer comme commercial à l'inscription.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {staff.map((m) => (
+            <div key={m.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-black">{initials(m.firstName, m.lastName)}</div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-gray-900 truncate">{m.firstName} {m.lastName}</h3>
+                  <p className="text-[11px] font-semibold text-indigo-600 flex items-center gap-1"><ShieldCheck size={12} /> Collaborateur</p>
+                </div>
+                <button onClick={() => remove(m)} disabled={busy} className="p-2 rounded-lg text-gray-300 hover:text-red-600 hover:bg-red-50" title="Retirer"><Trash2 size={16} /></button>
+              </div>
+              <div className="space-y-1 text-[12px] text-gray-500">
+                {m.memberNumber && <p className="flex items-center gap-1.5"><IdCard size={13} className="text-gray-400" /> N° {m.memberNumber}{m.cardNumber ? ` · badge ${m.cardNumber}` : ''}</p>}
+                {m.email && <p className="flex items-center gap-1.5 truncate"><Mail size={13} className="text-gray-400" /> {m.email}</p>}
+                {m.phone && <p className="flex items-center gap-1.5"><Phone size={13} className="text-gray-400" /> {m.phone}</p>}
               </div>
             </div>
-            <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-xl">
-              <Shield size={14} className="text-gray-400" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Permissions: Admin</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* MODALE INVITATION COLLABORATEUR */}
-      {isInviteModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
-               <div className="flex items-center space-x-3">
-                 <div className="bg-indigo-600 p-2 rounded-xl"><UserPlus size={20} /></div>
-                 <h2 className="text-xl font-black">Nouveau collaborateur</h2>
-               </div>
-               <button onClick={() => setIsInviteModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl"><X size={20} /></button>
-            </div>
-            <div className="p-8 space-y-6">
-               <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nom complet</label>
-                  <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" placeholder="Ex: Jean Michel" />
-               </div>
-               <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</label>
-                  <input type="email" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none" placeholder="jean@mail.com" />
-               </div>
-               <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Rôle & Permissions</label>
-                  <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold outline-none">
-                    <option>Coach</option>
-                    <option>Manager</option>
-                    <option>Accueil / Staff</option>
-                  </select>
-               </div>
-               <div className="p-4 bg-amber-50 rounded-2xl flex items-start space-x-3">
-                  <Lock size={16} className="text-amber-600 mt-1 shrink-0" />
-                  <p className="text-xs text-amber-800 font-medium leading-relaxed">Le collaborateur recevra un email pour définir son mot de passe et activer son compte.</p>
-               </div>
-               <button onClick={() => setIsInviteModalOpen(false)} className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Envoyer l'invitation</button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
     </div>

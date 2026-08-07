@@ -1784,6 +1784,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         {selectedContact.paidBy && (
                           <p className="text-xs opacity-75">Réglé par : {selectedContact.paidBy}</p>
                         )}
+                        {(selectedContact as any).commercialName && (
+                          <p className="text-xs opacity-75">Commercial : {(selectedContact as any).commercialName}</p>
+                        )}
                         {(selectedContact.subscriptionStart || selectedContact.subscriptionEnd) && (
                           <p className="text-xs opacity-90 font-bold mt-1">
                             Période : {selectedContact.subscriptionStart || '—'} → {selectedContact.subscriptionEnd || '—'}

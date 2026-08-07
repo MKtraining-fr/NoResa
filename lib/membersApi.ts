@@ -92,7 +92,21 @@ function rowToMember(r: any): Member {
     accessBlockedAt: r.access_blocked_at ?? undefined,
     accessBlockScheduledAt: r.access_block_scheduled_at ?? undefined,
     accessBlockScheduledReason: r.access_block_scheduled_reason ?? undefined,
+    staff: r.staff ?? false,
+    commercialId: r.commercial_id ?? undefined,
   } as Member;
+}
+
+/** Liste des profils staff (badgent mais masqués des vues membres). Pour la page Équipe. */
+export async function listStaff(): Promise<Member[]> {
+  const { data, error } = await supabase
+    .from('members')
+    .select('id, first_name, last_name, email, phone, member_number, status, created_at, photo_path, rfid_badge, keypad_code, access_blocked, staff, commercial_id')
+    .is('archived_at', null)
+    .eq('staff', true)
+    .order('last_name', { ascending: true });
+  if (error) { console.error('membersApi.listStaff', error); return []; }
+  return (data ?? []).map(rowToMember);
 }
 
 // --- API -------------------------------------------------------------------
@@ -106,16 +120,28 @@ export async function getMembers(): Promise<Member[]> {
         'subscription_start, subscription_end, ' +
         'member_number, status, join_date, created_at, photo_path, ' +
         'emergency_contact_name, emergency_contact_phone, notes, ' +
-        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason'
+        'gocardless_status, gocardless_mandate_id, gocardless_customer_id, rfid_badge, keypad_code, group_name, subgroup_name, access_blocked, access_block_reason, access_blocked_at, access_block_scheduled_at, access_block_scheduled_reason, staff, commercial_id'
     )
     .is('archived_at', null)
+    .eq('staff', false)   // le staff est masqué des listes membres (géré dans « Équipe »)
     .order('last_name', { ascending: true });
 
   if (error) {
     console.error('membersApi.getMembers', error);
     return [];
   }
-  return (data ?? []).map(rowToMember);
+  const members = (data ?? []).map(rowToMember);
+
+  // Résout le nom du commercial (fiche staff) pour l'affichage, sans jointure PostgREST fragile.
+  const commercialIds = Array.from(new Set(members.map((m) => m.commercialId).filter(Boolean))) as string[];
+  if (commercialIds.length) {
+    const { data: reps } = await supabase.from('members').select('id, first_name, last_name').in('id', commercialIds);
+    const nameById = new Map((reps ?? []).map((r: any) => [r.id, `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim()]));
+    for (const m of members) {
+      if (m.commercialId) (m as any).commercialName = nameById.get(m.commercialId) || undefined;
+    }
+  }
+  return members;
 }
 
 /** Membres archivés (corbeille). Données conservées intégralement. */
@@ -304,6 +330,8 @@ export interface NewMemberInput {
   subgroupName?: string;
   notes?: string;
   paidBy?: string;   // payeur tiers (association / entreprise) — "réglé par"
+  staff?: boolean;             // profil staff (badge mais masqué des vues membres)
+  commercialId?: string | null; // commercial (fiche staff) ayant réalisé la vente
 }
 
 export async function createMember(p: NewMemberInput): Promise<Member> {
@@ -339,6 +367,8 @@ export async function createMember(p: NewMemberInput): Promise<Member> {
       subgroup_name: p.subgroupName || null,
       notes: p.notes || null,
       paid_by: p.paidBy || null,
+      staff: p.staff ?? false,
+      commercial_id: p.commercialId ?? null,
       status: 'active',
       join_date: p.subscriptionStart || new Date().toISOString().split('T')[0],
     })

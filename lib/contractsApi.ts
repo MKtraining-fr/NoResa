@@ -173,6 +173,8 @@ export interface InscriptionData {
   // Groupe / sous-groupe (étiquette interne, invisible pour l'adhérent)
   groupName?: string;
   subgroupName?: string;
+  // Commercial (fiche staff) ayant réalisé la vente
+  commercialId?: string | null;
   // Période (utile pour les contrats à courte durée)
   subscriptionStart?: string;   // 'YYYY-MM-DD'
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
@@ -251,6 +253,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       keypad_code: keypadCode || null,
       group_name: d.groupName || null,
       subgroup_name: d.subgroupName || null,
+      commercial_id: d.commercialId || null,
     });
   } else {
     const m = await createMember({
@@ -272,6 +275,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       groupName: d.groupName,
       subgroupName: d.subgroupName,
       paidBy: d.paidBy,
+      commercialId: d.commercialId,
     });
     memberId = m.id;
   }

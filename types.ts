@@ -97,4 +97,13 @@ export interface Member {
   // Blocage programmé à une date future (job quotidien)
   accessBlockScheduledAt?: string;
   accessBlockScheduledReason?: string;
+  // Staff : profil qui badge mais reste hors des vues membres
+  staff?: boolean;
+  // Commercial (fiche staff) ayant réalisé la vente
+  commercialId?: string;
+  commercialName?: string;
+  cardNumber?: string;
+  keypadCode?: string;
+  groupName?: string;
+  subgroupName?: string;
 }

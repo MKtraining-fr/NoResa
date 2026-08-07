@@ -9,7 +9,8 @@ import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
   submitInscription, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
-import { generateCardNumber } from '../../lib/membersApi';
+import { generateCardNumber, listStaff } from '../../lib/membersApi';
+import type { Member } from '../../types';
 import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
 
@@ -42,7 +43,11 @@ const InscriptionPage: React.FC = () => {
   const [subgroupName, setSubgroupName] = useState('');
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
   const [groupsFlat, setGroupsFlat] = useState<MemberGroup[]>([]);
+  // Commercial (staff) ayant réalisé la vente
+  const [commercialId, setCommercialId] = useState('');
+  const [staffList, setStaffList] = useState<Member[]>([]);
   useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); getGroupsFlat().then(setGroupsFlat).catch(() => {}); }, []);
+  useEffect(() => { listStaff().then(setStaffList).catch(() => {}); }, []);
   const subOptions = groupTree.find((g) => g.name === groupName)?.subgroups ?? [];
   // Règle de facturation « payeur tiers » du groupe/sous-groupe choisi (association qui paie).
   const billingRule = useMemo(() => effectiveBillingRule(groupsFlat, groupName || null, subgroupName || null), [groupsFlat, groupName, subgroupName]);
@@ -219,6 +224,7 @@ const InscriptionPage: React.FC = () => {
         cardNumber: needsBadge ? (cardNumber.trim() || undefined) : undefined,
         groupName: groupName || undefined,
         subgroupName: subgroupName || undefined,
+        commercialId: commercialId || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
@@ -248,7 +254,7 @@ const InscriptionPage: React.FC = () => {
     setProfession(''); setCompany(''); setFormulaKey(''); setFreeAmount(''); setFreeLabel(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
-    setGroupName(''); setSubgroupName('');
+    setGroupName(''); setSubgroupName(''); setCommercialId('');
   };
 
   const openContract = async () => {
@@ -392,6 +398,18 @@ const InscriptionPage: React.FC = () => {
                   <option value="">{!groupName ? '— Choisir un groupe —' : subOptions.length === 0 ? '— Aucun sous-groupe —' : '— Aucun —'}</option>
                   {subOptions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
                 </select>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <span className={label}>Commercial</span>
+                <select className={field} value={commercialId} onChange={(e) => setCommercialId(e.target.value)}>
+                  <option value="">— Aucun —</option>
+                  {staffList.map((s) => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+                </select>
+                {staffList.length === 0 && (
+                  <span className="text-[11px] text-gray-400 mt-1 block">Ajoutez vos commerciaux dans « Équipe & Staff ».</span>
+                )}
               </div>
             </div>
           </div>

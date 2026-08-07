@@ -63,6 +63,7 @@ export async function getBlockedMembers(): Promise<BlockedMember[]> {
     .select('id, first_name, last_name, member_number, rfid_badge, photo_path, access_block_reason, access_blocked_at')
     .eq('access_blocked', true)
     .is('archived_at', null)
+    .eq('staff', false)   // le staff badge mais reste hors des vues membres
     .order('access_blocked_at', { ascending: false });
   if (error) { console.error('getBlockedMembers', error); return []; }
   return (data ?? []).map((r: any) => ({
@@ -101,10 +102,10 @@ export interface AccessEntry {
   qr_code: string | null;
   device_sn: string | null;
   member_id: string | null;
-  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null; notes: string | null; group_name: string | null; subgroup_name: string | null } | null;
+  member: { first_name: string | null; last_name: string | null; member_number: string | null; photo_path: string | null; notes: string | null; group_name: string | null; subgroup_name: string | null; staff?: boolean } | null;
 }
 
-const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path, notes, group_name, subgroup_name)';
+const ENTRY_SELECT = 'id, access_datetime, status, card_number, qr_code, device_sn, member_id, member:members(first_name, last_name, member_number, photo_path, notes, group_name, subgroup_name, staff)';
 
 /** Entrées du jour (passages enregistrés depuis minuit), plus récentes d'abord. */
 export async function getTodayEntries(): Promise<AccessEntry[]> {
@@ -140,7 +141,9 @@ export async function getEntriesBetween(
   if (opts.status) q = q.eq('status', opts.status);
   const { data, error } = await q;
   if (error) { console.error('getEntriesBetween', error); return []; }
-  return (data ?? []) as any;
+  // Le staff badge, mais ses passages sont masqués du contrôle d'accès.
+  // (Les passages sans fiche — badge inconnu — sont conservés.)
+  return ((data ?? []) as any[]).filter((r) => !r.member?.staff) as any;
 }
 
 /**
@@ -151,7 +154,7 @@ export async function getPresentCount(windowMinutes = 90): Promise<number> {
   const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
   const { data, error } = await supabase
     .from('access_logs')
-    .select('member_id, card_number')
+    .select('member_id, card_number, member:members(staff)')
     .eq('status', 'authorized')
     .eq('access_type', 'entry')
     .gte('access_datetime', since)
@@ -159,6 +162,7 @@ export async function getPresentCount(windowMinutes = 90): Promise<number> {
   if (error) { console.error('getPresentCount', error); return 0; }
   const seen = new Set<string>();
   for (const r of (data ?? []) as any[]) {
+    if (r.member?.staff) continue; // le staff présent n'est pas compté dans l'affluence
     seen.add(r.member_id ? `m:${r.member_id}` : `c:${r.card_number ?? Math.random()}`);
   }
   return seen.size;
