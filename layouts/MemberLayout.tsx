@@ -7,6 +7,7 @@ import { getMyMember } from '../lib/memberSelfApi';
 import { getUnreadAnnouncements } from '../lib/announcementsApi';
 import { ensurePushSubscribed, isPushSupported, pushPermission } from '../lib/pushApi';
 import PushPrompt, { PUSH_PROMPT_KEY } from '../components/PushPrompt';
+import InstallPrompt, { INSTALL_PROMPT_KEY } from '../components/InstallPrompt';
 
 const initialsOf = (f?: string, l?: string) =>
   (`${(f || '').trim()[0] || ''}${(l || '').trim()[0] || ''}`).toUpperCase() || '·';
@@ -23,17 +24,31 @@ const MemberShell: React.FC = () => {
   // l'abonnement est recréé tout seul (nouvel appareil, réinstallation…).
   useEffect(() => { ensurePushSubscribed().catch(() => {}); }, []);
 
-  // Proposition unique, à la première connexion (les navigateurs imposent un geste
-  // explicite). Ensuite le réglage vit dans le profil.
+  // Première connexion : on propose d'abord d'INSTALLER la PWA, puis (une fois cette
+  // étape passée) d'activer les NOTIFICATIONS. Jamais les deux modales en même temps.
+  const [showInstall, setShowInstall] = useState(false);
   const [showPush, setShowPush] = useState(false);
-  useEffect(() => {
+
+  const maybeOfferPush = React.useCallback(() => {
     let seen = false;
     try { seen = localStorage.getItem(PUSH_PROMPT_KEY) === '1'; } catch { /* noop */ }
     if (!seen && isPushSupported() && pushPermission() === 'default') {
-      const t = setTimeout(() => setShowPush(true), 1200); // laisse l'app s'afficher d'abord
-      return () => clearTimeout(t);
+      setTimeout(() => setShowPush(true), 400);
     }
   }, []);
+
+  useEffect(() => {
+    let installSeen = false;
+    try { installSeen = localStorage.getItem(INSTALL_PROMPT_KEY) === '1'; } catch { /* noop */ }
+    // Si l'invite d'installation a déjà été vue, on passe directement aux notifications.
+    // Sinon on tente l'installation ; InstallPrompt se ferme seul si rien n'est proposable.
+    if (installSeen) {
+      const t = setTimeout(maybeOfferPush, 1200);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setShowInstall(true), 1200); // laisse l'app s'afficher d'abord
+    return () => clearTimeout(t);
+  }, [maybeOfferPush]);
   // Recalculé à chaque navigation : la pastille retombe après lecture des annonces.
   useEffect(() => { getUnreadAnnouncements().then(setUnread).catch(() => {}); }, [location.pathname]);
 
@@ -98,7 +113,10 @@ const MemberShell: React.FC = () => {
         {right.map(NavItem)}
       </nav>
 
-      {showPush && <PushPrompt onClose={() => setShowPush(false)} />}
+      {showInstall && (
+        <InstallPrompt onClose={() => { setShowInstall(false); maybeOfferPush(); }} />
+      )}
+      {showPush && !showInstall && <PushPrompt onClose={() => setShowPush(false)} />}
     </div>
   );
 };
