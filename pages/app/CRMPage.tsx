@@ -12,7 +12,7 @@ import {
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload, StickyNote,
   RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, regularizePayments, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
@@ -206,6 +206,19 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   }, [contacts, location.key, location.search]);
 
   // Ferme la fiche : revient à la page d'origine si on y est arrivé via ?from=…, sinon reste sur le CRM.
+  // Convertit un membre en profil staff : il quitte les vues membres (géré dans « Équipe »).
+  const convertToStaff = async () => {
+    if (!selectedContact) return;
+    if (!window.confirm(`Passer ${selectedContact.firstName} ${selectedContact.lastName} en profil staff ?\n\nLa fiche quitte les listes membres et le contrôle d'accès (le badge reste actif). Elle sera gérée dans « Équipe & Staff ».`)) return;
+    try {
+      await setMemberStaff(selectedContact.id, true);
+      setContacts(await getMembers());
+      setIsDetailModalOpen(false);
+      if (returnTo) { const dest = returnTo; setReturnTo(null); navigate(dest); }
+      alert('Profil converti en staff. Retrouve-le dans « Équipe & Staff ».');
+    } catch (e: any) { alert(e?.message || 'Conversion impossible.'); }
+  };
+
   const closeDetail = () => {
     setIsDetailModalOpen(false);
     if (returnTo) { const dest = returnTo; setReturnTo(null); navigate(dest); }
@@ -1658,6 +1671,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       <Clock size={13} /> Programmer un blocage à une date
                     </button>
                   )}
+
+                  {/* Conversion en profil staff (quitte les vues membres) */}
+                  <button type="button" onClick={convertToStaff} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-indigo-600">
+                    <ShieldAlert size={13} /> Passer en profil staff (masquer des membres)
+                  </button>
 
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

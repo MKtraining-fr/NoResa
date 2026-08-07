@@ -97,6 +97,12 @@ function rowToMember(r: any): Member {
   } as Member;
 }
 
+/** Bascule une fiche entre membre et staff (le staff est masqué des vues membres). */
+export async function setMemberStaff(id: string, staff: boolean): Promise<void> {
+  const { error } = await supabase.from('members').update({ staff }).eq('id', id);
+  if (error) { console.error('membersApi.setMemberStaff', error); throw error; }
+}
+
 /** Liste des profils staff (badgent mais masqués des vues membres). Pour la page Équipe. */
 export async function listStaff(): Promise<Member[]> {
   const { data, error } = await supabase

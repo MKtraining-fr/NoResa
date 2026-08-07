@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { UserPlus, X, Loader2, RefreshCw, Trash2, ShieldCheck, IdCard, Mail, Phone } from 'lucide-react';
-import { listStaff, createMember, patchMember } from '../../lib/membersApi';
+import { UserPlus, X, Loader2, RefreshCw, Trash2, ShieldCheck, IdCard, Mail, Phone, UserMinus } from 'lucide-react';
+import { listStaff, createMember, patchMember, setMemberStaff } from '../../lib/membersApi';
 import type { Member } from '../../types';
 
 const initials = (f?: string, l?: string) => (`${(f || '')[0] || ''}${(l || '')[0] || ''}`).toUpperCase() || '·';
@@ -42,6 +42,15 @@ const TeamPage: React.FC = () => {
     setBusy(true);
     try { await patchMember(m.id, { archived_at: new Date().toISOString() }); await load(); }
     catch (e: any) { alert(e?.message || 'Suppression impossible.'); }
+    finally { setBusy(false); }
+  };
+
+  // Repasse un staff en membre : la fiche revient dans les listes membres.
+  const toMember = async (m: Member) => {
+    if (!window.confirm(`Repasser ${m.firstName} ${m.lastName} en membre ?\n\nLa fiche réapparaîtra dans les listes membres et le contrôle d'accès.`)) return;
+    setBusy(true);
+    try { await setMemberStaff(m.id, false); await load(); }
+    catch (e: any) { alert(e?.message || 'Conversion impossible.'); }
     finally { setBusy(false); }
   };
 
@@ -109,6 +118,10 @@ const TeamPage: React.FC = () => {
                 {m.email && <p className="flex items-center gap-1.5 truncate"><Mail size={13} className="text-gray-400" /> {m.email}</p>}
                 {m.phone && <p className="flex items-center gap-1.5"><Phone size={13} className="text-gray-400" /> {m.phone}</p>}
               </div>
+              <button onClick={() => toMember(m)} disabled={busy}
+                className="mt-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-indigo-600 border border-gray-200 rounded-xl py-2 hover:border-indigo-300">
+                <UserMinus size={13} /> Repasser en membre
+              </button>
             </div>
           ))}
         </div>
