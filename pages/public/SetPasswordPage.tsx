@@ -29,15 +29,32 @@ const SetPasswordPage: React.FC = () => {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Règles affichées + validées en direct (le serveur reste l'autorité finale).
+  const lenOk = pwd.length >= 8;
+  const matchOk = pwd2.length > 0 && pwd === pwd2;
+  const canSubmit = lenOk && matchOk;
+
+  // Traduit en français les messages de refus renvoyés par Supabase (sinon anglais/cryptiques).
+  const translateAuthError = (m: string): string => {
+    const s = (m || '').toLowerCase();
+    const len = s.match(/at least (\d+) characters/);
+    if (len) return `Le mot de passe doit contenir au moins ${len[1]} caractères.`;
+    if (s.includes('character of each') || s.includes('required characters'))
+      return 'Le mot de passe doit mélanger minuscules, majuscules, chiffres et caractères spéciaux.';
+    if (s.includes('weak') || s.includes('pwned') || s.includes('leaked') || s.includes('compromised'))
+      return 'Ce mot de passe est trop courant. Choisissez-en un autre, moins facile à deviner.';
+    return m || 'Enregistrement impossible. Réessayez.';
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr('');
-    if (pwd.length < 8) { setErr('8 caractères minimum.'); return; }
-    if (pwd !== pwd2) { setErr('Les deux mots de passe ne correspondent pas.'); return; }
+    if (!lenOk) { setErr('8 caractères minimum.'); return; }
+    if (!matchOk) { setErr('Les deux mots de passe ne correspondent pas.'); return; }
     setBusy(true);
     const { error } = await supabase.auth.updateUser({ password: pwd });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(translateAuthError(error.message)); return; }
     setDone(true);
     setTimeout(() => navigate('/membre', { replace: true }), 1600);
   };
@@ -89,7 +106,24 @@ const SetPasswordPage: React.FC = () => {
                 <input type={showPwd ? 'text' : 'password'} required value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Confirmer le mot de passe"
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-brand-soft text-sm font-medium" />
               </div>
-              <button type="submit" disabled={busy} className="w-full bg-brand text-white font-bold py-3.5 rounded-2xl shadow-xl hover:opacity-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+
+              {/* Règles du mot de passe, validées en direct */}
+              <ul className="space-y-1.5 px-1">
+                {[
+                  { ok: lenOk, txt: 'Au moins 8 caractères' },
+                  { ok: matchOk, txt: 'Les deux mots de passe sont identiques' },
+                ].map((r, i) => (
+                  <li key={i} className={`flex items-center gap-2 text-[12px] font-medium ${r.ok ? 'text-green-600' : 'text-gray-400'}`}>
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center ${r.ok ? 'bg-green-100' : 'bg-gray-100'}`}>
+                      {r.ok ? <Check size={11} strokeWidth={3} /> : <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />}
+                    </span>
+                    {r.txt}
+                  </li>
+                ))}
+                <li className="text-[11px] text-gray-400 pl-6">Conseil : mélangez lettres, chiffres et un caractère spécial.</li>
+              </ul>
+
+              <button type="submit" disabled={busy || !canSubmit} className="w-full bg-brand text-white font-bold py-3.5 rounded-2xl shadow-xl hover:opacity-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
                 {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                 <span>{busy ? 'Enregistrement…' : 'Valider mon mot de passe'}</span>
               </button>
