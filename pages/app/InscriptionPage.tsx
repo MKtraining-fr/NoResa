@@ -505,7 +505,7 @@ const InscriptionPage: React.FC = () => {
                 <div>
                   <span className={label}>Règlement du badge</span>
                   <div className="flex flex-wrap gap-2">
-                    {['Espèces', 'CB', 'Prélèvement'].map((m) => (
+                    {['Espèces', 'CB', 'Chèque', 'Prélèvement'].map((m) => (
                       <button key={m} onClick={() => setBadgePaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${badgePaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: badgePaymentMethod === m ? RED : undefined }}>{m}</button>
                     ))}
                   </div>
