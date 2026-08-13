@@ -398,9 +398,6 @@ const GroupsSettingsPage: React.FC<{ embedded?: boolean }> = ({ embedded = false
                                           <li key={k} className="flex items-center gap-2 text-[11px] text-gray-500">
                                             <span className="text-gray-300">•</span>
                                             <span className="truncate">{m.name || '—'}{m.number ? ` (n° ${m.number})` : ''}</span>
-                                            <span className={`ml-auto shrink-0 ${m.visits ? 'text-gray-400' : 'text-amber-600'}`}>
-                                              {m.visits ? `${m.visits} passage${m.visits > 1 ? 's' : ''}` : 'aucun passage'}
-                                            </span>
                                           </li>
                                         ))}
                                       </ul>
