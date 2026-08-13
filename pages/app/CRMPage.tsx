@@ -414,10 +414,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!pin) { alert("Ce membre n'a pas de numéro d'adhérent."); return; }
     setAccessBusy(true);
     try {
-      // Si la fiche porte une date de fin d'abonnement, on la transmet au contrôleur :
-      // il expire alors l'accès tout seul (le job nocturne reste le filet de sécurité).
+      // Date de fin transmise au contrôleur UNIQUEMENT si elle est dans le futur.
+      // Réactiver un accès dont la date est déjà passée avec une date passée ferait
+      // expirer le badge aussitôt — dans ce cas on ouvre l'accès (NoResa gère l'expiration).
       const subEnd = (selectedContact as any).subscriptionEnd as string | undefined;
-      const endTime = subEnd ? subEnd.slice(0, 10).replace(/-/g, '') : null;
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const endTime = subEnd && subEnd.slice(0, 10) > todayIso ? subEnd.slice(0, 10).replace(/-/g, '') : null;
       await enqueueAccessCommand({
         memberId: selectedContact.id, pin,
         cardNumber: selectedContact.cardNumber || null,
@@ -426,11 +428,16 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         action,
         endTime,
       });
-      // Activer / Débloquer lèvent le statut « bloqué »
+      // Activer / Débloquer lèvent le statut « bloqué » ET annulent tout blocage programmé
+      // encore en attente (sinon il pourrait re-couper l'accès juste après la réactivation).
       if (action === 'grant' || action === 'unblock') {
-        await patchMember(selectedContact.id, { access_blocked: false, access_block_reason: null, access_blocked_at: null });
+        await patchMember(selectedContact.id, {
+          access_blocked: false, access_block_reason: null, access_blocked_at: null,
+          access_block_scheduled_at: null, access_block_scheduled_reason: null,
+        });
         updateField('accessBlocked' as any, false);
         updateField('accessBlockReason' as any, undefined);
+        updateField('accessBlockScheduledAt' as any, undefined);
       }
       const label = { grant: 'Création/activation', unblock: 'Déblocage', revoke: 'Suppression' }[action];
       alert(`${label} de l'accès demandé. Le pont l'appliquera sur le contrôleur dans quelques secondes.`);
