@@ -33,7 +33,19 @@ export interface MyMember {
 export async function getMyMember(): Promise<MyMember | null> {
   const { data, error } = await supabase.rpc('my_member');
   if (error) { console.error('memberSelfApi.getMyMember', error); return null; }
-  const r = Array.isArray(data) ? data[0] : data;
+  let r: any = Array.isArray(data) ? data[0] : data;
+  // Aucune fiche liée à ce compte : on tente un auto-rattachement par e-mail (fiche
+  // existante non liée portant la même adresse), puis on relit. Corrige les cas où le
+  // lien ne s'est pas fait (e-mail ajouté après coup, inscription staff sans compte…).
+  if (!r) {
+    try {
+      const claimed = await supabase.rpc('claim_my_member');
+      if (claimed.data) {
+        const retry = await supabase.rpc('my_member');
+        r = Array.isArray(retry.data) ? retry.data[0] : retry.data;
+      }
+    } catch (e) { console.error('claim_my_member', e); }
+  }
   if (!r) return null;
   return {
     id: r.id,
