@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
-  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2,
+  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2, ChevronDown,
 } from 'lucide-react';
 import WebcamCapture from '../../components/WebcamCapture';
 import {
@@ -101,6 +101,8 @@ const InscriptionPage: React.FC = () => {
   const [formulaPaymentMethod, setFormulaPaymentMethod] = useState('');
   const [badgePaymentMethod, setBadgePaymentMethod] = useState('CB');
   const [services, setServices] = useState<Record<string, boolean>>({});
+  // Groupe de formules déplié à l'étape Formule (accordéon : repliés par défaut).
+  const [openGrp, setOpenGrp] = useState<string | null>(null);
   // Mandat SEPA amorcé dès l'étape Formule (fiche + mandat créés, RIB ouvert dans un onglet).
   const [mandateMemberId, setMandateMemberId] = useState<string | null>(null);
   const [mandateUrl, setMandateUrl] = useState('');
@@ -213,6 +215,14 @@ const InscriptionPage: React.FC = () => {
 
   const toggleService = (key: string) => setServices((s) => ({ ...s, [key]: !s[key] }));
 
+  // À l'arrivée sur l'étape Formule avec une formule déjà choisie, on déplie son groupe.
+  useEffect(() => {
+    if (step === 1 && openGrp === null && formulaKey) {
+      setOpenGrp(formulaKey === 'libre' ? 'Sans engagement' : (FORMULAS.find((f) => f.key === formulaKey)?.group ?? null));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, formulaKey]);
+
   // Annule le mandat amorcé (archive la fiche orpheline créée par GoCardless).
   const cancelEarlyMandate = async (silent = false) => {
     const id = mandateMemberId;
@@ -305,6 +315,7 @@ const InscriptionPage: React.FC = () => {
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName(''); setCommercialId('');
     setMandateMemberId(null); setMandateUrl(''); setMandateMsg(''); mandateCtx.current = null;
+    setOpenGrp(null);
   };
 
   const openContract = async () => {
@@ -495,33 +506,52 @@ const InscriptionPage: React.FC = () => {
                   L'inscription est verrouillée : la formule et le mode de règlement sont définis par les règles du groupe/sous-groupe.
                 </div>
               </div>
-            ) : (['Engagement', 'Sans engagement'] as const).map((grp) => (
-              <div key={grp}>
-                <span className={label}>{grp}</span>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {FORMULAS.filter((f) => f.group === grp).map((f) => (
-                    <button key={f.key} onClick={() => setFormulaKey(f.key)} className={`text-left p-4 rounded-2xl border-2 transition ${formulaKey === f.key ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === f.key ? '#fdeaea' : undefined, borderColor: formulaKey === f.key ? RED : undefined }}>
-                      <div className="font-bold text-gray-900 text-sm leading-snug">{f.label}</div>
-                      <div className="mt-1 font-semibold" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
-                    </button>
-                  ))}
-                  {grp === 'Sans engagement' && (
-                    <div onClick={() => setFormulaKey('libre')} className={`text-left p-4 rounded-2xl border-2 transition cursor-pointer ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
-                      <div className="font-bold text-gray-900 text-sm leading-snug">Accès à montant libre</div>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <input type="number" step="0.01" min="0" value={freeAmount}
-                          onChange={(e) => setFreeAmount(e.target.value)}
-                          onClick={(e) => { e.stopPropagation(); setFormulaKey('libre'); }}
-                          onFocus={() => setFormulaKey('libre')}
-                          placeholder="0,00"
-                          className="w-24 bg-transparent font-semibold outline-none border-b-2 border-gray-300 focus:border-red-500 text-base" style={{ color: RED }} />
-                        <span className="font-semibold" style={{ color: RED }}>€</span>
-                      </div>
+            ) : (['Engagement', 'Sans engagement'] as const).map((grp) => {
+              const grpTitle = grp === 'Engagement' ? 'Avec abonnement (engagement)' : 'Sans abonnement (à la carte)';
+              const isOpen = openGrp === grp;
+              const selInGroup = !!formulaKey && (grp === 'Sans engagement'
+                ? (formulaKey === 'libre' || FORMULAS.some((f) => f.key === formulaKey && f.group === grp))
+                : FORMULAS.some((f) => f.key === formulaKey && f.group === grp));
+              const selLabel = !selInGroup ? '' : (formulaKey === 'libre'
+                ? `Accès à montant libre${Number(freeAmount) > 0 ? ` — ${eur(Number(freeAmount))}` : ''}`
+                : (() => { const f = FORMULAS.find((x) => x.key === formulaKey); return f ? `${f.label.split('—')[0].trim()} · ${eur(f.price)}${f.recurring ? '/mois' : ''}` : ''; })());
+              return (
+                <div key={grp} className="border-2 border-gray-200 rounded-2xl overflow-hidden">
+                  <button type="button" onClick={() => setOpenGrp(isOpen ? null : grp)}
+                    className="w-full flex items-center justify-between gap-2 px-4 py-3.5 bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <span className="font-bold text-gray-900 text-sm">{grpTitle}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {selInGroup && <span className="text-[12px] font-semibold truncate" style={{ color: RED }}>{selLabel}</span>}
+                      <ChevronDown size={18} className={`shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {isOpen && (
+                    <div className="grid sm:grid-cols-2 gap-3 p-3">
+                      {FORMULAS.filter((f) => f.group === grp).map((f) => (
+                        <button key={f.key} onClick={() => setFormulaKey(f.key)} className={`text-left p-4 rounded-2xl border-2 transition ${formulaKey === f.key ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === f.key ? '#fdeaea' : undefined, borderColor: formulaKey === f.key ? RED : undefined }}>
+                          <div className="font-bold text-gray-900 text-sm leading-snug">{f.label}</div>
+                          <div className="mt-1 font-semibold" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
+                        </button>
+                      ))}
+                      {grp === 'Sans engagement' && (
+                        <div onClick={() => setFormulaKey('libre')} className={`text-left p-4 rounded-2xl border-2 transition cursor-pointer ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
+                          <div className="font-bold text-gray-900 text-sm leading-snug">Accès à montant libre</div>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <input type="number" step="0.01" min="0" value={freeAmount}
+                              onChange={(e) => setFreeAmount(e.target.value)}
+                              onClick={(e) => { e.stopPropagation(); setFormulaKey('libre'); }}
+                              onFocus={() => setFormulaKey('libre')}
+                              placeholder="0,00"
+                              className="w-24 bg-transparent font-semibold outline-none border-b-2 border-gray-300 focus:border-red-500 text-base" style={{ color: RED }} />
+                            <span className="font-semibold" style={{ color: RED }}>€</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div>
               <span className={label}>Période d'abonnement</span>
