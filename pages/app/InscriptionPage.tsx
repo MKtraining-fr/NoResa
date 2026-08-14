@@ -7,9 +7,9 @@ import {
 import WebcamCapture from '../../components/WebcamCapture';
 import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
-  submitInscription, getContractUrl, Formula, InscriptionResult,
+  submitInscription, beginInscriptionMandate, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
-import { generateCardNumber, listStaff } from '../../lib/membersApi';
+import { generateCardNumber, listStaff, patchMember } from '../../lib/membersApi';
 import type { Member } from '../../types';
 import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
@@ -101,6 +101,14 @@ const InscriptionPage: React.FC = () => {
   const [formulaPaymentMethod, setFormulaPaymentMethod] = useState('');
   const [badgePaymentMethod, setBadgePaymentMethod] = useState('CB');
   const [services, setServices] = useState<Record<string, boolean>>({});
+  // Mandat SEPA amorcé dès l'étape Formule (fiche + mandat créés, RIB ouvert dans un onglet).
+  const [mandateMemberId, setMandateMemberId] = useState<string | null>(null);
+  const [mandateUrl, setMandateUrl] = useState('');
+  const [mandateBusy, setMandateBusy] = useState(false);
+  const [mandateMsg, setMandateMsg] = useState('');
+  // Contexte au moment de l'amorce : si la formule ou le mode de règlement change ensuite,
+  // le mandat n'est plus cohérent -> on l'annule (voir l'effet plus bas).
+  const mandateCtx = useRef<{ key: string; payment: string } | null>(null);
 
   // Déclarations
   const [consentCga, setConsentCga] = useState(false);
@@ -205,6 +213,46 @@ const InscriptionPage: React.FC = () => {
 
   const toggleService = (key: string) => setServices((s) => ({ ...s, [key]: !s[key] }));
 
+  // Annule le mandat amorcé (archive la fiche orpheline créée par GoCardless).
+  const cancelEarlyMandate = async (silent = false) => {
+    const id = mandateMemberId;
+    setMandateMemberId(null); setMandateUrl(''); mandateCtx.current = null;
+    if (!silent) setMandateMsg('');
+    if (id) { try { await patchMember(id, { archived_at: new Date().toISOString() }); } catch { /* noop */ } }
+  };
+
+  // Amorce le mandat dès l'étape Formule : crée la fiche + le mandat, ouvre le RIB dans un onglet.
+  const startMandateEarly = async () => {
+    if (!formula) { setMandateMsg('Choisissez d’abord une formule.'); return; }
+    if (!email.trim()) { setMandateMsg("Renseignez l'email à l'étape Identité pour le mandat."); return; }
+    setMandateBusy(true); setMandateMsg('');
+    try {
+      const r = await beginInscriptionMandate({
+        firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), phone: phone || undefined,
+        address: address || undefined, postalCode: postalCode || undefined, city: city || undefined,
+        formula, formulaPaymentMethod, badgePaymentMethod,
+        subscriptionStart: subStart || undefined, subscriptionEnd: subEnd || undefined,
+        groupName: groupName || undefined, subgroupName: subgroupName || undefined,
+        commercialId: commercialId || undefined,
+        services: [], consentCga: false, consentMedical: false, signatureDataUrl: '', signerName: '', totalDue: 0,
+      });
+      setMandateMemberId(r.memberId); setMandateUrl(r.authorisationUrl);
+      mandateCtx.current = { key: formulaKey, payment: formulaPaymentMethod };
+      window.open(r.authorisationUrl, '_blank', 'noopener');
+    } catch (e: any) { setMandateMsg(e?.message || 'Impossible de démarrer le mandat.'); }
+    finally { setMandateBusy(false); }
+  };
+
+  // Formule ou mode de règlement modifié après l'amorce -> le mandat n'est plus cohérent : annulation.
+  useEffect(() => {
+    if (mandateMemberId && mandateCtx.current &&
+        (mandateCtx.current.key !== formulaKey || mandateCtx.current.payment !== formulaPaymentMethod)) {
+      cancelEarlyMandate(true);
+      setMandateMsg('Formule ou règlement modifié : le mandat lancé a été annulé. Relancez-le si besoin.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formulaKey, formulaPaymentMethod, mandateMemberId]);
+
   // --- Validation finale ------------------------------------------------------
   const submit = async () => {
     if (!formula) { setError('Choisissez une formule.'); setStep(1); return; }
@@ -225,6 +273,7 @@ const InscriptionPage: React.FC = () => {
         groupName: groupName || undefined,
         subgroupName: subgroupName || undefined,
         commercialId: commercialId || undefined,
+        existingMandateMemberId: mandateMemberId || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod,
@@ -255,6 +304,7 @@ const InscriptionPage: React.FC = () => {
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName(''); setCommercialId('');
+    setMandateMemberId(null); setMandateUrl(''); setMandateMsg(''); mandateCtx.current = null;
   };
 
   const openContract = async () => {
@@ -486,6 +536,32 @@ const InscriptionPage: React.FC = () => {
                     <button key={m} onClick={() => setFormulaPaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${formulaPaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: formulaPaymentMethod === m ? RED : undefined }}>{m}</button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Prélèvement SEPA : possibilité de faire signer le mandat (RIB) dès maintenant. */}
+            {!billingRule && formulaPaymentMethod === 'Prélèvement' && (
+              <div className="p-4 rounded-2xl border" style={{ borderColor: '#f0c9c9', backgroundColor: '#fdf3f3' }}>
+                <div className="flex items-center gap-2 font-bold text-gray-900"><CreditCard size={18} style={{ color: RED }} /> Mandat de prélèvement (RIB)</div>
+                {!mandateMemberId ? (
+                  <>
+                    <p className="text-[12px] text-gray-500 mt-1">Vous pouvez faire signer le mandat dès maintenant : il s'ouvre dans un nouvel onglet, l'inscription reste ici. Sinon, il sera proposé à la fin.</p>
+                    <button type="button" onClick={startMandateEarly} disabled={mandateBusy || !email.trim()}
+                      className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm disabled:opacity-50" style={{ backgroundColor: RED }}>
+                      {mandateBusy ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />} Faire signer le mandat (nouvel onglet)
+                    </button>
+                    {!email.trim() && <p className="text-[11px] text-gray-400 mt-1">Renseignez l'email à l'étape Identité pour activer le mandat.</p>}
+                  </>
+                ) : (
+                  <div className="mt-1 space-y-2">
+                    <p className="text-[12px] font-semibold text-green-700 flex items-center gap-1.5"><Check size={14} /> Mandat lancé — le RIB se remplit dans l'autre onglet. Continuez l'inscription, il est déjà rattaché.</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button type="button" onClick={() => window.open(mandateUrl, '_blank', 'noopener')} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-800 underline">Rouvrir le lien RIB</button>
+                      <button type="button" onClick={() => cancelEarlyMandate(false)} className="text-[12px] font-bold text-gray-400 hover:text-red-600">Annuler le mandat</button>
+                    </div>
+                  </div>
+                )}
+                {mandateMsg && <p className="text-[11px] font-semibold text-red-600 mt-2">{mandateMsg}</p>}
               </div>
             )}
 

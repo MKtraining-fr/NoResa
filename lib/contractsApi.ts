@@ -175,6 +175,9 @@ export interface InscriptionData {
   subgroupName?: string;
   // Commercial (fiche staff) ayant réalisé la vente
   commercialId?: string | null;
+  // Mandat SEPA déjà amorcé pendant l'étape Formule (fiche + mandat créés en amont) :
+  // le submit complète alors CETTE fiche au lieu d'en recréer une (évite les doublons).
+  existingMandateMemberId?: string | null;
   // Période (utile pour les contrats à courte durée)
   subscriptionStart?: string;   // 'YYYY-MM-DD'
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
@@ -207,6 +210,30 @@ export interface InscriptionResult {
  *  - sinon (comptant / espèces / séance / carnet) -> création membre simple
  *  Puis : création du contrat + génération du PDF signé + email.
  */
+/**
+ * Amorce le mandat SEPA dès l'étape « Formule » (avant la signature du contrat) :
+ * crée la fiche + la demande GoCardless et renvoie l'URL du RIB (à ouvrir dans un
+ * nouvel onglet). Le submit complètera ensuite CETTE fiche via existingMandateMemberId.
+ */
+export async function beginInscriptionMandate(d: InscriptionData): Promise<{ memberId: string; authorisationUrl: string }> {
+  const gymId = await getGymId();
+  if (!gymId) throw new Error('Impossible de déterminer la salle (gym_id).');
+  if (d.formulaPaymentMethod !== 'Prélèvement') throw new Error('Le mandat ne concerne que le règlement par prélèvement.');
+  if (!d.email) throw new Error('Un email est requis pour le mandat de prélèvement (à renseigner à l\'étape Identité).');
+  const r = await startMandateSetup({
+    firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone,
+    gymId, subscriptionLabel: d.formula.label, price: d.formula.price,
+  });
+  await patchMember(r.member_id, {
+    address: d.address || null, city: d.city || null, postal_code: d.postalCode || null,
+    periodicity: d.formula.periodicity || null, payment_method_label: 'Prélèvement',
+    subscription_start: d.subscriptionStart || null, subscription_end: d.subscriptionEnd || null,
+    group_name: d.groupName || null, subgroup_name: d.subgroupName || null,
+    commercial_id: d.commercialId || null,
+  });
+  return { memberId: r.member_id, authorisationUrl: r.authorisation_url };
+}
+
 export async function submitInscription(d: InscriptionData): Promise<InscriptionResult> {
   const gymId = await getGymId();
   if (!gymId) throw new Error('Impossible de déterminer la salle (gym_id).');
@@ -227,23 +254,35 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   const usesMandate = d.formulaPaymentMethod === 'Prélèvement';
 
   if (usesMandate) {
-    if (!d.email) throw new Error('Un email est requis pour un règlement par prélèvement automatique.');
-    const r = await startMandateSetup({
-      firstName: d.firstName,
-      lastName: d.lastName,
-      email: d.email,
-      phone: d.phone,
-      gymId,
-      subscriptionLabel: d.formula.label,
-      price: d.formula.price,
-    });
-    memberId = r.member_id;
-    authorisationUrl = r.authorisation_url;
-    // Complète la fiche créée par le flux GoCardless (adresse, périodicité, mode de règlement)
+    if (d.existingMandateMemberId) {
+      // Mandat déjà amorcé à l'étape Formule : on complète CETTE fiche (pas de doublon,
+      // pas de second mandat). Le lien RIB a déjà été présenté dans l'autre onglet.
+      memberId = d.existingMandateMemberId;
+    } else {
+      if (!d.email) throw new Error('Un email est requis pour un règlement par prélèvement automatique.');
+      const r = await startMandateSetup({
+        firstName: d.firstName,
+        lastName: d.lastName,
+        email: d.email,
+        phone: d.phone,
+        gymId,
+        subscriptionLabel: d.formula.label,
+        price: d.formula.price,
+      });
+      memberId = r.member_id;
+      authorisationUrl = r.authorisation_url;
+    }
+    // Complète la fiche (créée par GoCardless) avec toutes les données de l'inscription.
     await patchMember(memberId, {
+      first_name: d.firstName,
+      last_name: d.lastName,
+      email: d.email || null,
+      phone: d.phone || null,
       address: d.address || null,
       city: d.city || null,
       postal_code: d.postalCode || null,
+      subscription_label: d.formula.label,
+      price: d.formula.price ?? null,
       periodicity: d.formula.periodicity || null,
       payment_method_label: d.formulaPaymentMethod || 'Prélèvement',
       subscription_start: d.subscriptionStart || null,
