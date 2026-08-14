@@ -331,6 +331,17 @@ const InscriptionPage: React.FC = () => {
           {g.emailed ? '✉️ Contrat envoyé par email à l\u2019adhérent.' : (g.email_reason || 'Email non envoyé.')}
         </p>
 
+        {result.keypadCode && (
+          <div className="mt-6 p-5 rounded-2xl bg-gray-900 text-white flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="text-left">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-300">Code d'accès (clavier) à communiquer</p>
+              <p className="text-4xl font-black tracking-[0.25em] mt-0.5">{result.keypadCode}</p>
+            </div>
+            <button onClick={() => { try { navigator.clipboard.writeText(result.keypadCode!); } catch { /* noop */ } }}
+              className="shrink-0 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 font-bold text-sm">Copier le code</button>
+          </div>
+        )}
+
         <div className="mt-8 flex flex-col gap-3 items-center">
           <button onClick={openContract} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-gray-900 text-white font-bold hover:bg-gray-800">
             <FileText size={18} /> Voir le contrat signé (PDF)
@@ -346,9 +357,9 @@ const InscriptionPage: React.FC = () => {
             </div>
           )}
 
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-wrap justify-center gap-3 mt-4">
+            <button onClick={() => navigate(`/app/crm?member=${result.memberId}`)} className="px-6 py-3 rounded-xl text-white font-bold" style={{ backgroundColor: RED }}>Voir la fiche du client</button>
             <button onClick={reset} className="px-6 py-3 rounded-xl border border-gray-200 font-bold text-gray-700 hover:bg-gray-50">Nouvelle inscription</button>
-            <button onClick={() => navigate('/app/crm/membres')} className="px-6 py-3 rounded-xl border border-gray-200 font-bold text-gray-700 hover:bg-gray-50">Voir les membres</button>
           </div>
         </div>
       </div>
