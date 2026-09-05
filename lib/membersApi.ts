@@ -390,6 +390,24 @@ export async function patchMember(id: string, fields: Record<string, any>): Prom
   if (error) { console.error('membersApi.patchMember', error); throw error; }
 }
 
+/**
+ * Fusionne deux fiches : déplace le compte app + tout l'historique du doublon
+ * vers la fiche à conserver, complète les champs manquants, puis archive le doublon.
+ * `preferDuplicateLogin` = garder le compte (login) du doublon plutôt que celui de
+ * la fiche conservée (utile quand le bon e-mail est sur le doublon récent).
+ */
+export async function mergeMembers(
+  keeperId: string, duplicateId: string, preferDuplicateLogin = false,
+): Promise<void> {
+  const { error } = await supabase.rpc('merge_members', {
+    p_keeper: keeperId, p_duplicate: duplicateId, p_prefer_duplicate_login: preferDuplicateLogin,
+  });
+  if (error) {
+    console.error('membersApi.mergeMembers', error);
+    throw new Error(error.message || 'Fusion impossible.');
+  }
+}
+
 /** Vrai si ce numéro de badge est déjà utilisé par un membre ACTIF (non archivé). */
 export async function isCardNumberTaken(cardNumber: string, excludeMemberId?: string): Promise<boolean> {
   const card = (cardNumber || '').trim();

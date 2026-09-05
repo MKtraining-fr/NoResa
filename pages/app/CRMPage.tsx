@@ -20,6 +20,7 @@ import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../l
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
 import WebcamCapture from '../../components/WebcamCapture';
+import MergeMembersModal from '../../components/MergeMembersModal';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
 
@@ -43,6 +44,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editBackup, setEditBackup] = useState<any | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [memberSales, setMemberSales] = useState<any[]>([]);
@@ -222,6 +224,18 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const closeDetail = () => {
     setIsDetailModalOpen(false);
     if (returnTo) { const dest = returnTo; setReturnTo(null); navigate(dest); }
+  };
+
+  // Après une fusion : recharge la liste et rouvre la fiche conservée.
+  const handleMerged = async (keeperId: string) => {
+    setMergeOpen(false);
+    try {
+      const list = await getMembers();
+      setContacts(list);
+      const keeper: any = list.find((x: any) => x.id === keeperId);
+      if (keeper) setSelectedContact((prev: any) => ({ ...(prev || {}), ...keeper }));
+    } catch { /* noop */ }
+    alert('Fiches fusionnées : l\'historique et le compte ont été transférés, le doublon est archivé.');
   };
 
   // Au retour de la signature du mandat GoCardless (#/app/crm?member=<id>&gcpoll=1),
@@ -1684,6 +1698,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <ShieldAlert size={13} /> Passer en profil staff (masquer des membres)
                   </button>
 
+                  {/* Fusion de deux fiches en doublon */}
+                  <button type="button" onClick={() => setMergeOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-red-600">
+                    <Link2 size={13} /> Fusionner avec une fiche en doublon
+                  </button>
+
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
@@ -2279,6 +2298,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       )}
 
       {webcamFor && <WebcamCapture onCapture={(f) => { if (webcamFor === 'member') applyFichePhoto(f); else applyAddPhoto(f); }} onClose={() => setWebcamFor(null)} />}
+
+      {mergeOpen && selectedContact && (
+        <MergeMembersModal open={mergeOpen} current={selectedContact} onClose={() => setMergeOpen(false)} onMerged={handleMerged} />
+      )}
     </div>
   );
 };
