@@ -35,6 +35,7 @@ const PricingPage = lazy(() => import('./pages/public/PricingPage'));
 const ContactPage = lazy(() => import('./pages/public/ContactPage'));
 const LoginPage = lazy(() => import('./pages/public/LoginPage'));
 const SetPasswordPage = lazy(() => import('./pages/public/SetPasswordPage'));
+const MandateThanksPage = lazy(() => import('./pages/public/MandateThanksPage'));
 const RegisterMemberPage = lazy(() => import('./pages/public/RegisterMemberPage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
@@ -85,6 +86,7 @@ const App: React.FC = () => {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
+          <Route path="/merci-inscription" element={<MandateThanksPage />} />
           <Route path="/inscription" element={<RegisterMemberPage />} />
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
