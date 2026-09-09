@@ -201,11 +201,24 @@ export async function recordSale(
 export async function getRecentSales(limit = 50): Promise<any[]> {
   const { data, error } = await supabase
     .from('sales')
-    .select('id, invoice_number, sale_date, payment_method, subtotal_ht, total_tva, total_ttc, invoice_email_status, invoice_pdf_path, member:members(first_name, last_name, email)')
+    .select('id, invoice_number, sale_date, payment_method, subtotal_ht, total_tva, total_ttc, invoice_email_status, invoice_pdf_path, member:members(first_name, last_name, email), lines:product_sales(quantity, label, product:products(name))')
     .order('sale_date', { ascending: false })
     .limit(limit);
   if (error) { console.error('boutiqueApi.getRecentSales', error); return []; }
   return data ?? [];
+}
+
+/** Résumé lisible des articles d'une vente : « Créatine ×2, 1 séance ». */
+export function saleItemsLabel(sale: any): string {
+  const lines = Array.isArray(sale?.lines) ? sale.lines : [];
+  if (lines.length === 0) return '—';
+  return lines
+    .map((l: any) => {
+      const name = l?.product?.name || l?.label || 'Article';
+      const qty = Number(l?.quantity) || 1;
+      return qty > 1 ? `${name} ×${qty}` : name;
+    })
+    .join(', ');
 }
 
 /** Ventes (achats) d'un client précis, avec leurs lignes. */

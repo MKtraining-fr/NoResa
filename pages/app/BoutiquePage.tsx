@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Product, Member } from '../../types';
-import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice, createProduct, getCategories, CategoryRow, createSupplier } from '../../lib/boutiqueApi';
+import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice, createProduct, getCategories, CategoryRow, createSupplier, saleItemsLabel } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
 import { activatePurchasedAccess } from '../../lib/accessApi';
 
@@ -505,6 +505,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       <th className="py-3 px-3">Facture</th>
                       <th className="py-3 px-3">Date</th>
                       <th className="py-3 px-3">Client</th>
+                      <th className="py-3 px-3">Articles</th>
                       <th className="py-3 px-3">Paiement</th>
                       <th className="py-3 px-3 text-right">Total TTC</th>
                       <th className="py-3 px-3 text-center">Facture email</th>
@@ -517,6 +518,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                         <td className="py-3 px-3 font-semibold text-gray-900">{s.invoice_number || '—'}</td>
                         <td className="py-3 px-3 text-gray-500 font-medium">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : '—'}</td>
                         <td className="py-3 px-3 font-bold text-gray-700">{s.member ? `${s.member.first_name} ${s.member.last_name}` : 'Anonyme'}</td>
+                        <td className="py-3 px-3 text-gray-600 font-medium max-w-[240px] truncate" title={saleItemsLabel(s)}>{saleItemsLabel(s)}</td>
                         <td className="py-3 px-3 text-gray-500 font-medium">{s.payment_method || '—'}</td>
                         <td className="py-3 px-3 text-right font-semibold text-indigo-600">{Number(s.total_ttc || 0).toFixed(2).replace('.', ',')} €</td>
                         <td className="py-3 px-3 text-center">
