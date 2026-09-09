@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { getGymId } from './membersApi';
 import { Product } from '../types';
 
 // --- Produits ---------------------------------------------------------------
@@ -46,6 +47,129 @@ export async function getCategories(): Promise<CategoryRow[]> {
     .order('name');
   if (error) { console.error('boutiqueApi.getCategories', error); return []; }
   return (data ?? []) as CategoryRow[];
+}
+
+/** Crée une catégorie (ou renvoie l'existante de même nom). */
+export async function createCategory(name: string): Promise<CategoryRow> {
+  const n = name.trim();
+  if (!n) throw new Error('Nom de catégorie vide.');
+  const { data: existing } = await supabase.from('product_categories').select('id, name').ilike('name', n).limit(1).maybeSingle();
+  if (existing) return existing as CategoryRow;
+  const { data, error } = await supabase.from('product_categories').insert({ name: n, is_active: true }).select('id, name').single();
+  if (error) { console.error('boutiqueApi.createCategory', error); throw error; }
+  return data as CategoryRow;
+}
+
+// --- Fiche produit (détail + CRUD) -----------------------------------------
+
+export interface ProductDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  sku: string | null;
+  price: number;
+  costPrice: number | null;
+  vatRate: number;
+  stock: number;
+  minStockAlert: number | null;
+  imageUrl: string | null;
+  categoryId: string | null;
+  supplierId: string | null;
+  isActive: boolean;
+  categoryName?: string | null;
+  supplierName?: string | null;
+}
+
+export interface ProductInput {
+  name: string;
+  description?: string | null;
+  sku?: string | null;
+  price: number;
+  costPrice?: number | null;
+  vatRate?: number | null;
+  stock?: number;
+  minStockAlert?: number | null;
+  categoryId?: string | null;
+  supplierId?: string | null;
+}
+
+function rowToProductDetail(r: any): ProductDetail {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? null,
+    sku: r.sku ?? null,
+    price: Number(r.price) || 0,
+    costPrice: r.cost_price != null ? Number(r.cost_price) : null,
+    vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0,
+    stock: r.stock_quantity ?? 0,
+    minStockAlert: r.min_stock_alert ?? null,
+    imageUrl: r.image_url ?? null,
+    categoryId: r.category_id ?? null,
+    supplierId: r.supplier_id ?? null,
+    isActive: r.is_active !== false,
+    categoryName: r.category?.name ?? null,
+    supplierName: r.supplier?.name ?? null,
+  };
+}
+
+const PRODUCT_SELECT = 'id, name, description, sku, price, cost_price, vat_rate, stock_quantity, min_stock_alert, image_url, category_id, supplier_id, is_active, category:product_categories(name), supplier:suppliers(name)';
+
+export async function getProduct(id: string): Promise<ProductDetail | null> {
+  const { data, error } = await supabase.from('products').select(PRODUCT_SELECT).eq('id', id).maybeSingle();
+  if (error) { console.error('boutiqueApi.getProduct', error); return null; }
+  return data ? rowToProductDetail(data) : null;
+}
+
+function inputToRow(p: Partial<ProductInput>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (p.name !== undefined) row.name = p.name;
+  if (p.description !== undefined) row.description = p.description || null;
+  if (p.sku !== undefined) row.sku = p.sku || null;
+  if (p.price !== undefined) row.price = p.price;
+  if (p.costPrice !== undefined) row.cost_price = p.costPrice ?? null;
+  if (p.vatRate !== undefined) row.vat_rate = p.vatRate ?? 0;
+  if (p.stock !== undefined) row.stock_quantity = p.stock;
+  if (p.minStockAlert !== undefined) row.min_stock_alert = p.minStockAlert ?? null;
+  if (p.categoryId !== undefined) row.category_id = p.categoryId || null;
+  if (p.supplierId !== undefined) row.supplier_id = p.supplierId || null;
+  return row;
+}
+
+/** Crée un produit et renvoie son id. */
+export async function createProduct(p: ProductInput): Promise<string> {
+  const gymId = await getGymId();
+  if (!gymId) throw new Error("Impossible de déterminer la salle (gym_id).");
+  const { data, error } = await supabase.from('products')
+    .insert({ gym_id: gymId, is_active: true, stock_quantity: p.stock ?? 0, ...inputToRow(p) })
+    .select('id').single();
+  if (error) { console.error('boutiqueApi.createProduct', error); throw error; }
+  return (data as any).id as string;
+}
+
+/** Met à jour les champs d'un produit. */
+export async function updateProduct(id: string, patch: Partial<ProductInput>): Promise<void> {
+  const { error } = await supabase.from('products').update(inputToRow(patch)).eq('id', id);
+  if (error) { console.error('boutiqueApi.updateProduct', error); throw error; }
+}
+
+/** Active / désactive un produit (désactivé = retiré du catalogue, conservé). */
+export async function setProductActive(id: string, active: boolean): Promise<void> {
+  const { error } = await supabase.from('products').update({ is_active: active }).eq('id', id);
+  if (error) { console.error('boutiqueApi.setProductActive', error); throw error; }
+}
+
+/** Téléverse une photo produit (bucket public) et enregistre son URL. Renvoie l'URL. */
+export async function uploadProductImage(productId: string, file: File): Promise<string> {
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${productId}/${Date.now()}.${ext}`;
+  const up = await supabase.storage.from('product-images').upload(path, file, { upsert: true });
+  if (up.error) { console.error('boutiqueApi.uploadProductImage (upload)', up.error); throw up.error; }
+  const { data: pub } = supabase.storage.from('product-images').getPublicUrl(path);
+  const url = pub.publicUrl;
+  const { error } = await supabase.from('products').update({ image_url: url }).eq('id', productId);
+  if (error) { console.error('boutiqueApi.uploadProductImage (update)', error); throw error; }
+  return url;
 }
 
 // --- Ventes -----------------------------------------------------------------
@@ -126,6 +250,63 @@ export async function getSuppliers(): Promise<SupplierRow[]> {
   const counts: Record<string, number> = {};
   (prods ?? []).forEach((p: any) => { if (p.supplier_id) counts[p.supplier_id] = (counts[p.supplier_id] || 0) + 1; });
   return (data ?? []).map((s: any) => ({ ...s, productCount: counts[s.id] || 0 }));
+}
+
+export async function getSupplier(id: string): Promise<SupplierRow | null> {
+  const { data, error } = await supabase.from('suppliers')
+    .select('id, name, contact_name, email, phone, address, supplier_type, notes')
+    .eq('id', id).maybeSingle();
+  if (error) { console.error('boutiqueApi.getSupplier', error); return null; }
+  return (data as any) || null;
+}
+
+export interface SupplierInput {
+  name: string; contactName?: string | null; email?: string | null;
+  phone?: string | null; address?: string | null; supplierType?: string | null; notes?: string | null;
+}
+
+function supplierInputToRow(p: Partial<SupplierInput>): Record<string, any> {
+  const row: Record<string, any> = {};
+  if (p.name !== undefined) row.name = p.name;
+  if (p.contactName !== undefined) row.contact_name = p.contactName || null;
+  if (p.email !== undefined) row.email = p.email || null;
+  if (p.phone !== undefined) row.phone = p.phone || null;
+  if (p.address !== undefined) row.address = p.address || null;
+  if (p.supplierType !== undefined) row.supplier_type = p.supplierType || null;
+  if (p.notes !== undefined) row.notes = p.notes || null;
+  return row;
+}
+
+export async function createSupplier(p: SupplierInput): Promise<string> {
+  const { data, error } = await supabase.from('suppliers')
+    .insert({ is_active: true, ...supplierInputToRow(p) }).select('id').single();
+  if (error) { console.error('boutiqueApi.createSupplier', error); throw error; }
+  return (data as any).id as string;
+}
+
+export async function updateSupplier(id: string, patch: Partial<SupplierInput>): Promise<void> {
+  const { error } = await supabase.from('suppliers').update(supplierInputToRow(patch)).eq('id', id);
+  if (error) { console.error('boutiqueApi.updateSupplier', error); throw error; }
+}
+
+export async function deactivateSupplier(id: string): Promise<void> {
+  const { error } = await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
+  if (error) { console.error('boutiqueApi.deactivateSupplier', error); throw error; }
+}
+
+/** Produits (actifs et inactifs) rattachés à un fournisseur. */
+export async function getSupplierProducts(supplierId: string): Promise<Product[]> {
+  const { data, error } = await supabase.from('products')
+    .select('id, name, price, stock_quantity, min_stock_alert, image_url, vat_rate, sku, cost_price, is_active, category:product_categories(name)')
+    .eq('supplier_id', supplierId).order('name');
+  if (error) { console.error('boutiqueApi.getSupplierProducts', error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id, name: r.name, price: Number(r.price) || 0, stock: r.stock_quantity ?? 0,
+    minStockAlert: r.min_stock_alert ?? null, category: r.category?.name || 'Divers',
+    image: r.image_url || undefined, vatRate: r.vat_rate != null ? Number(r.vat_rate) : 0,
+    costPrice: r.cost_price != null ? Number(r.cost_price) : undefined, sku: r.sku || undefined,
+    supplier: undefined, isActive: r.is_active !== false,
+  } as any));
 }
 
 // --- Statistiques -----------------------------------------------------------

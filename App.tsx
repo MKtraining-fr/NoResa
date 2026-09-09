@@ -49,6 +49,8 @@ const UnpaidPage = lazy(() => import('./pages/app/UnpaidPage'));
 const CancellationsPage = lazy(() => import('./pages/app/CancellationsPage'));
 const AnnouncementsPage = lazy(() => import('./pages/app/AnnouncementsPage'));
 const BoutiquePage = lazy(() => import('./pages/app/BoutiquePage'));
+const ProductDetailPage = lazy(() => import('./pages/app/ProductDetailPage'));
+const SupplierDetailPage = lazy(() => import('./pages/app/SupplierDetailPage'));
 const TeamPage = lazy(() => import('./pages/app/TeamPage'));
 const SettingsPage = lazy(() => import('./pages/app/SettingsPage'));
 const MessageriePage = lazy(() => import('./pages/app/MessageriePage'));
@@ -129,6 +131,8 @@ const App: React.FC = () => {
             <Route path="boutique/produits" element={<BoutiquePage view="produits" />} />
             <Route path="boutique/ventes" element={<BoutiquePage view="ventes" />} />
             <Route path="boutique/fournisseurs" element={<BoutiquePage view="fournisseurs" />} />
+            <Route path="boutique/produit/:id" element={<ProductDetailPage />} />
+            <Route path="boutique/fournisseur/:id" element={<SupplierDetailPage />} />
 
             {/* Access Control Route */}
             <Route path="acces" element={<AccessControlPage />} />

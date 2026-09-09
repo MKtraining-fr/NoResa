@@ -4,10 +4,11 @@ import {
   ShoppingBag, Plus, Package, TrendingUp, Search, Truck, 
   ShoppingCart, ArrowUpRight, X, Minus, Trash2, CheckCircle2, 
   CreditCard, Banknote, User, UserPlus, Check, ChevronDown,
-  Edit2, Save, Calendar, Camera, Tag, AlertTriangle, Download, Send, Pencil, FileText
+  Edit2, Save, Calendar, Camera, Tag, AlertTriangle, Download, Send, Pencil, FileText, Loader2
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Product, Member } from '../../types';
-import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice } from '../../lib/boutiqueApi';
+import { getProducts, recordSale, getRecentSales, sendInvoice, getStats, getInvoiceUrl, BoutiqueStats, getSuppliers, SupplierRow, deleteSale, updateProductStock, generateInvoice, viewInvoice, createProduct, getCategories, CategoryRow, createSupplier } from '../../lib/boutiqueApi';
 import { searchMembers, createQuickMember } from '../../lib/membersApi';
 import { activatePurchasedAccess } from '../../lib/accessApi';
 
@@ -19,6 +20,7 @@ interface BoutiquePageProps {
 }
 
 const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState(view);
   const [isSelling, setIsSelling] = useState(false);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -57,12 +59,27 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [quickEmail, setQuickEmail] = useState('');
   const [creatingMember, setCreatingMember] = useState(false);
 
+  // Catégories + création d'un nouveau produit (formulaire réel)
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [npName, setNpName] = useState('');
+  const [npPrice, setNpPrice] = useState('');
+  const [npStock, setNpStock] = useState('');
+  const [npCategory, setNpCategory] = useState('');
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [npError, setNpError] = useState('');
+  // Nouveau fournisseur
+  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
+  const [nsName, setNsName] = useState('');
+  const [nsContact, setNsContact] = useState('');
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+
   const lowStock = (p: Product) => p.stock <= (p.minStockAlert ?? 3);
   const lowStockProducts = products.filter(lowStock);
 
   useEffect(() => {
     const load = () => getProducts().then(setProducts);
     load();
+    getCategories().then(setCategories);
     window.addEventListener('focus', load);
     return () => window.removeEventListener('focus', load);
   }, []);
@@ -288,6 +305,40 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
     }
   };
 
+  // Création réelle d'un produit : minimal ici (nom + prix), puis on file sur sa fiche
+  // pour la photo, la description et le reste.
+  const handleCreateProduct = async () => {
+    setNpError('');
+    if (!npName.trim()) { setNpError('Le nom est obligatoire.'); return; }
+    const price = Number(npPrice.replace(',', '.'));
+    if (!(price >= 0)) { setNpError('Prix de vente invalide.'); return; }
+    setCreatingProduct(true);
+    try {
+      const id = await createProduct({
+        name: npName.trim(), price,
+        stock: npStock === '' ? 0 : (parseInt(npStock, 10) || 0),
+        categoryId: npCategory || null,
+      });
+      setIsAddProductModalOpen(false);
+      setNpName(''); setNpPrice(''); setNpStock(''); setNpCategory('');
+      navigate(`/app/boutique/produit/${id}`);
+    } catch (e: any) {
+      setNpError(e?.message || 'Création impossible.');
+    } finally { setCreatingProduct(false); }
+  };
+
+  const handleCreateSupplier = async () => {
+    if (!nsName.trim() || creatingSupplier) return;
+    setCreatingSupplier(true);
+    try {
+      const id = await createSupplier({ name: nsName.trim(), contactName: nsContact.trim() || null });
+      setSupplierModalOpen(false); setNsName(''); setNsContact('');
+      navigate(`/app/boutique/fournisseur/${id}`);
+    } catch (e: any) {
+      alert('Création impossible : ' + (e?.message || ''));
+    } finally { setCreatingSupplier(false); }
+  };
+
   const openStockEdit = (p: Product) => {
     setStockEdit(p);
     setStockValue(String(p.stock));
@@ -365,7 +416,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                {products.map(product => (
                  <div key={product.id} className="group border border-gray-50 rounded-2xl overflow-hidden hover:shadow-md transition-all duration-500 bg-white relative">
-                    <div className="relative overflow-hidden aspect-square bg-gray-50 flex items-center justify-center">
+                    <div onClick={() => navigate(`/app/boutique/produit/${product.id}`)} title="Voir la fiche produit" className="relative overflow-hidden aspect-square bg-gray-50 flex items-center justify-center cursor-pointer">
                       {product.image ? (
                         <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700" alt="" />
                       ) : (
@@ -374,9 +425,9 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                     </div>
                     <div className="p-6 space-y-4">
-                       <div>
+                       <div onClick={() => navigate(`/app/boutique/produit/${product.id}`)} className="cursor-pointer">
                           <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide mb-1">{product.category}</p>
-                          <h4 className="text-sm font-semibold text-gray-900 truncate">{product.name}</h4>
+                          <h4 className="text-sm font-semibold text-gray-900 truncate hover:text-indigo-600 transition-colors">{product.name}</h4>
                        </div>
                        <div className="flex items-center justify-between">
                           <p className="text-xl font-semibold text-gray-900">{product.price.toFixed(2).replace('.', ',')} €</p>
@@ -384,7 +435,10 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                             {product.stock} en stock <Pencil size={10} />
                           </button>
                        </div>
-                       <button onClick={() => { setIsSelling(true); addToCart(product); }} className="w-full py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-semibold uppercase tracking-wide hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Vendre l'article</button>
+                       <div className="grid grid-cols-2 gap-2">
+                         <button onClick={() => navigate(`/app/boutique/produit/${product.id}`)} className="py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-semibold uppercase tracking-wide hover:bg-gray-100 transition-all">Fiche</button>
+                         <button onClick={() => { setIsSelling(true); addToCart(product); }} className="py-3 bg-gray-50 text-gray-600 rounded-2xl text-[10px] font-semibold uppercase tracking-wide hover:bg-indigo-600 hover:text-white transition-all shadow-sm">Vendre</button>
+                       </div>
                     </div>
                  </div>
                ))}
@@ -493,15 +547,21 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
 
         {activeView === 'fournisseurs' && (
           <div className="p-5">
+            <div className="flex justify-end mb-5">
+              <button onClick={() => setSupplierModalOpen(true)} className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-bold text-xs uppercase tracking-wide shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <Plus size={16} /> Nouveau fournisseur
+              </button>
+            </div>
             {suppliers.length === 0 ? (
               <div className="p-6 flex flex-col items-center justify-center text-center space-y-6">
                 <div className="bg-indigo-50 p-5 rounded-full text-indigo-600"><Truck size={48} /></div>
                 <h3 className="text-xl font-semibold">Aucun fournisseur</h3>
+                <p className="text-gray-500 text-sm">Ajoutez vos fournisseurs pour les rattacher à vos produits.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {suppliers.map(s => (
-                  <div key={s.id} className="border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-xl transition-all">
+                  <button key={s.id} onClick={() => navigate(`/app/boutique/fournisseur/${s.id}`)} className="text-left border border-gray-100 rounded-2xl p-6 bg-white hover:shadow-xl hover:border-indigo-200 transition-all">
                     <div className="flex items-center space-x-4 mb-4">
                       <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-lg font-semibold uppercase shrink-0">{initials(s.name, '')}</div>
                       <div className="min-w-0">
@@ -518,7 +578,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produits</span>
                       <span className="text-sm font-semibold text-gray-900">{s.productCount}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -542,36 +602,32 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                <button onClick={() => setIsAddProductModalOpen(false)} className="p-2 hover:bg-white/10 rounded-xl relative z-10 transition-colors"><X size={24} /></button>
             </div>
             <div className="p-6 space-y-6">
-               <div className="flex items-center space-x-8">
-                  <div className="w-24 h-24 bg-gray-50 border-4 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-gray-400 hover:border-indigo-100 hover:bg-indigo-50 transition-all cursor-pointer group">
-                     <Camera size={24} className="group-hover:scale-110 transition-transform" />
-                     <span className="text-[10px] font-semibold uppercase mt-2">PHOTO</span>
-                  </div>
-                  <div className="flex-grow space-y-1">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom du produit</label>
-                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Whey, Shaker, Gants..." />
-                  </div>
+               <div className="space-y-1">
+                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom du produit</label>
+                 <input type="text" value={npName} onChange={(e) => setNpName(e.target.value)} autoFocus className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Whey, Shaker, Gants..." />
                </div>
                <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1">
                     <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prix de vente (€)</label>
-                    <input type="text" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="19.90" />
+                    <input type="text" inputMode="decimal" value={npPrice} onChange={(e) => setNpPrice(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="19,90" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Stock initial</label>
-                    <input type="number" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="50" />
+                    <input type="number" value={npStock} onChange={(e) => setNpStock(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="0" />
                   </div>
                </div>
                <div className="space-y-1">
                   <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Catégorie</label>
-                  <select className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
-                    <option>Suppléments</option>
-                    <option>Accessoires</option>
-                    <option>Équipement</option>
-                    <option>Vêtements</option>
+                  <select value={npCategory} onChange={(e) => setNpCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none">
+                    <option value="">— Aucune —</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                </div>
-               <button onClick={() => setIsAddProductModalOpen(false)} className="w-full py-5 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] uppercase tracking-wide text-xs">Ajouter à l'inventaire</button>
+               <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1.5"><Camera size={13} /> Photo, description et fournisseur s'ajoutent juste après, sur la fiche du produit.</p>
+               {npError && <p className="text-[12px] font-semibold text-red-600">{npError}</p>}
+               <button onClick={handleCreateProduct} disabled={creatingProduct} className="w-full py-5 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] uppercase tracking-wide text-xs disabled:opacity-60 flex items-center justify-center gap-2">
+                 {creatingProduct ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Créer & ouvrir la fiche
+               </button>
             </div>
           </div>
         </div>
@@ -854,6 +910,32 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
            </div>
         </div>
       )}
+      {/* MODALE NOUVEAU FOURNISSEUR */}
+      {supplierModalOpen && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setSupplierModalOpen(false)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="p-6 bg-indigo-600 text-white flex justify-between items-center">
+              <h2 className="text-lg font-semibold flex items-center gap-2"><Truck size={18} /> Nouveau fournisseur</h2>
+              <button onClick={() => setSupplierModalOpen(false)} className="p-1.5 hover:bg-white/10 rounded-xl"><X size={20} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom du fournisseur</label>
+                <input value={nsName} onChange={e => setNsName(e.target.value)} autoFocus className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Nutrimuscle, Décathlon Pro…" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Contact (optionnel)</label>
+                <input value={nsContact} onChange={e => setNsContact(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Nom du contact" />
+              </div>
+              <p className="text-[11px] text-gray-400 font-medium">Le reste (email, téléphone, adresse, notes) se complète sur la fiche.</p>
+              <button onClick={handleCreateSupplier} disabled={!nsName.trim() || creatingSupplier} className="w-full py-4 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-wide text-xs disabled:opacity-60 flex items-center justify-center gap-2">
+                {creatingSupplier ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Créer & ouvrir la fiche
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODALE STOCK */}
       {stockEdit && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setStockEdit(null)}>
