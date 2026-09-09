@@ -367,8 +367,13 @@ export async function activatePurchasedAccess(
     end.setMonth(end.getMonth() + 1);
     patch.subscription_end = end.toISOString().split('T')[0];
     endTime = ymd(end); // date de fin appliquée au contrôleur (format AAAAMMJJ)
+    patch.pack_credits = null;   // accès au temps : pas de carnet
+    patch.pack_since = null;
   } else {
     patch.subscription_end = null;
+    // Carnet/séance : compteur de crédits + nouvelle fenêtre de comptage (comme apply_recharge).
+    patch.pack_credits = kind === 'pack10' ? 10 : 1;
+    patch.pack_since = today.toISOString();
   }
   await patchMember(member.id, patch);
 

@@ -201,7 +201,7 @@ const RachatCard: React.FC<{ pack: MyPackStatus; onRecharge: () => void }> = ({ 
           </div>
           <div>
             <p className="font-extrabold text-[14.5px] text-gray-900">{isCarnet ? 'Carnet de séances' : 'Séance à l’unité'}</p>
-            <p className="text-[11px] text-gray-400 font-semibold">{isCarnet ? 'Pack de 10 séances' : '1 entrée'}</p>
+            <p className="text-[11px] text-gray-400 font-semibold">{isCarnet ? `${pack.total} séances au total` : '1 entrée'}</p>
           </div>
         </div>
         <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg ${low ? 'text-orange-600 bg-orange-50' : 'text-green-700 bg-green-50'}`}>
