@@ -30,7 +30,7 @@ export const FORMULAS: Formula[] = [
 ];
 
 /** Badge obligatoire (avec son propre mode de paiement). */
-export const BADGE = { label: 'Badge (obligatoire)', price: 15.00 };
+export const BADGE = { label: 'Badge (optionnel)', price: 15.00 };
 
 /** Services complémentaires optionnels. */
 export const SERVICES = [
@@ -186,6 +186,7 @@ export interface InscriptionData {
   formulaPaymentMethod: string;   // règlement de la formule (Prélèvement / Espèces / CB / Chèque / Comptant / Facturé à l'association)
   paidBy?: string;                // payeur tiers (association / entreprise) si facturation groupe
   badgePaymentMethod: string;     // règlement du badge
+  includeBadge?: boolean;         // badge pris (optionnel) : ajoute la ligne badge au contrat/total
   services: { label: string; price: number }[];
   // Déclarations + signature
   consentCga: boolean;
@@ -347,7 +348,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     } catch (e) { console.error('enqueue grant', e); }
   }
 
-  const needsBadge = d.formula.group === 'Engagement';
+  const needsBadge = d.includeBadge === true;
   const options: ContractOption[] = [
     ...(needsBadge ? [{ label: BADGE.label, price: BADGE.price, payment: d.badgePaymentMethod }] : []),
     ...d.services.map((s) => ({ label: s.label, price: s.price })),

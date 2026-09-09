@@ -100,6 +100,8 @@ const InscriptionPage: React.FC = () => {
   const [freeLabel, setFreeLabel] = useState('');
   const [formulaPaymentMethod, setFormulaPaymentMethod] = useState('');
   const [badgePaymentMethod, setBadgePaymentMethod] = useState('CB');
+  // Badge désormais OPTIONNEL (plus obligatoire) : ajouté seulement si coché.
+  const [wantBadge, setWantBadge] = useState(false);
   const [services, setServices] = useState<Record<string, boolean>>({});
   // Groupe de formules déplié à l'étape Formule (accordéon : repliés par défaut).
   const [openGrp, setOpenGrp] = useState<string | null>(null);
@@ -132,9 +134,10 @@ const InscriptionPage: React.FC = () => {
     return FORMULAS.find((f) => f.key === formulaKey) || null;
   }, [billingRule, groupName, formulaKey, freeAmount, freeLabel]);
   const chosenServices = SERVICES.filter((s) => services[s.key]);
-  // Le badge n'est requis que pour un abonnement (formule "Engagement"). Pas d'abonnement = pas de badge.
-  const needsBadge = formula?.group === 'Engagement';
-  const total = (formula ? formula.price : 0) + (needsBadge ? BADGE.price : 0) + chosenServices.reduce((a, s) => a + s.price, 0);
+  // Le badge est proposé pour un abonnement (formule "Engagement") mais reste OPTIONNEL.
+  const badgeEligible = formula?.group === 'Engagement';
+  const includeBadge = badgeEligible && wantBadge;
+  const total = (formula ? formula.price : 0) + (includeBadge ? BADGE.price : 0) + chosenServices.reduce((a, s) => a + s.price, 0);
   const eur = (n: number) => `${(n || 0).toFixed(2).replace('.', ',')} €`;
 
   // Mode de règlement + période par défaut selon la formule
@@ -206,7 +209,7 @@ const InscriptionPage: React.FC = () => {
   // --- Navigation entre étapes ----------------------------------------------
   const canNext = () => {
     if (step === 0) return firstName.trim() && lastName.trim();
-    if (step === 1) return !!formula && !!formulaPaymentMethod && (!needsBadge || !!badgePaymentMethod) && (!!billingRule || formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
+    if (step === 1) return !!formula && !!formulaPaymentMethod && (!includeBadge || !!badgePaymentMethod) && (!!billingRule || formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
     if (step === 2) return consentCga && consentMedical;
     return true;
   };
@@ -279,14 +282,14 @@ const InscriptionPage: React.FC = () => {
         phone: phone || undefined, email: email.trim() || undefined,
         profession: profession || undefined, company: company || undefined,
         photo,
-        cardNumber: needsBadge ? (cardNumber.trim() || undefined) : undefined,
+        cardNumber: includeBadge ? (cardNumber.trim() || undefined) : undefined,
         groupName: groupName || undefined,
         subgroupName: subgroupName || undefined,
         commercialId: commercialId || undefined,
         existingMandateMemberId: mandateMemberId || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
-        formula, formulaPaymentMethod, badgePaymentMethod,
+        formula, formulaPaymentMethod, badgePaymentMethod, includeBadge,
         paidBy: billingRule?.payerName || undefined,
         services: chosenServices.map((s) => ({ label: s.label, price: s.price })),
         consentCga, consentMedical,
@@ -606,9 +609,18 @@ const InscriptionPage: React.FC = () => {
               </div>
             )}
 
-            {needsBadge && (
+            {badgeEligible && (
               <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
-                <div className="flex items-center gap-2 font-bold text-gray-900"><BadgeCheck size={18} style={{ color: RED }} /> Badge (obligatoire) — {eur(BADGE.price)}</div>
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="flex items-center gap-2 font-bold text-gray-900"><BadgeCheck size={18} style={{ color: RED }} /> Badge (optionnel) — {eur(BADGE.price)}</span>
+                  <span className="relative inline-flex items-center">
+                    <input type="checkbox" className="sr-only peer" checked={wantBadge} onChange={(e) => setWantBadge(e.target.checked)} />
+                    <span className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-red-500 transition-colors" />
+                    <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                  </span>
+                </label>
+                {!wantBadge && <p className="text-[11px] text-gray-400">Le badge n'est plus obligatoire. Active-le seulement si l'adhérent en prend un.</p>}
+                {wantBadge && (<>
                 <div>
                   <span className={label}>Numéro de badge</span>
                   <div className="flex gap-2">
@@ -627,6 +639,7 @@ const InscriptionPage: React.FC = () => {
                     ))}
                   </div>
                 </div>
+                </>)}
               </div>
             )}
 
@@ -655,7 +668,7 @@ const InscriptionPage: React.FC = () => {
               {phone && <Row k="Téléphone" v={phone} />}
               <Row k="Formule" v={`${formula?.label || '—'} (${eur(formula?.price || 0)}${formula?.recurring ? '/mois' : ''})`} />
               <Row k="Règlement formule" v={formulaPaymentMethod} />
-              {needsBadge && <Row k="Badge obligatoire" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />}
+              {includeBadge && <Row k="Badge (optionnel)" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />}
               {chosenServices.map((s) => <Row key={s.key} k={s.label} v={eur(s.price)} />)}
               <div className="flex justify-between px-4 py-3 font-semibold text-base" style={{ color: RED }}>
                 <span>TOTAL À L'INSCRIPTION</span><span>{eur(total)}</span>
