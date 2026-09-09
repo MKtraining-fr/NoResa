@@ -193,10 +193,20 @@ export async function restoreMember(id: string): Promise<void> {
   if (error) { console.error('membersApi.restoreMember', error); throw error; }
 }
 
-/** Suppression définitive (irréversible). À n'utiliser que depuis la corbeille. */
+/**
+ * Suppression définitive (RGPD, irréversible). À n'utiliser que depuis la corbeille.
+ * Efface la fiche, TOUTES ses données liées (contrats, paiements, passages…) ET le
+ * compte de connexion. Passe par une Edge Function (droits service, contrôle staff).
+ */
 export async function hardDeleteMember(id: string): Promise<void> {
-  const { error } = await supabase.from('members').delete().eq('id', id);
-  if (error) { console.error('membersApi.hardDeleteMember', error); throw error; }
+  const { data, error } = await supabase.functions.invoke('member-hard-delete', { body: { member_id: id } });
+  if (error) {
+    let msg = error.message || 'Suppression impossible';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    console.error('membersApi.hardDeleteMember', msg);
+    throw new Error(msg);
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
 }
 
 /**
