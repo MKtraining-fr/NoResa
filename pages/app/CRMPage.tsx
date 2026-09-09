@@ -12,7 +12,7 @@ import {
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload, StickyNote,
   RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, regularizePayments, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
@@ -224,6 +224,20 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const closeDetail = () => {
     setIsDetailModalOpen(false);
     if (returnTo) { const dest = returnTo; setReturnTo(null); navigate(dest); }
+  };
+
+  // Renvoie l'e-mail d'activation (création de mot de passe app) à l'adhérent.
+  const [resendingActivation, setResendingActivation] = useState(false);
+  const resendActivation = async () => {
+    if (!selectedContact?.id) return;
+    if (!selectedContact.email) { alert("Cette fiche n'a pas d'e-mail. Ajoutez-en un d'abord."); return; }
+    setResendingActivation(true);
+    try {
+      await resendActivationEmail(selectedContact.id);
+      alert(`E-mail d'activation envoyé à ${selectedContact.email}.`);
+    } catch (e: any) {
+      alert("Envoi impossible : " + (e?.message || ''));
+    } finally { setResendingActivation(false); }
   };
 
   // Après une fusion : recharge la liste et rouvre la fiche conservée.
@@ -1701,6 +1715,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {/* Fusion de deux fiches en doublon */}
                   <button type="button" onClick={() => setMergeOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-red-600">
                     <Link2 size={13} /> Fusionner avec une fiche en doublon
+                  </button>
+
+                  {/* Renvoi de l'e-mail d'activation (création de mot de passe app) */}
+                  <button type="button" onClick={resendActivation} disabled={resendingActivation} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-indigo-600 disabled:opacity-50">
+                    <Mail size={13} /> {resendingActivation ? 'Envoi…' : "Renvoyer l'e-mail d'activation (app)"}
                   </button>
 
                   {/* Contact + abonnement résumé */}

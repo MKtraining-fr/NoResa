@@ -418,6 +418,22 @@ export async function mergeMembers(
   }
 }
 
+/**
+ * (Re)crée le compte app de l'adhérent et lui renvoie l'e-mail d'activation
+ * (lien de création de mot de passe). Idempotent. Utile si le mail initial n'est
+ * pas arrivé ou pour un membre inscrit sans compte (ex. formule sans engagement).
+ */
+export async function resendActivationEmail(memberId: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('member-welcome', { body: { member_id: memberId } });
+  if (error) {
+    let msg = error.message || "Envoi de l'e-mail impossible";
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    throw new Error(msg);
+  }
+  const r = data as any;
+  if (r && r.ok === false) throw new Error(r.reason || "E-mail non envoyé (configuration ?).");
+}
+
 /** Vrai si ce numéro de badge est déjà utilisé par un membre ACTIF (non archivé). */
 export async function isCardNumberTaken(cardNumber: string, excludeMemberId?: string): Promise<boolean> {
   const card = (cardNumber || '').trim();

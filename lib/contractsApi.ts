@@ -375,9 +375,11 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
 
   const generate = await generateContract(contractId, d.signatureDataUrl, true);
 
-  // Inscription AVEC engagement -> crée le compte adhérent + e-mail d'activation
+  // Toute inscription avec e-mail -> crée le compte adhérent + e-mail d'activation
   // (lien de création de mot de passe pour accéder à l'app). Best-effort.
-  if (d.formula.engagement && d.email) {
+  // (Avant : réservé aux formules « avec engagement » -> les « 1 mois », séances,
+  // carnets ne recevaient jamais leur e-mail de création de mot de passe.)
+  if (d.email) {
     try { await supabase.functions.invoke('member-welcome', { body: { member_id: memberId } }); }
     catch (e) { console.error('member-welcome', e); }
   }
