@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabaseClient';
+import { syncPushToken } from './native';
 
 // Rôles tels qu'ils existent dans la table public.users (en minuscules).
 export type DbRole =
@@ -95,6 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfileLoaded(false);
           setTimeout(() => { loadProfile(uid); }, 0);
         }
+        // App native : (ré)enregistre le token push maintenant qu'on a un compte. No-op en PWA.
+        setTimeout(() => { syncPushToken(); }, 0);
       } else {
         userIdRef.current = null;
         setUserId(null);

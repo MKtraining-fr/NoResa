@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import { AuthProvider } from "./lib/AuthContext";
 import { supabase } from "./lib/supabaseClient";
+import { initNative } from "./lib/native";
 
 /**
  * Lien e-mail « créer / réinitialiser mon mot de passe » : Supabase renvoie les
@@ -53,6 +54,9 @@ async function boot() {
       }
     }
   }
+
+  // Initialise la couche native (no-op en PWA/navigateur).
+  initNative();
 
   const rootElement = document.getElementById("root");
   if (!rootElement) {
