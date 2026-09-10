@@ -84,6 +84,11 @@ const MemberHome: React.FC = () => {
   }
 
   const active = (member.status ?? '').toLowerCase() === 'active';
+  // Abonnement d'engagement en cours (formule récurrente / annuelle) : on NE propose PAS
+  // l'achat de séance. L'achat/recharge reste réservé au SANS engagement : mois, séance,
+  // carnet (ou pas encore d'abonnement du tout).
+  const subLabel = (member.subscriptionLabel || '').toLowerCase();
+  const hasEngagement = /formule|pr[ée]l[èe]vement|engagement|annuel|ann[ée]e|abonnement/.test(subLabel);
   const aff = affluenceLevel(occ);
   const maxEntries = Math.max(1, ...occ.map((o) => o.entries));
   const nowH = new Date().getHours();
@@ -133,10 +138,13 @@ const MemberHome: React.FC = () => {
         </p>
       </button>
 
-      {/* Carnet de séances (détenteurs) — sinon CTA « première séance » */}
+      {/* Carnet (détenteurs) ; abonnement d'engagement -> pas d'achat de séance ;
+          sinon (sans engagement / pas encore d'abo) -> CTA « prendre une séance ». */}
       {pack?.isPack
         ? <RachatCard pack={pack} onRecharge={() => setRechargeOpen(true)} />
-        : <FirstSeanceCard onBuy={() => setRechargeOpen(true)} />}
+        : hasEngagement
+          ? <AbonnementActifCard label={member.subscriptionLabel} end={member.subscriptionEnd} />
+          : <FirstSeanceCard onBuy={() => setRechargeOpen(true)} />}
 
       {/* App partenaire MuscleFlow */}
       <PartnerCard onOpen={() => setPartnerOpen(true)} />
@@ -236,6 +244,21 @@ const ProspectActivateCard: React.FC<{ onActivate: () => void }> = ({ onActivate
       <button onClick={onActivate} className="mt-4 w-full bg-white text-gray-900 py-3 rounded-2xl font-extrabold text-[13.5px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
         <Plus size={16} strokeWidth={2.4} /> Activer mon accès
       </button>
+    </div>
+  </div>
+);
+
+// Membre avec abonnement d'engagement : on affiche son abonnement, sans proposer d'achat de séance.
+const AbonnementActifCard: React.FC<{ label: string | null; end: string | null }> = ({ label, end }) => (
+  <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm">
+    <div className="flex items-center gap-2.5">
+      <div className="w-10 h-10 rounded-xl bg-brand-soft flex items-center justify-center text-brand shrink-0"><Dumbbell size={19} /></div>
+      <div className="min-w-0">
+        <p className="font-extrabold text-[14.5px] text-gray-900">Abonnement en cours</p>
+        <p className="text-[11px] text-gray-400 font-semibold truncate">
+          {label || 'Membre'}{end ? ` · jusqu'au ${new Date(end).toLocaleDateString('fr-FR')}` : ''}
+        </p>
+      </div>
     </div>
   </div>
 );
