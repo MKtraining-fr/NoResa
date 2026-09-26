@@ -11,7 +11,15 @@ const RED = '#C81E1E';
  *    ou liens). Laisse vide -> emplacements gris "photo à venir".
  *  - VIDEO_URL : un lien YouTube ou Vimeo (visite de la salle). Vide -> masqué.
  * ------------------------------------------------------------------ */
-const PHOTOS: string[] = [];
+const BASE = import.meta.env.BASE_URL; // '/' sur le web, './' sur l'app native
+const PHOTOS: string[] = [
+  `${BASE}salle/1.jpg`,
+  `${BASE}salle/2.jpg`,
+  `${BASE}salle/3.jpg`,
+  `${BASE}salle/4.jpg`,
+  `${BASE}salle/5.jpg`,
+  `${BASE}salle/6.jpg`,
+];
 const VIDEO_URL = '';
 
 const DecouvertePage: React.FC = () => {
