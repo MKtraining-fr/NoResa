@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Dumbbell, HeartPulse, Users, Award, Timer, Flame, ArrowRight } from 'lucide-react';
+import { Dumbbell, HeartPulse, Award, Timer, Flame, ShoppingBag, ArrowRight } from 'lucide-react';
 
 const RED = '#C81E1E';
 
@@ -11,10 +11,10 @@ const RED = '#C81E1E';
 const ACTIVITES = [
   { icon: Dumbbell, title: 'Musculation', desc: 'Un plateau complet : machines guidées, poids libres, racks et barres pour tous les niveaux.' },
   { icon: HeartPulse, title: 'Cardio-training', desc: 'Tapis, vélos, rameurs et elliptiques pour l’endurance et la remise en forme.' },
-  { icon: Users, title: 'Cours collectifs', desc: 'Des séances encadrées pour se motiver en groupe et varier les entraînements.' },
+  { icon: Flame, title: 'Zone Hyrox', desc: 'Espace fonctionnel dédié : sled, wall balls, rameur, ski erg… pour t’entraîner façon Hyrox.' },
   { icon: Award, title: 'Accompagnement', desc: 'Suivi et programmes personnalisés avec la formule « Suivi + Formation ».' },
   { icon: Timer, title: 'Accès en autonomie', desc: 'Large amplitude horaire : entraîne-toi quand ça t’arrange, de 6h à 23h en semaine.' },
-  { icon: Flame, title: 'Renforcement & cross', desc: 'Espace fonctionnel pour le renforcement, la mobilité et les circuits.' },
+  { icon: ShoppingBag, title: 'Boutique nutrition', desc: 'Protéines, compléments et accessoires : retrouve tout sur place à l’accueil.' },
 ];
 
 const ActivitesPage: React.FC = () => (
