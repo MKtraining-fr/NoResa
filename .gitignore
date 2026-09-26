@@ -27,3 +27,4 @@ migrated_prompt_history/
 
 # Outillage local Claude (preview, etc.)
 .claude/
+qr-inscription.*
