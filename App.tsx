@@ -49,6 +49,7 @@ const DecouvertePage = lazy(() => import('./pages/public/salle/DecouvertePage'))
 const ActivitesPage = lazy(() => import('./pages/public/salle/ActivitesPage'));
 const TarifsPage = lazy(() => import('./pages/public/salle/TarifsPage'));
 const FaqPage = lazy(() => import('./pages/public/salle/FaqPage'));
+const SalleLoginPage = lazy(() => import('./pages/public/salle/SalleLoginPage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -110,6 +111,7 @@ const App: React.FC = () => {
             <Route path="/activites" element={<ActivitesPage />} />
             <Route path="/tarifs" element={<TarifsPage />} />
             <Route path="/faq" element={<FaqPage />} />
+            <Route path="/connexion-salle" element={<SalleLoginPage />} />
           </Route>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>

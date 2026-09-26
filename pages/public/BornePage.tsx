@@ -45,7 +45,7 @@ const BornePage: React.FC = () => {
               </span>
               <ArrowRight size={20} style={{ color: RED }} className="group-active:translate-x-1 transition-transform" />
             </Link>
-            <Link to="/connexion" className="group bg-white/10 border border-white/30 text-white rounded-3xl p-6 active:scale-[0.98] transition-transform flex items-center gap-4">
+            <Link to="/connexion-salle" className="group bg-white/10 border border-white/30 text-white rounded-3xl p-6 active:scale-[0.98] transition-transform flex items-center gap-4">
               <span className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><CreditCard size={26} /></span>
               <span className="flex-1">
                 <span className="block text-xl font-extrabold">Payer une séance</span>

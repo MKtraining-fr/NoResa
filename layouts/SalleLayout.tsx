@@ -32,7 +32,7 @@ const SalleLayout: React.FC = () => {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/connexion" className="text-[15px] font-bold text-gray-600 hover:text-[color:var(--red)]">Connexion</Link>
+            <Link to="/connexion-salle" className="text-[15px] font-bold text-gray-600 hover:text-[color:var(--red)]">Connexion</Link>
             <Link to="/inscription" className="inline-flex items-center gap-2 text-white font-bold text-sm px-5 py-2.5 rounded-full shadow-md" style={{ backgroundColor: RED }}>
               <UserPlus size={16} /> S'inscrire
             </Link>
@@ -49,7 +49,7 @@ const SalleLayout: React.FC = () => {
               <NavLink key={n.to} to={n.to} onClick={() => setOpen(false)} className="text-lg font-bold text-gray-800">{n.label}</NavLink>
             ))}
             <div className="pt-3 border-t border-gray-100 flex flex-col gap-3">
-              <Link to="/connexion" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 text-lg font-bold text-gray-700"><LogIn size={18} /> Connexion</Link>
+              <Link to="/connexion-salle" onClick={() => setOpen(false)} className="inline-flex items-center gap-2 text-lg font-bold text-gray-700"><LogIn size={18} /> Connexion</Link>
               <Link to="/inscription" onClick={() => setOpen(false)} className="inline-flex items-center justify-center gap-2 text-white font-bold px-4 py-3 rounded-xl" style={{ backgroundColor: RED }}><UserPlus size={18} /> S'inscrire</Link>
             </div>
           </div>
@@ -78,7 +78,7 @@ const SalleLayout: React.FC = () => {
         <div className="border-t border-white/10">
           <div className="max-w-6xl mx-auto px-5 py-4 text-xs text-gray-500 flex items-center justify-between">
             <span>© {new Date().getFullYear()} La SaLLe</span>
-            <Link to="/connexion" className="hover:text-white">Espace membre</Link>
+            <Link to="/connexion-salle" className="hover:text-white">Espace membre</Link>
           </div>
         </div>
       </footer>

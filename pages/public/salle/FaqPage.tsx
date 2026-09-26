@@ -8,7 +8,7 @@ const RED = '#C81E1E';
 const FAQ: { q: string; a: React.ReactNode }[] = [
   { q: 'Quels sont les horaires ?', a: <>Du lundi au vendredi : <b>6h00 – 23h00</b>. Samedi et dimanche : <b>7h00 – 20h00</b>.</> },
   { q: 'Comment je m’inscris ?', a: <>Sur la <b>borne</b> à l'accueil ou depuis l'appli : bouton <b>« M'inscrire »</b>, tu crées ton compte et tu choisis ta formule. Ça prend 2 minutes.</> },
-  { q: 'Comment j’accède à la salle ?', a: <>Avec ton <b>code d'accès</b> à taper sur le clavier de la porte (ou ton badge si tu en prends un). Ton code apparaît dans ton <Link to="/connexion" className="underline font-semibold" style={{ color: RED }}>espace membre</Link> dès l'inscription.</> },
+  { q: 'Comment j’accède à la salle ?', a: <>Avec ton <b>code d'accès</b> à taper sur le clavier de la porte (ou ton badge si tu en prends un). Ton code apparaît dans ton <Link to="/connexion-salle" className="underline font-semibold" style={{ color: RED }}>espace membre</Link> dès l'inscription.</> },
   { q: 'Puis-je venir sans engagement ?', a: <>Oui : <b>séance à l'unité (5 €)</b>, <b>carnet de 10 séances (45 €)</b> ou <b>1 mois (40 €)</b>. Voir les <Link to="/tarifs" className="underline font-semibold" style={{ color: RED }}>tarifs</Link>.</> },
   { q: 'Comment se passe le paiement ?', a: <>Par <b>carte bancaire</b> (paiement instantané) pour les séances, carnets et mois. Pour les abonnements mensuels, par <b>prélèvement SEPA automatique</b>.</> },
   { q: 'Le badge est-il obligatoire ?', a: <>Non, il est <b>optionnel</b> (15 €). Sans badge, tu entres avec ton <b>code d'accès</b> personnel.</> },
@@ -45,7 +45,7 @@ const FaqPage: React.FC = () => {
           <p className="font-extrabold text-lg">Une autre question ?</p>
           <p className="text-sm opacity-90 font-medium">On te répond via la messagerie de ton espace membre.</p>
         </div>
-        <Link to="/connexion" className="bg-white font-bold text-sm px-5 py-3 rounded-xl whitespace-nowrap" style={{ color: RED }}>Nous écrire</Link>
+        <Link to="/connexion-salle" className="bg-white font-bold text-sm px-5 py-3 rounded-xl whitespace-nowrap" style={{ color: RED }}>Nous écrire</Link>
       </div>
     </div>
   );
