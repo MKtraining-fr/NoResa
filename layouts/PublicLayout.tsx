@@ -2,10 +2,26 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Menu, X, Dumbbell } from 'lucide-react';
+import { isKiosk } from '../lib/kiosk';
 
 const PublicLayout: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const location = useLocation();
+
+  // Mode borne : en-tête minimal La SaLLe (retour à /borne), sans navigation
+  // marketing ni pied de page — aucune sortie vers la vitrine NoResa.
+  if (isKiosk()) {
+    return (
+      <div className="min-h-screen flex flex-col font-sans overflow-x-hidden bg-white">
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
+          <div className="max-w-5xl mx-auto px-4 h-16 flex items-center">
+            <Link to="/borne" className="text-2xl font-extrabold tracking-tight" style={{ color: '#C81E1E' }}>La SaLLe</Link>
+          </div>
+        </header>
+        <main className="flex-grow"><Outlet /></main>
+      </div>
+    );
+  }
 
   const navLinks = [
     { label: 'Accueil', path: '/' },

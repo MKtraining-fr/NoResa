@@ -27,6 +27,12 @@ import AppLayout from './layouts/AppLayout';
 import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
 import MemberAccessGate from './components/MemberAccessGate';
+import { isKiosk } from './lib/kiosk';
+
+// En mode borne (kiosque), les pages marketing NoResa redirigent vers /borne :
+// l'adhérent ne doit jamais retomber sur la vitrine SaaS.
+const NoKiosk: React.FC<{ children: React.ReactElement }> = ({ children }) =>
+  isKiosk() ? <Navigate to="/borne" replace /> : children;
 
 // Pages : chargées à la demande (code-splitting -> bundle initial plus léger)
 const HomePage = lazy(() => import('./pages/public/HomePage'));
@@ -37,6 +43,7 @@ const LoginPage = lazy(() => import('./pages/public/LoginPage'));
 const SetPasswordPage = lazy(() => import('./pages/public/SetPasswordPage'));
 const MandateThanksPage = lazy(() => import('./pages/public/MandateThanksPage'));
 const RegisterMemberPage = lazy(() => import('./pages/public/RegisterMemberPage'));
+const BornePage = lazy(() => import('./pages/public/BornePage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -91,16 +98,18 @@ const App: React.FC = () => {
           <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
           <Route path="/merci-inscription" element={<MandateThanksPage />} />
           <Route path="/inscription" element={<RegisterMemberPage />} />
+          {/* Borne tactile (La SaLLe) — plein écran, hors layout marketing */}
+          <Route path="/borne" element={<BornePage />} />
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
-            <Route path="/" element={isNativeApp ? <Navigate to="/membre" replace /> : <HomePage />} />
-            <Route path="/fonctionnalites" element={<FeaturesPage />} />
-            <Route path="/tarifs" element={<PricingPage />} />
-            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/" element={isNativeApp ? <Navigate to="/membre" replace /> : <NoKiosk><HomePage /></NoKiosk>} />
+            <Route path="/fonctionnalites" element={<NoKiosk><FeaturesPage /></NoKiosk>} />
+            <Route path="/tarifs" element={<NoKiosk><PricingPage /></NoKiosk>} />
+            <Route path="/contact" element={<NoKiosk><ContactPage /></NoKiosk>} />
             <Route path="/connexion" element={<LoginPage />} />
-            <Route path="/inscription-salle" element={<RegisterGymPage />} />
-            <Route path="/salles" element={<GymsExplorerPage />} />
-            <Route path="/salle/:gymId" element={<GymPublicPage />} />
+            <Route path="/inscription-salle" element={<NoKiosk><RegisterGymPage /></NoKiosk>} />
+            <Route path="/salles" element={<NoKiosk><GymsExplorerPage /></NoKiosk>} />
+            <Route path="/salle/:gymId" element={<NoKiosk><GymPublicPage /></NoKiosk>} />
           </Route>
 
           {/* Admin/Back-Office Routes */}
