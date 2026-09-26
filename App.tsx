@@ -21,6 +21,29 @@ const RecoveryHandler: React.FC = () => {
   return null;
 };
 
+// Mode borne : retour automatique à l'accueil /borne après inactivité, SANS quitter
+// le plein écran (contrairement au timer d'inactivité d'Edge qui ferme la session).
+const KIOSK_IDLE_MS = 120000; // 2 min
+const KioskIdleReset: React.FC = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isKiosk()) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        // Revient à l'accueil borne si on n'y est pas déjà (reste en plein écran).
+        if (!/#\/borne(\?|$)/.test(window.location.hash)) navigate('/borne', { replace: true });
+      }, KIOSK_IDLE_MS);
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'wheel'] as const;
+    events.forEach((e) => window.addEventListener(e, arm, { passive: true }));
+    arm();
+    return () => { clearTimeout(timer); events.forEach((e) => window.removeEventListener(e, arm)); };
+  }, [navigate]);
+  return null;
+};
+
 // Layouts + garde d'accès : chargés normalement (nécessaires à la structure des routes)
 import PublicLayout from './layouts/PublicLayout';
 import SalleLayout from './layouts/SalleLayout';
@@ -98,6 +121,7 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <RecoveryHandler />
+      <KioskIdleReset />
       <AppErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
