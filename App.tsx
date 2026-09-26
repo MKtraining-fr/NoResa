@@ -31,9 +31,14 @@ const KioskIdleReset: React.FC = () => {
     let timer: ReturnType<typeof setTimeout>;
     const arm = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        // Revient à l'accueil borne si on n'y est pas déjà (reste en plein écran).
-        if (!/#\/borne(\?|$)/.test(window.location.hash)) navigate('/borne', { replace: true });
+      timer = setTimeout(async () => {
+        // Sécurité borne partagée : si un membre était connecté, on le déconnecte.
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) await supabase.auth.signOut();
+        } catch { /* noop */ }
+        // Revient à l'accueil borne (reste en plein écran).
+        navigate('/borne', { replace: true });
       }, KIOSK_IDLE_MS);
     };
     const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'wheel'] as const;
