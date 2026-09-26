@@ -23,6 +23,7 @@ const RecoveryHandler: React.FC = () => {
 
 // Layouts + garde d'accès : chargés normalement (nécessaires à la structure des routes)
 import PublicLayout from './layouts/PublicLayout';
+import SalleLayout from './layouts/SalleLayout';
 import AppLayout from './layouts/AppLayout';
 import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
@@ -44,6 +45,10 @@ const SetPasswordPage = lazy(() => import('./pages/public/SetPasswordPage'));
 const MandateThanksPage = lazy(() => import('./pages/public/MandateThanksPage'));
 const RegisterMemberPage = lazy(() => import('./pages/public/RegisterMemberPage'));
 const BornePage = lazy(() => import('./pages/public/BornePage'));
+const DecouvertePage = lazy(() => import('./pages/public/salle/DecouvertePage'));
+const ActivitesPage = lazy(() => import('./pages/public/salle/ActivitesPage'));
+const TarifsPage = lazy(() => import('./pages/public/salle/TarifsPage'));
+const FaqPage = lazy(() => import('./pages/public/salle/FaqPage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -98,8 +103,14 @@ const App: React.FC = () => {
           <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
           <Route path="/merci-inscription" element={<MandateThanksPage />} />
           <Route path="/inscription" element={<RegisterMemberPage />} />
-          {/* Borne tactile (La SaLLe) — plein écran, hors layout marketing */}
-          <Route path="/borne" element={<BornePage />} />
+          {/* Mini-site public « La SaLLe » (borne + web) — univers salle, hors marketing NoResa */}
+          <Route element={<SalleLayout />}>
+            <Route path="/borne" element={<BornePage />} />
+            <Route path="/decouverte" element={<DecouvertePage />} />
+            <Route path="/activites" element={<ActivitesPage />} />
+            <Route path="/tarifs" element={<TarifsPage />} />
+            <Route path="/faq" element={<FaqPage />} />
+          </Route>
           {/* Public Routes */}
           <Route element={<PublicLayout />}>
             <Route path="/" element={isNativeApp ? <Navigate to="/membre" replace /> : <NoKiosk><HomePage /></NoKiosk>} />
