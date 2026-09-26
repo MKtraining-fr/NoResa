@@ -23,7 +23,7 @@ const SalleLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900 font-sans overflow-x-hidden" style={{ ['--red' as any]: RED }}>
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-100">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between gap-4">
           <Link to="/borne" className="text-2xl font-extrabold tracking-tight shrink-0" style={{ color: RED }}>La SaLLe</Link>
 

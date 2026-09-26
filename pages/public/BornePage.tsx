@@ -32,9 +32,9 @@ const BornePage: React.FC = () => {
       {/* Hero */}
       <section className="text-white" style={{ background: `radial-gradient(120% 80% at 85% -20%, #d8352f 0%, rgba(216,53,47,0) 45%), linear-gradient(160deg, ${RED} 0%, ${RED} 45%, #8E1414 100%)` }}>
         <div className="max-w-6xl mx-auto px-5 pt-14 pb-16 sm:pt-20 sm:pb-20">
-          <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.28em] opacity-85">A.R.A.P.S · Villeneuve-la-Comptal</p>
+          <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.28em] text-white/85">A.R.A.P.S · Villeneuve-la-Comptal</p>
           <h1 className="mt-3 text-5xl sm:text-6xl font-extrabold tracking-tight text-balance">Ta salle, ouverte de 6h à 23h.</h1>
-          <p className="mt-4 text-lg font-semibold opacity-95 max-w-xl">Musculation, cardio et accompagnement, à ton rythme. Inscris-toi en 2 minutes et entraîne-toi dès aujourd'hui.</p>
+          <p className="mt-4 text-lg font-semibold text-white/95 max-w-xl">Musculation, cardio et accompagnement, à ton rythme. Inscris-toi en 2 minutes et entraîne-toi dès aujourd'hui.</p>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
             <Link to="/inscription" className="group bg-white text-gray-900 rounded-3xl p-6 shadow-2xl active:scale-[0.98] transition-transform flex items-center gap-4">
@@ -49,7 +49,7 @@ const BornePage: React.FC = () => {
               <span className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><CreditCard size={26} /></span>
               <span className="flex-1">
                 <span className="block text-xl font-extrabold">Payer une séance</span>
-                <span className="block text-[13px] font-semibold opacity-85">Connecte-toi à ton espace</span>
+                <span className="block text-[13px] font-semibold text-white/85">Connecte-toi à ton espace</span>
               </span>
               <ArrowRight size={20} className="group-active:translate-x-1 transition-transform" />
             </Link>
