@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, AlertCircle, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2, Mail } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 
 /**
- * Auto-inscription publique — création d'un PROFIL uniquement.
+ * Auto-inscription publique (La SaLLe) — création d'un PROFIL uniquement.
  * Pas de formule ni de mandat : une fois le mot de passe créé (e-mail) et
  * connecté, l'adhérent achète sa première séance. Les abonnements avec
- * engagement se souscrivent en salle.
+ * engagement se souscrivent en salle. Reste dans l'univers salle (pas de NoResa).
  */
 
+const RED = '#C81E1E';
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/prospect-register`;
 const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
@@ -69,7 +70,7 @@ const RegisterMemberPage: React.FC = () => {
 
   const input = (k: string, ph: string, type = 'text') => (
     <input type={type} value={(f as any)[k]} onChange={(e) => set(k, e.target.value)} placeholder={ph}
-      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20" />
+      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-red-100" />
   );
 
   if (done) {
@@ -85,7 +86,7 @@ const RegisterMemberPage: React.FC = () => {
           <div className="mt-4 flex items-center justify-center gap-2 text-[12px] font-bold text-gray-400">
             <Mail size={15} /> Pense à vérifier tes spams
           </div>
-          <button onClick={() => navigate('/connexion')} className="mt-6 w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl">Aller à la connexion</button>
+          <button onClick={() => navigate('/connexion-salle')} className="mt-6 w-full text-white font-bold py-3.5 rounded-2xl shadow-xl" style={{ backgroundColor: RED }}>Aller à la connexion</button>
         </div>
       </div>
     );
@@ -94,11 +95,14 @@ const RegisterMemberPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans px-4 py-8">
       <div className="max-w-md mx-auto">
-        <button onClick={() => navigate('/connexion')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-4"><ArrowLeft size={16} /> Connexion</button>
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => navigate('/borne')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500"><ArrowLeft size={16} /> Accueil</button>
+          <Link to="/borne" className="text-xl font-extrabold tracking-tight" style={{ color: RED }}>La SaLLe</Link>
+        </div>
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-indigo-600 rounded-2xl shadow-xl mb-4"><ShieldCheck className="text-white w-7 h-7" /></div>
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl shadow-xl mb-4" style={{ backgroundColor: RED }}><ShieldCheck className="text-white w-7 h-7" /></div>
           <h1 className="text-2xl font-extrabold text-gray-900">Créer mon compte</h1>
-          <p className="text-gray-500 mt-1 text-sm">Quelques infos pour créer ton profil. Tu prendras ta première séance une fois connecté.</p>
+          <p className="text-gray-500 mt-1 text-sm">Quelques infos pour créer ton profil La SaLLe. Tu prendras ta première séance une fois connecté.</p>
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-5 space-y-5">
@@ -124,17 +128,17 @@ const RegisterMemberPage: React.FC = () => {
           <div className="space-y-2.5">
             <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Déclarations</p>
             <label className="flex items-start gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={f.consentCga} onChange={(e) => set('consentCga', e.target.checked)} className="mt-0.5 w-4 h-4 rounded text-indigo-600" />
+              <input type="checkbox" checked={f.consentCga} onChange={(e) => set('consentCga', e.target.checked)} className="mt-0.5 w-4 h-4 rounded" style={{ accentColor: RED }} />
               <span className="text-xs text-gray-600 font-medium">J'ai pris connaissance des Conditions générales et du Règlement intérieur.</span>
             </label>
             <label className="flex items-start gap-2.5 cursor-pointer">
-              <input type="checkbox" checked={f.consentMedical} onChange={(e) => set('consentMedical', e.target.checked)} className="mt-0.5 w-4 h-4 rounded text-indigo-600" />
+              <input type="checkbox" checked={f.consentMedical} onChange={(e) => set('consentMedical', e.target.checked)} className="mt-0.5 w-4 h-4 rounded" style={{ accentColor: RED }} />
               <span className="text-xs text-gray-600 font-medium">J'ai fait contrôler par un médecin mon aptitude à pratiquer une activité sportive.</span>
             </label>
           </div>
 
           {USE_TURNSTILE && <div ref={widgetRef} className="flex justify-center" />}
-          <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+          <button onClick={submit} disabled={busy} className="w-full text-white font-bold py-3.5 rounded-2xl shadow-xl transition-all disabled:opacity-60 flex items-center justify-center gap-2" style={{ backgroundColor: RED }}>
             {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
             <span>{busy ? 'Création…' : 'Créer mon compte'}</span>
           </button>
