@@ -37,8 +37,10 @@ const KioskIdleReset: React.FC = () => {
           const { data } = await supabase.auth.getSession();
           if (data.session) await supabase.auth.signOut();
         } catch { /* noop */ }
-        // Revient à l'accueil borne (reste en plein écran).
-        navigate('/borne', { replace: true });
+        // Retour à l'accueil borne + RECHARGEMENT COMPLET : la borne restant ouverte
+        // en continu, c'est le seul moment où elle récupère la dernière version déployée.
+        try { window.location.hash = '#/borne?kiosk=1'; } catch { /* noop */ }
+        window.location.reload();
       }, KIOSK_IDLE_MS);
     };
     const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'wheel'] as const;
