@@ -52,6 +52,31 @@ export async function deleteAnnouncement(id: string): Promise<void> {
   if (error) { console.error('deleteAnnouncement', error); throw error; }
 }
 
+// ---- Public (borne / mini-site, sans authentification) ----
+
+export interface PublicAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  mediaUrl: string | null;
+  publishedAt: string | null;
+}
+
+/** Annonces publiées, lisibles sans compte (page Infos + écran de veille de la borne). */
+export async function getPublicAnnouncements(): Promise<PublicAnnouncement[]> {
+  const { data, error } = await supabase.rpc('public_announcements');
+  if (error) { console.error('getPublicAnnouncements', error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    title: r.title ?? '',
+    body: r.body ?? '',
+    category: (r.category ?? 'info') as AnnouncementCategory,
+    mediaUrl: r.media_url ?? null,
+    publishedAt: r.published_at ?? null,
+  }));
+}
+
 // ---- Adhérent ----
 
 export interface MyAnnouncement {

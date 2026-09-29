@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { UserPlus, CreditCard, ArrowRight, Camera, Dumbbell, Tag, HelpCircle } from 'lucide-react';
+import { UserPlus, CreditCard, ArrowRight, Camera, Dumbbell, Tag, HelpCircle, Megaphone } from 'lucide-react';
 import { setKiosk } from '../../lib/kiosk';
 
 const RED = '#C81E1E';
@@ -24,6 +24,7 @@ const BornePage: React.FC = () => {
     { to: '/decouverte', icon: Camera, label: 'Découverte', sub: 'La salle en images' },
     { to: '/activites', icon: Dumbbell, label: 'Activités', sub: 'Ce que tu peux faire' },
     { to: '/tarifs', icon: Tag, label: 'Tarifs', sub: 'Formules & séances' },
+    { to: '/infos', icon: Megaphone, label: 'Infos', sub: 'Actus & promos' },
     { to: '/faq', icon: HelpCircle, label: 'FAQ', sub: 'Tes questions' },
   ];
 
@@ -60,7 +61,7 @@ const BornePage: React.FC = () => {
       {/* Accès aux sections */}
       <section className="max-w-6xl mx-auto px-5 py-12">
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400 mb-5">Découvrir la salle</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {sections.map((s) => (
             <Link key={s.to} to={s.to} className="group border border-gray-100 rounded-3xl p-6 hover:border-red-200 hover:shadow-lg transition-all bg-white">
               <span className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4" style={{ backgroundColor: '#fdecec', color: RED }}><s.icon size={22} /></span>

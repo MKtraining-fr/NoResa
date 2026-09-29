@@ -13,6 +13,7 @@ const NAV = [
   { to: '/decouverte', label: 'Découverte' },
   { to: '/activites', label: 'Activités' },
   { to: '/tarifs', label: 'Tarifs' },
+  { to: '/infos', label: 'Infos' },
   { to: '/faq', label: 'FAQ' },
 ];
 
