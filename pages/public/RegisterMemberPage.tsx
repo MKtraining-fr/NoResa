@@ -75,7 +75,7 @@ const RegisterMemberPage: React.FC = () => {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-slate-50 font-sans flex items-center justify-center px-4">
+      <div className="ui-crisp min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-gray-100 p-7 text-center">
           <div className="w-16 h-16 rounded-full bg-green-50 text-green-600 flex items-center justify-center mx-auto"><CheckCircle2 size={36} /></div>
           <h1 className="text-2xl font-extrabold text-gray-900 mt-4">Compte créé 🎉</h1>
@@ -93,7 +93,7 @@ const RegisterMemberPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans px-4 py-8">
+    <div className="ui-crisp min-h-screen bg-slate-50 px-4 py-8">
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => navigate('/borne')} className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500"><ArrowLeft size={16} /> Accueil</button>

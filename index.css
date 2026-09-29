@@ -11,9 +11,12 @@
 
 body {
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+}
+
+/* Police système bien hintée (Segoe UI sur Windows) : rendu net « ClearType » sur
+   la borne, sans le côté flou de la webfont Inter. Appliquée au mini-site La SaLLe. */
+.ui-crisp {
+  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
 }
 
 .pwa-hide-scrollbar::-webkit-scrollbar { display: none; }
