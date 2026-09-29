@@ -37,10 +37,9 @@ const KioskIdleReset: React.FC = () => {
           const { data } = await supabase.auth.getSession();
           if (data.session) await supabase.auth.signOut();
         } catch { /* noop */ }
-        // Retour à l'accueil borne + RECHARGEMENT COMPLET : la borne restant ouverte
-        // en continu, c'est le seul moment où elle récupère la dernière version déployée.
-        try { window.location.hash = '#/borne?kiosk=1'; } catch { /* noop */ }
-        window.location.reload();
+        // Bascule sur l'écran de veille (vidéo + annonces). Une touche y ramène à
+        // l'accueil ; la veille se recharge périodiquement pour récupérer les MAJ.
+        if (!/#\/veille/.test(window.location.hash)) navigate('/veille', { replace: true });
       }, KIOSK_IDLE_MS);
     };
     const events = ['pointerdown', 'keydown', 'touchstart', 'mousemove', 'wheel'] as const;
@@ -81,6 +80,7 @@ const TarifsPage = lazy(() => import('./pages/public/salle/TarifsPage'));
 const FaqPage = lazy(() => import('./pages/public/salle/FaqPage'));
 const SalleLoginPage = lazy(() => import('./pages/public/salle/SalleLoginPage'));
 const InfosPage = lazy(() => import('./pages/public/salle/InfosPage'));
+const VeillePage = lazy(() => import('./pages/public/salle/VeillePage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -136,6 +136,8 @@ const App: React.FC = () => {
           <Route path="/definir-mot-de-passe" element={<SetPasswordPage />} />
           <Route path="/merci-inscription" element={<MandateThanksPage />} />
           <Route path="/inscription" element={<RegisterMemberPage />} />
+          {/* Écran de veille de la borne — plein écran, hors layout */}
+          <Route path="/veille" element={<VeillePage />} />
           {/* Mini-site public « La SaLLe » (borne + web) — univers salle, hors marketing NoResa */}
           <Route element={<SalleLayout />}>
             <Route path="/borne" element={<BornePage />} />
