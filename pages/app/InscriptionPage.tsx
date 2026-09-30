@@ -211,16 +211,28 @@ const InscriptionPage: React.FC = () => {
     if (step !== 3) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ratio = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#15226e';
+    // Dimensionne le pavé quand sa taille réelle est connue, et le redimensionne si
+    // elle change (évite un canvas de largeur 0 figée au montage → tracé non inscrit).
+    const setup = () => {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const w = Math.round(rect.width * ratio);
+      const h = Math.round(rect.height * ratio);
+      if (canvas.width === w && canvas.height === h) return;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#15226e';
+    };
+    setup();
+    const ro = new ResizeObserver(setup);
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, [step]);
 
   const pointer = (e: React.PointerEvent<HTMLCanvasElement>) => {

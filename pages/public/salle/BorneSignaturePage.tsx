@@ -67,13 +67,27 @@ const BorneSignaturePage: React.FC = () => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ratio = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#14100F';
+    // Dimensionne le pavé quand sa taille réelle est connue. Au montage, la largeur
+    // peut encore être 0 (transition d'écran sur la borne) : dans ce cas le tracé ne
+    // s'inscrirait pas. Un ResizeObserver applique la bonne taille dès qu'elle arrive,
+    // et on ne réinitialise (donc n'efface) que si la taille a réellement changé.
+    const setup = () => {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const w = Math.round(rect.width * ratio);
+      const h = Math.round(rect.height * ratio);
+      if (canvas.width === w && canvas.height === h) return;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(ratio, ratio);
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#14100F';
+    };
+    setup();
+    const ro = new ResizeObserver(setup);
+    ro.observe(canvas);
+    return () => ro.disconnect();
   }, []);
 
   const pos = (e: React.PointerEvent) => {
