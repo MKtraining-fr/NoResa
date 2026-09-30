@@ -194,6 +194,9 @@ export interface InscriptionData {
   signatureDataUrl: string;
   signerName: string;
   totalDue: number;
+  // « Comment nous avez-vous connu ? » + code rattaché à une personne (parrain, masqué côté client)
+  acquisitionSource?: string | null;
+  referralCode?: string | null;
 }
 
 export interface InscriptionResult {
@@ -374,6 +377,18 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
   });
 
   const generate = await generateContract(contractId, d.signatureDataUrl, true);
+
+  // « Comment nous avez-vous connu ? » + code rattaché à une personne (parrain).
+  // Best-effort : ne bloque jamais l'inscription.
+  if (d.acquisitionSource || d.referralCode) {
+    try {
+      await supabase.rpc('apply_member_acquisition', {
+        p_member_id: memberId,
+        p_source: d.acquisitionSource || null,
+        p_code: d.referralCode || null,
+      });
+    } catch (e) { console.error('apply_member_acquisition', e); }
+  }
 
   // Toute inscription avec e-mail -> crée le compte adhérent + e-mail d'activation
   // (lien de création de mot de passe pour accéder à l'app). Best-effort.

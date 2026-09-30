@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
   CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2, ChevronDown,
+  Send, CheckCircle2,
 } from 'lucide-react';
 import WebcamCapture from '../../components/WebcamCapture';
 import {
@@ -13,6 +14,7 @@ import { generateCardNumber, listStaff, patchMember } from '../../lib/membersApi
 import type { Member } from '../../types';
 import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
+import { requestBorneSignature } from '../../lib/borneBridge';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
 const RED = '#C81E1E';
@@ -161,6 +163,49 @@ const InscriptionPage: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const [sigEmpty, setSigEmpty] = useState(true);
+  // Signature déportée sur la borne (temps réel)
+  const [remoteSig, setRemoteSig] = useState<string | null>(null);
+  const [borneStatus, setBorneStatus] = useState<string | null>(null);
+  const [borneWaiting, setBorneWaiting] = useState(false);
+  const [borneAcq, setBorneAcq] = useState<string | null>(null);
+  const [borneCode, setBorneCode] = useState<string | null>(null);
+  const borneCancel = useRef<null | (() => void)>(null);
+
+  // Peint une signature (data URL) reçue de la borne dans le canvas, pour aperçu.
+  const drawRemoteSignature = (dataUrl: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    const img = new Image();
+    img.onload = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+    img.src = dataUrl;
+  };
+
+  const signOnBorne = () => {
+    const signerName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (!signerName) { setBorneStatus("Renseignez le nom du client (étape Identité) avant d'envoyer à la borne."); return; }
+    setBorneStatus('Envoi à la borne… le client peut patienter devant l’écran.');
+    setBorneWaiting(true);
+    const { cancel } = requestBorneSignature(signerName, {
+      onReady: () => setBorneStatus('Borne prête ✓ — le client signe à l’écran.'),
+      onResult: (r) => {
+        setRemoteSig(r.signature);
+        setBorneAcq(r.acquisition ?? null);
+        setBorneCode(r.referralCode ?? null);
+        setSigEmpty(false);
+        setBorneWaiting(false);
+        // Le client a coché les 2 cases obligatoires sur la borne : on l'enregistre côté contrat.
+        setConsentCga(true);
+        setConsentMedical(true);
+        setBorneStatus('Signature reçue ✓');
+        drawRemoteSignature(r.signature);
+      },
+      onError: (m) => { setBorneStatus(m); setBorneWaiting(false); },
+    });
+    borneCancel.current = cancel;
+  };
+
+  const cancelBorne = () => { borneCancel.current?.(); borneCancel.current = null; setBorneWaiting(false); setBorneStatus('Demande annulée.'); };
 
   useEffect(() => {
     if (step !== 3) return;
@@ -274,7 +319,7 @@ const InscriptionPage: React.FC = () => {
     setError('');
     setSubmitting(true);
     try {
-      const signatureDataUrl = canvasRef.current!.toDataURL('image/png');
+      const signatureDataUrl = remoteSig || canvasRef.current!.toDataURL('image/png');
       const res = await submitInscription({
         civility, firstName: firstName.trim(), lastName: lastName.trim(),
         birthDate: birthDate || undefined, nationality: nationality || undefined,
@@ -295,6 +340,8 @@ const InscriptionPage: React.FC = () => {
         consentCga, consentMedical,
         signatureDataUrl, signerName: `${firstName.trim()} ${lastName.trim()}`.trim(),
         totalDue: total,
+        acquisitionSource: borneAcq || undefined,
+        referralCode: borneCode || undefined,
       });
       setResult(res);
       // Si on convertit un prospect : on le marque converti vers le nouveau membre.
@@ -690,7 +737,37 @@ const InscriptionPage: React.FC = () => {
         {step === 3 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Signature de l'adhérent</h2>
-            <p className="text-sm text-gray-500">Signez ci-dessous avec le doigt, précédé de la mention « lu et approuvé ».</p>
+
+            {/* Faire signer sur la borne (pont temps réel) */}
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Faire signer sur la borne</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Le client signe directement sur l'écran tactile de la salle.</p>
+                </div>
+                {!borneWaiting ? (
+                  <button type="button" onClick={signOnBorne} disabled={submitting}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-bold text-sm shrink-0 disabled:opacity-50"
+                    style={{ backgroundColor: RED }}>
+                    <Send size={16} /> Envoyer à la borne
+                  </button>
+                ) : (
+                  <button type="button" onClick={cancelBorne}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 text-gray-600 bg-white border border-gray-200">
+                    <Loader2 size={16} className="animate-spin" /> Annuler
+                  </button>
+                )}
+              </div>
+              {borneStatus && <p className="text-xs font-semibold mt-3 text-gray-600">{borneStatus}</p>}
+              {remoteSig && (
+                <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-green-700">
+                  <CheckCircle2 size={18} /> Signature reçue de la borne
+                  {borneAcq && <span className="text-gray-400 font-medium">· {borneAcq}</span>}
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-gray-500">Ou signez ci-dessous avec le doigt, précédé de la mention « lu et approuvé ».</p>
             <div className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 overflow-hidden">
               <canvas
                 ref={canvasRef}
@@ -703,7 +780,7 @@ const InscriptionPage: React.FC = () => {
               />
               {sigEmpty && <span className="absolute inset-0 flex items-center justify-center text-gray-300 font-semibold pointer-events-none">Signez ici</span>}
             </div>
-            <button onClick={clearSig} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"><Eraser size={16} /> Effacer</button>
+            <button onClick={() => { clearSig(); setRemoteSig(null); }} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"><Eraser size={16} /> Effacer</button>
           </div>
         )}
 

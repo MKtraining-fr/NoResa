@@ -37,6 +37,8 @@ const KioskIdleReset: React.FC = () => {
           const { data } = await supabase.auth.getSession();
           if (data.session) await supabase.auth.signOut();
         } catch { /* noop */ }
+        // Ne pas interrompre une signature en cours sur la borne.
+        if (/#\/borne\/signature/.test(window.location.hash)) return;
         // Bascule sur l'écran de veille (vidéo + annonces). Une touche y ramène à
         // l'accueil ; la veille se recharge périodiquement pour récupérer les MAJ.
         if (!/#\/veille/.test(window.location.hash)) navigate('/veille', { replace: true });
@@ -58,6 +60,19 @@ import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
 import MemberAccessGate from './components/MemberAccessGate';
 import { isKiosk } from './lib/kiosk';
+import { startBorneSignBridge, stopBorneSignBridge } from './lib/borneBridge';
+
+// Écoute (borne, mode kiosque) des demandes de signature envoyées par le PC :
+// à réception, bascule sur l'écran de signature.
+const BorneSignListener: React.FC = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isKiosk()) return;
+    startBorneSignBridge(() => navigate('/borne/signature'));
+    return () => stopBorneSignBridge();
+  }, [navigate]);
+  return null;
+};
 
 // En mode borne (kiosque), les pages marketing NoResa redirigent vers /borne :
 // l'adhérent ne doit jamais retomber sur la vitrine SaaS.
@@ -81,6 +96,7 @@ const FaqPage = lazy(() => import('./pages/public/salle/FaqPage'));
 const SalleLoginPage = lazy(() => import('./pages/public/salle/SalleLoginPage'));
 const InfosPage = lazy(() => import('./pages/public/salle/InfosPage'));
 const VeillePage = lazy(() => import('./pages/public/salle/VeillePage'));
+const BorneSignaturePage = lazy(() => import('./pages/public/salle/BorneSignaturePage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
@@ -130,6 +146,7 @@ const App: React.FC = () => {
     <HashRouter>
       <RecoveryHandler />
       <KioskIdleReset />
+      <BorneSignListener />
       <AppErrorBoundary>
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -138,6 +155,8 @@ const App: React.FC = () => {
           <Route path="/inscription" element={<RegisterMemberPage />} />
           {/* Écran de veille de la borne — plein écran, hors layout */}
           <Route path="/veille" element={<VeillePage />} />
+          {/* Signature du contrat sur la borne (déclenchée par le PC en temps réel) */}
+          <Route path="/borne/signature" element={<BorneSignaturePage />} />
           {/* Mini-site public « La SaLLe » (borne + web) — univers salle, hors marketing NoResa */}
           <Route element={<SalleLayout />}>
             <Route path="/borne" element={<BornePage />} />
