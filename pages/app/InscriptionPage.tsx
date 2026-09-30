@@ -119,7 +119,6 @@ const InscriptionPage: React.FC = () => {
   // Déclarations
   const [consentCga, setConsentCga] = useState(false);
   const [consentMedical, setConsentMedical] = useState(false);
-  const [consentImage, setConsentImage] = useState(false);
 
   // Process
   const [submitting, setSubmitting] = useState(false);
@@ -198,7 +197,6 @@ const InscriptionPage: React.FC = () => {
         // Le client a coché les 2 cases obligatoires sur la borne : on l'enregistre côté contrat.
         setConsentCga(true);
         setConsentMedical(true);
-        setConsentImage(!!r.consentImage);
         setBorneStatus('Signature reçue ✓');
         drawRemoteSignature(r.signature);
       },
@@ -255,9 +253,11 @@ const InscriptionPage: React.FC = () => {
 
   // --- Navigation entre étapes ----------------------------------------------
   const canNext = () => {
-    if (step === 0) return firstName.trim() && lastName.trim();
+    if (step === 0) return !!firstName.trim() && !!lastName.trim() && !!photo;
     if (step === 1) return !!formula && !!formulaPaymentMethod && (!includeBadge || !!badgePaymentMethod) && (!!billingRule || formulaKey !== 'libre' || (Number(freeAmount) > 0 && !!subEnd));
-    if (step === 2) return consentCga && consentMedical;
+    // Les consentements ne bloquent plus le passage à l'étape signature : c'est le
+    // client qui les valide (sur la borne, ou sur le PC en secours). Ils sont exigés
+    // à la validation finale (submit).
     return true;
   };
   const next = () => { setError(''); if (canNext()) setStep((s) => Math.min(s + 1, 3)); };
@@ -316,6 +316,8 @@ const InscriptionPage: React.FC = () => {
   // --- Validation finale ------------------------------------------------------
   const submit = async () => {
     if (!formula) { setError('Choisissez une formule.'); setStep(1); return; }
+    if (!photo) { setError("La photo de l'adhérent est obligatoire (identification / sécurité)."); setStep(0); return; }
+    if (!consentCga || !consentMedical) { setError("Les déclarations (conditions générales + aptitude médicale) doivent être validées — par le client sur la borne, ou cochées ici en secours."); setStep(2); return; }
     if (sigEmpty) { setError("La signature est obligatoire."); return; }
     if (formulaPaymentMethod === 'Prélèvement' && !email.trim()) { setError("Un email est requis pour un règlement par prélèvement."); setStep(0); return; }
     setError('');
@@ -339,7 +341,7 @@ const InscriptionPage: React.FC = () => {
         formula, formulaPaymentMethod, badgePaymentMethod, includeBadge,
         paidBy: billingRule?.payerName || undefined,
         services: chosenServices.map((s) => ({ label: s.label, price: s.price })),
-        consentCga, consentMedical, consentImage,
+        consentCga, consentMedical,
         signatureDataUrl, signerName: `${firstName.trim()} ${lastName.trim()}`.trim(),
         totalDue: total,
         acquisitionSource: borneAcq || undefined,
@@ -363,7 +365,7 @@ const InscriptionPage: React.FC = () => {
     setStep(0); setCivility('Monsieur'); setFirstName(''); setLastName(''); setBirthDate('');
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
     setProfession(''); setCompany(''); setFormulaKey(''); setFreeAmount(''); setFreeLabel(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
-    setServices({}); setConsentCga(false); setConsentMedical(false); setConsentImage(false); setError(''); setResult(null); setSigEmpty(true);
+    setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName(''); setCommercialId('');
     setMandateMemberId(null); setMandateUrl(''); setMandateMsg(''); mandateCtx.current = null;
@@ -466,7 +468,8 @@ const InscriptionPage: React.FC = () => {
                 {photoPreview ? <img src={photoPreview} alt="" className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={32} />}
               </div>
               <div>
-                <span className={label}>Photo de l'adhérent</span>
+                <span className={label}>Photo de l'adhérent <span className="text-red-600">*</span></span>
+                <p className="text-xs text-gray-400 mb-1.5">Obligatoire — sert uniquement à l'identification (photo de profil), jamais diffusée.</p>
                 <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => setWebcamOpen(true)} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold" style={{ backgroundColor: RED }}>
@@ -724,6 +727,10 @@ const InscriptionPage: React.FC = () => {
               </div>
             </div>
 
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
+              Les déclarations ci-dessous sont <b>validées par le client lui-même sur la borne</b> lors de la signature.
+              Ne les cochez ici que si le client signe directement sur ce PC (secours).
+            </div>
             <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
               <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentCga} onChange={(e) => setConsentCga(e.target.checked)} />
               <span className="text-sm text-gray-700">Je déclare avoir pris connaissance des <b>Conditions générales d'adhésion</b> et du Règlement intérieur.</span>
@@ -732,10 +739,9 @@ const InscriptionPage: React.FC = () => {
               <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentMedical} onChange={(e) => setConsentMedical(e.target.checked)} />
               <span className="text-sm text-gray-700">Je déclare avoir fait contrôler par un médecin mon <b>aptitude à pratiquer une activité sportive</b>.</span>
             </label>
-            <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentImage} onChange={(e) => setConsentImage(e.target.checked)} />
-              <span className="text-sm text-gray-700"><b>Droit à l'image</b> (facultatif) : j'autorise l'utilisation de ma photo <b>uniquement comme photo de profil</b> (jamais diffusée ni communiquée).</span>
-            </label>
+            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-xs text-gray-500">
+              <b>Droit à l'image :</b> la photo est prise pour l'identification de l'adhérent (sécurité) et utilisée uniquement comme photo de profil. Elle n'est jamais rendue publique, ni diffusée, ni communiquée à des tiers.
+            </div>
           </div>
         )}
 

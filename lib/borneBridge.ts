@@ -38,15 +38,25 @@ export function requestBorneSignature(
   const sessionId = (crypto as any).randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   const ch = supabase.channel(CHANNEL);
   let done = false;
+  let ready = false;
+  let resendTimer: ReturnType<typeof setInterval> | null = null;
+
+  const stopResend = () => { if (resendTimer) { clearInterval(resendTimer); resendTimer = null; } };
   const timer = setTimeout(() => {
     if (done) return; done = true;
-    handlers.onError("La borne n'a pas répondu. Réessayez ou faites signer ici.");
+    stopResend();
+    handlers.onError("La borne n'a pas répondu. Vérifiez qu'elle est allumée sur l'écran d'accueil (et à jour), puis réessayez — ou faites signer ici.");
     supabase.removeChannel(ch);
   }, timeoutMs);
-  const finish = () => { done = true; clearTimeout(timer); supabase.removeChannel(ch); };
+  const finish = () => { done = true; clearTimeout(timer); stopResend(); supabase.removeChannel(ch); };
+
+  const sendRequest = () => { ch.send({ type: 'broadcast', event: 'sign-request', payload: { sessionId, signerName } }); };
 
   ch.on('broadcast', { event: 'sign-ready' }, ({ payload }: any) => {
-    if (!done && payload?.sessionId === sessionId) handlers.onReady?.();
+    if (done || payload?.sessionId !== sessionId) return;
+    ready = true;
+    stopResend(); // la borne a reçu la demande : inutile de continuer à ré-émettre
+    handlers.onReady?.();
   });
   ch.on('broadcast', { event: 'sign-result' }, ({ payload }: any) => {
     if (done || payload?.sessionId !== sessionId) return;
@@ -55,10 +65,15 @@ export function requestBorneSignature(
   });
   ch.subscribe((status) => {
     if (status === 'SUBSCRIBED') {
-      ch.send({ type: 'broadcast', event: 'sign-request', payload: { sessionId, signerName } });
-    } else if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !done) {
+      // Première émission immédiate, puis ré-émission jusqu'à l'accusé de réception
+      // de la borne (« sign-ready ») : évite qu'un message unique se perde si la borne
+      // n'était pas prête à l'instant précis de l'envoi.
+      sendRequest();
+      stopResend();
+      resendTimer = setInterval(() => { if (!done && !ready) sendRequest(); }, 2000);
+    } else if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !done) {
       finish();
-      handlers.onError('Connexion temps réel impossible (Realtime).');
+      handlers.onError('Connexion temps réel impossible (Realtime). Vérifiez la connexion Internet du PC.');
     }
   });
 
