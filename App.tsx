@@ -59,7 +59,7 @@ import AppLayout from './layouts/AppLayout';
 import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
 import MemberAccessGate from './components/MemberAccessGate';
-import { isKiosk } from './lib/kiosk';
+import { isKiosk, KIOSK_EVENT } from './lib/kiosk';
 import { startBorneSignBridge, stopBorneSignBridge, isBridgeSubscribed, subscribeBridgeStatus } from './lib/borneBridge';
 // Écrans critiques de la borne : chargés en dur (pas en lazy) pour qu'aucun
 // téléchargement de chunk ne soit requis au moment où ils s'affichent — un kiosque
@@ -71,16 +71,24 @@ import BorneSignaturePage from './pages/public/salle/BorneSignaturePage';
 // à réception, bascule sur l'écran de signature.
 const BorneSignListener: React.FC = () => {
   const navigate = useNavigate();
+  const [armed, setArmed] = useState(isKiosk());
   const [connected, setConnected] = useState(isBridgeSubscribed());
+  // Réagit à l'armement/désarmement du kiosque, même s'il survient après le montage
+  // (ex. ?kiosk=1 traité par BornePage) — l'écoute démarre alors sans rechargement.
   useEffect(() => {
-    if (!isKiosk()) return;
+    const onKiosk = () => setArmed(isKiosk());
+    window.addEventListener(KIOSK_EVENT, onKiosk);
+    return () => window.removeEventListener(KIOSK_EVENT, onKiosk);
+  }, []);
+  useEffect(() => {
+    if (!armed) return;
     startBorneSignBridge(() => navigate('/borne/signature'));
     const unsub = subscribeBridgeStatus(() => setConnected(isBridgeSubscribed()));
     return () => { unsub(); stopBorneSignBridge(); };
-  }, [navigate]);
+  }, [armed, navigate]);
   // Voyant discret (coin bas-gauche) : vert = la borne est prête à recevoir une
   // signature du PC ; gris = écoute non connectée. Visible uniquement en mode borne.
-  if (!isKiosk()) return null;
+  if (!armed) return null;
   return (
     <div style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 60, display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'none' }}
       title={connected ? 'Borne prête à signer' : 'Borne non connectée (écoute inactive)'}>

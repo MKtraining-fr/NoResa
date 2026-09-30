@@ -5,6 +5,24 @@ import App from "./App";
 import { AuthProvider } from "./lib/AuthContext";
 import { supabase } from "./lib/supabaseClient";
 import { initNative } from "./lib/native";
+import { setKiosk } from "./lib/kiosk";
+
+/**
+ * Mode borne (kiosque) : on l'arme AVANT le rendu de React. `?kiosk=1` (dans le
+ * hash, ex. #/borne?kiosk=1) arme, `?kiosk=0` désarme. BornePage le fait aussi,
+ * mais dans un effet qui s'exécute APRÈS le montage : trop tard pour l'écoute de
+ * signature de la borne, qui teste isKiosk() au montage. On le fait donc ici, en
+ * synchrone, pour que l'écoute (et le voyant « borne prête ») démarrent au 1er rendu.
+ */
+try {
+  const h = window.location.hash; // ex: #/borne?kiosk=1
+  const qi = h.indexOf("?");
+  if (qi !== -1) {
+    const k = new URLSearchParams(h.slice(qi + 1)).get("kiosk");
+    if (k === "1") setKiosk(true);
+    else if (k === "0") setKiosk(false);
+  }
+} catch { /* noop */ }
 
 /**
  * Lien e-mail « créer / réinitialiser mon mot de passe » : Supabase renvoie les
