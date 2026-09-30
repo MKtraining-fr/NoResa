@@ -18,7 +18,7 @@ import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStat
 import { getMemberPayments, regularizePayments, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
-import { getMemberContracts, getContractUrl } from '../../lib/contractsApi';
+import { getMemberContracts, getContractUrl, deleteContract } from '../../lib/contractsApi';
 import WebcamCapture from '../../components/WebcamCapture';
 import MergeMembersModal from '../../components/MergeMembersModal';
 import { Member, ContactStatus, Product } from '../../types';
@@ -2130,23 +2130,41 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                 {c.total_due != null ? ' · ' + Number(c.total_due).toFixed(2).replace('.', ',') + ' €' : ''}
                               </p>
                             </div>
-                            {c.pdf_path ? (
+                            <div className="flex items-center gap-2 shrink-0">
+                              {c.pdf_path ? (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const u = await getContractUrl(c.pdf_path);
+                                      if (u) window.open(u, '_blank');
+                                      else alert("Impossible d'ouvrir le contrat.");
+                                    } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
+                                  }}
+                                  title="Voir / télécharger le contrat signé (PDF)"
+                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors"
+                                >
+                                  <FileText size={14} /> Contrat
+                                </button>
+                              ) : (
+                                <span className="text-[11px] font-semibold text-amber-600 uppercase">En cours</span>
+                              )}
                               <button
                                 onClick={async () => {
+                                  if (!window.confirm(`Supprimer définitivement le contrat ${c.contract_number || ''} ?\nCette action est irréversible (ligne + PDF).`)) return;
                                   try {
-                                    const u = await getContractUrl(c.pdf_path);
-                                    if (u) window.open(u, '_blank');
-                                    else alert("Impossible d'ouvrir le contrat.");
-                                  } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
+                                    await deleteContract(c.id);
+                                    if (selectedContact) {
+                                      const list = await getMemberContracts(selectedContact.id);
+                                      setMemberContracts(list);
+                                    }
+                                  } catch (e) { alert('Échec de la suppression : ' + ((e as Error)?.message || '')); }
                                 }}
-                                title="Voir / télécharger le contrat signé (PDF)"
-                                className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors shrink-0"
+                                title="Supprimer définitivement ce contrat"
+                                className="flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-red-100 transition-colors"
                               >
-                                <FileText size={14} /> Contrat
+                                <Trash2 size={14} />
                               </button>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-amber-600 uppercase shrink-0">En cours</span>
-                            )}
+                            </div>
                           </div>
                         ))}
                       </div>

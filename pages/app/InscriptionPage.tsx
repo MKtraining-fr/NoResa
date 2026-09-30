@@ -779,7 +779,7 @@ const InscriptionPage: React.FC = () => {
               )}
             </div>
 
-            <p className="text-sm text-gray-500">Ou signez ci-dessous avec le doigt, précédé de la mention « lu et approuvé ».</p>
+            <p className="text-sm text-gray-500">Ou signez ci-dessous avec le doigt.</p>
             <div className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 overflow-hidden">
               <canvas
                 ref={canvasRef}

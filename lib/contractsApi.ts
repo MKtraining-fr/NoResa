@@ -143,6 +143,18 @@ export async function getContractUrl(path?: string | null): Promise<string | nul
   return data?.signedUrl ?? null;
 }
 
+/** Supprime définitivement un contrat (ligne + PDF). Réservé au staff. */
+export async function deleteContract(id: string): Promise<void> {
+  const { data, error } = await supabase.rpc('delete_contract', { p_id: id });
+  if (error) { console.error('contractsApi.deleteContract', error); throw error; }
+  // data = chemin du PDF renvoyé par la RPC → on supprime aussi le fichier du bucket.
+  const pdfPath = data as string | null;
+  if (pdfPath) {
+    try { await supabase.storage.from('contracts').remove([pdfPath]); }
+    catch (e) { console.error('deleteContract: suppression PDF', e); }
+  }
+}
+
 /** Contrats d'un membre (pour les afficher dans sa fiche). */
 export async function getMemberContracts(memberId: string): Promise<any[]> {
   const { data, error } = await supabase

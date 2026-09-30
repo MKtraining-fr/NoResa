@@ -54,6 +54,7 @@ const BorneSignaturePage: React.FC = () => {
   const [empty, setEmpty] = useState(true);
   const [consentCga, setConsentCga] = useState(false);
   const [consentMed, setConsentMed] = useState(false);
+  const [readApproved, setReadApproved] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const [source, setSource] = useState('');
   const [code, setCode] = useState('');
@@ -84,7 +85,7 @@ const BorneSignaturePage: React.FC = () => {
   const end = () => { drawing.current = false; };
   const clear = () => { const c = canvasRef.current!; c.getContext('2d')!.clearRect(0, 0, c.width, c.height); setEmpty(true); };
 
-  const canValidate = !empty && consentCga && consentMed && !done;
+  const canValidate = !empty && consentCga && consentMed && readApproved && !done;
 
   const validate = () => {
     if (!canValidate) return;
@@ -146,6 +147,10 @@ const BorneSignaturePage: React.FC = () => {
             <input type="checkbox" checked={consentMed} onChange={(e) => setConsentMed(e.target.checked)} className="mt-1 w-5 h-5" style={{ accentColor: RED }} />
             <span className="text-sm font-medium text-gray-700">Je déclare avoir fait contrôler par un médecin mon aptitude à pratiquer une activité sportive.</span>
           </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={readApproved} onChange={(e) => setReadApproved(e.target.checked)} className="mt-1 w-5 h-5" style={{ accentColor: RED }} />
+            <span className="text-sm font-medium text-gray-700"><b>Lu et approuvé</b> : je certifie avoir lu et approuvé l'ensemble du contrat d'adhésion.</span>
+          </label>
         </div>
 
         {/* Information photo / droit à l'image (pas de case : usage strictement interne) */}
@@ -168,7 +173,7 @@ const BorneSignaturePage: React.FC = () => {
         {/* Pavé de signature */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Signature (précédée de « lu et approuvé »)</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Signature</p>
             <button onClick={clear} className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-gray-700"><Eraser size={14} /> Effacer</button>
           </div>
           <div className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-white" style={{ height: '220px' }}>
