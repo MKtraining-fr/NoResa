@@ -119,6 +119,7 @@ const InscriptionPage: React.FC = () => {
   // Déclarations
   const [consentCga, setConsentCga] = useState(false);
   const [consentMedical, setConsentMedical] = useState(false);
+  const [consentImage, setConsentImage] = useState(false);
 
   // Process
   const [submitting, setSubmitting] = useState(false);
@@ -197,6 +198,7 @@ const InscriptionPage: React.FC = () => {
         // Le client a coché les 2 cases obligatoires sur la borne : on l'enregistre côté contrat.
         setConsentCga(true);
         setConsentMedical(true);
+        setConsentImage(!!r.consentImage);
         setBorneStatus('Signature reçue ✓');
         drawRemoteSignature(r.signature);
       },
@@ -337,7 +339,7 @@ const InscriptionPage: React.FC = () => {
         formula, formulaPaymentMethod, badgePaymentMethod, includeBadge,
         paidBy: billingRule?.payerName || undefined,
         services: chosenServices.map((s) => ({ label: s.label, price: s.price })),
-        consentCga, consentMedical,
+        consentCga, consentMedical, consentImage,
         signatureDataUrl, signerName: `${firstName.trim()} ${lastName.trim()}`.trim(),
         totalDue: total,
         acquisitionSource: borneAcq || undefined,
@@ -361,7 +363,7 @@ const InscriptionPage: React.FC = () => {
     setStep(0); setCivility('Monsieur'); setFirstName(''); setLastName(''); setBirthDate('');
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
     setProfession(''); setCompany(''); setFormulaKey(''); setFreeAmount(''); setFreeLabel(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
-    setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
+    setServices({}); setConsentCga(false); setConsentMedical(false); setConsentImage(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName(''); setCommercialId('');
     setMandateMemberId(null); setMandateUrl(''); setMandateMsg(''); mandateCtx.current = null;
@@ -729,6 +731,10 @@ const InscriptionPage: React.FC = () => {
             <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
               <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentMedical} onChange={(e) => setConsentMedical(e.target.checked)} />
               <span className="text-sm text-gray-700">Je déclare avoir fait contrôler par un médecin mon <b>aptitude à pratiquer une activité sportive</b>.</span>
+            </label>
+            <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentImage} onChange={(e) => setConsentImage(e.target.checked)} />
+              <span className="text-sm text-gray-700"><b>Droit à l'image</b> (facultatif) : j'autorise l'utilisation de ma photo <b>uniquement comme photo de profil</b> (jamais diffusée ni communiquée).</span>
             </label>
           </div>
         )}

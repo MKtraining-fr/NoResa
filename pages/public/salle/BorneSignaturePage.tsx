@@ -35,6 +35,7 @@ const CGA: { h?: string; t?: string }[] = [
   { t: "IV) L'adhérent a la faculté de résilier l'abonnement en paiement mensuel par LRAR à l'adresse indiquée, chaque mois à la date anniversaire mensuelle de prise d'effet, moyennant un préavis de trois semaines, le paiement de chaque mois entamé étant intégralement dû ; ce délai court à compter de la réception de la lettre par La SaLLe / ARAPS." },
   { h: "8. INFORMATIQUE, FICHIERS ET LIBERTÉS" },
   { t: "Les données concernant l'adhérent sont destinées à la gestion de son abonnement par La SaLLe / ARAPS. Conformément à la loi du 6 janvier 1978 modifiée, La SaLLe / ARAPS pourra adresser des offres sur ses services, sauf opposition signifiée par courrier. L'adhérent dispose d'un droit d'accès, de rectification et de suppression des informations le concernant, qu'il peut exercer à tout moment, et peut, pour des motifs légitimes, s'opposer au traitement. La SaLLe / ARAPS se réserve le droit de communiquer les données à des partenaires ou prestataires (banques, société de recouvrement, partenaires marketing ou événementiel)." },
+  { t: "Droit à l'image : lorsque l'adhérent y consent expressément lors de son inscription, sa photographie est utilisée uniquement comme photo de son profil adhérent, à des fins d'identification interne. Elle n'est ni rendue publique, ni diffusée, ni communiquée à des tiers, et l'adhérent peut en demander le retrait à tout moment." },
   { t: "Les conditions générales d'adhésion font partie intégrante du contrat et doivent être signées et datées par l'adhérent, qui atteste les avoir intégralement lues, comprises et acceptées." },
 ];
 
@@ -49,6 +50,7 @@ const BorneSignaturePage: React.FC = () => {
   const [empty, setEmpty] = useState(true);
   const [consentCga, setConsentCga] = useState(false);
   const [consentMed, setConsentMed] = useState(false);
+  const [consentImage, setConsentImage] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const [source, setSource] = useState('');
   const [code, setCode] = useState('');
@@ -83,7 +85,7 @@ const BorneSignaturePage: React.FC = () => {
   const validate = () => {
     if (!canValidate) return;
     const signature = canvasRef.current!.toDataURL('image/png');
-    sendSignResult({ signature, acquisition: source || null, referralCode: code.trim() || null });
+    sendSignResult({ signature, acquisition: source || null, referralCode: code.trim() || null, consentImage });
     setDone(true);
     setTimeout(() => navigate('/borne', { replace: true }), 2600);
   };
@@ -137,6 +139,12 @@ const BorneSignaturePage: React.FC = () => {
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={consentMed} onChange={(e) => setConsentMed(e.target.checked)} className="mt-1 w-5 h-5" style={{ accentColor: RED }} />
             <span className="text-sm font-medium text-gray-700">Je déclare avoir fait contrôler par un médecin mon aptitude à pratiquer une activité sportive.</span>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={consentImage} onChange={(e) => setConsentImage(e.target.checked)} className="mt-1 w-5 h-5" style={{ accentColor: RED }} />
+            <span className="text-sm font-medium text-gray-700">
+              <b>Droit à l'image (facultatif).</b> J'autorise La SaLLe à prendre ma photo et à l'utiliser <b>uniquement comme photo de mon profil adhérent</b>. Elle n'est visible par personne d'autre, n'est jamais diffusée ni communiquée à des tiers, et je peux demander son retrait à tout moment.
+            </span>
           </label>
         </div>
 

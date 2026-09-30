@@ -18,6 +18,7 @@ export interface SignResult {
   signature: string;               // data URL PNG
   acquisition?: string | null;     // « Comment nous avez-vous connu ? »
   referralCode?: string | null;    // code rattaché à une personne (parrain, masqué côté client)
+  consentImage?: boolean;          // droit à l'image (photo de profil)
 }
 
 // ---------------------------------------------------------------------------

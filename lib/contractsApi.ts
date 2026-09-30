@@ -61,6 +61,7 @@ export interface ContractInput {
   totalDue: number;
   consentCga: boolean;
   consentMedical: boolean;
+  consentImage?: boolean;
   signerName: string;
 }
 
@@ -105,6 +106,7 @@ export async function createContract(p: ContractInput): Promise<{ id: string; co
       total_due: p.totalDue,
       consent_cga: p.consentCga,
       consent_medical: p.consentMedical,
+      consent_image: p.consentImage ?? false,
       signer_name: p.signerName,
       signed_at: new Date().toISOString(),
     })
@@ -191,6 +193,7 @@ export interface InscriptionData {
   // Déclarations + signature
   consentCga: boolean;
   consentMedical: boolean;
+  consentImage?: boolean;
   signatureDataUrl: string;
   signerName: string;
   totalDue: number;
@@ -373,6 +376,7 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     totalDue: d.totalDue,
     consentCga: d.consentCga,
     consentMedical: d.consentMedical,
+    consentImage: d.consentImage,
     signerName: d.signerName,
   });
 
