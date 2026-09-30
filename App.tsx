@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -71,6 +71,10 @@ import BorneSignaturePage from './pages/public/salle/BorneSignaturePage';
 // à réception, bascule sur l'écran de signature.
 const BorneSignListener: React.FC = () => {
   const navigate = useNavigate();
+  // navigate via une ref : l'écoute ne doit PAS se redémarrer à chaque changement de
+  // route (sinon stopBorneSignBridge vide `pending` et l'écran de signature se ferme).
+  const navRef = useRef(navigate);
+  navRef.current = navigate;
   const [armed, setArmed] = useState(isKiosk());
   const [connected, setConnected] = useState(isBridgeSubscribed());
   // Réagit à l'armement/désarmement du kiosque, même s'il survient après le montage
@@ -82,10 +86,10 @@ const BorneSignListener: React.FC = () => {
   }, []);
   useEffect(() => {
     if (!armed) return;
-    startBorneSignBridge(() => navigate('/borne/signature'));
+    startBorneSignBridge(() => navRef.current('/borne/signature'));
     const unsub = subscribeBridgeStatus(() => setConnected(isBridgeSubscribed()));
     return () => { unsub(); stopBorneSignBridge(); };
-  }, [armed, navigate]);
+  }, [armed]);
   // Voyant discret (coin bas-gauche) : vert = la borne est prête à recevoir une
   // signature du PC ; gris = écoute non connectée. Visible uniquement en mode borne.
   if (!armed) return null;

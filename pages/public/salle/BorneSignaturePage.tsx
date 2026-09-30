@@ -44,7 +44,11 @@ const SOURCES = ['Un ami / une connaissance', 'Réseaux sociaux', 'En passant de
 
 const BorneSignaturePage: React.FC = () => {
   const navigate = useNavigate();
-  const req = getPendingSign();
+  // On capture la demande UNE SEULE FOIS au montage : l'écran ne doit pas se fermer
+  // si l'état module `pending` change ensuite (chaque re-rendu — cocher une case,
+  // ouvrir les conditions — ne doit surtout pas renvoyer à l'accueil).
+  const reqRef = useRef(getPendingSign());
+  const req = reqRef.current;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const [empty, setEmpty] = useState(true);
@@ -55,8 +59,9 @@ const BorneSignaturePage: React.FC = () => {
   const [code, setCode] = useState('');
   const [done, setDone] = useState(false);
 
-  // Pas de demande en attente : on retourne à l'accueil.
-  useEffect(() => { if (!req) navigate('/borne', { replace: true }); }, [req, navigate]);
+  // Aucune demande au montage (accès direct à l'URL) : on retourne à l'accueil.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!req) navigate('/borne', { replace: true }); }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -84,7 +89,9 @@ const BorneSignaturePage: React.FC = () => {
   const validate = () => {
     if (!canValidate) return;
     const signature = canvasRef.current!.toDataURL('image/png');
-    sendSignResult({ signature, acquisition: source || null, referralCode: code.trim() || null });
+    // On passe explicitement le sessionId capturé au montage (au cas où l'état
+    // module `pending` aurait été réinitialisé entre-temps).
+    sendSignResult({ sessionId: req?.sessionId, signature, acquisition: source || null, referralCode: code.trim() || null });
     setDone(true);
     setTimeout(() => navigate('/borne', { replace: true }), 2600);
   };
