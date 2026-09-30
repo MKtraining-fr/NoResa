@@ -89,6 +89,13 @@ let pending: SignRequest | null = null;
 const subs = new Set<() => void>();
 const notify = () => subs.forEach((cb) => { try { cb(); } catch { /* noop */ } });
 
+// État de connexion de l'écoute (pour afficher un voyant « borne prête » sur l'accueil).
+let bridgeSubscribed = false;
+const statusSubs = new Set<() => void>();
+const notifyStatus = () => statusSubs.forEach((cb) => { try { cb(); } catch { /* noop */ } });
+export function isBridgeSubscribed(): boolean { return bridgeSubscribed; }
+export function subscribeBridgeStatus(cb: () => void): () => void { statusSubs.add(cb); return () => statusSubs.delete(cb); }
+
 export function getPendingSign(): SignRequest | null { return pending; }
 export function subscribePending(cb: () => void): () => void { subs.add(cb); return () => subs.delete(cb); }
 export function clearPendingSign(): void { pending = null; notify(); }
@@ -106,12 +113,17 @@ export function startBorneSignBridge(onRequest: (req: SignRequest) => void): voi
     notify();
     onRequest(pending);
   });
-  ch.subscribe();
+  ch.subscribe((status) => {
+    bridgeSubscribed = status === 'SUBSCRIBED';
+    notifyStatus();
+  });
 }
 
 export function stopBorneSignBridge(): void {
   if (borneChannel) { supabase.removeChannel(borneChannel); borneChannel = null; }
   pending = null;
+  bridgeSubscribed = false;
+  notifyStatus();
 }
 
 /** Renvoie la signature (et les infos annexes) au PC. */

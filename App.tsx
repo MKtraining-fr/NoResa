@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
@@ -60,7 +60,7 @@ import MemberLayout from './layouts/MemberLayout';
 import ProtectedRoute from './lib/ProtectedRoute';
 import MemberAccessGate from './components/MemberAccessGate';
 import { isKiosk } from './lib/kiosk';
-import { startBorneSignBridge, stopBorneSignBridge } from './lib/borneBridge';
+import { startBorneSignBridge, stopBorneSignBridge, isBridgeSubscribed, subscribeBridgeStatus } from './lib/borneBridge';
 // Écrans critiques de la borne : chargés en dur (pas en lazy) pour qu'aucun
 // téléchargement de chunk ne soit requis au moment où ils s'affichent — un kiosque
 // resté ouvert longtemps pourrait sinon ne plus récupérer un chunk obsolète.
@@ -71,12 +71,23 @@ import BorneSignaturePage from './pages/public/salle/BorneSignaturePage';
 // à réception, bascule sur l'écran de signature.
 const BorneSignListener: React.FC = () => {
   const navigate = useNavigate();
+  const [connected, setConnected] = useState(isBridgeSubscribed());
   useEffect(() => {
     if (!isKiosk()) return;
     startBorneSignBridge(() => navigate('/borne/signature'));
-    return () => stopBorneSignBridge();
+    const unsub = subscribeBridgeStatus(() => setConnected(isBridgeSubscribed()));
+    return () => { unsub(); stopBorneSignBridge(); };
   }, [navigate]);
-  return null;
+  // Voyant discret (coin bas-gauche) : vert = la borne est prête à recevoir une
+  // signature du PC ; gris = écoute non connectée. Visible uniquement en mode borne.
+  if (!isKiosk()) return null;
+  return (
+    <div style={{ position: 'fixed', left: 8, bottom: 8, zIndex: 60, display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'none' }}
+      title={connected ? 'Borne prête à signer' : 'Borne non connectée (écoute inactive)'}>
+      <span style={{ width: 9, height: 9, borderRadius: 9999, background: connected ? '#16a34a' : '#9ca3af', boxShadow: connected ? '0 0 6px #16a34a' : 'none' }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: connected ? '#16a34a' : '#9ca3af' }}>{connected ? 'Borne prête' : 'Hors ligne'}</span>
+    </div>
+  );
 };
 
 // En mode borne (kiosque), les pages marketing NoResa redirigent vers /borne :
