@@ -61,6 +61,11 @@ import ProtectedRoute from './lib/ProtectedRoute';
 import MemberAccessGate from './components/MemberAccessGate';
 import { isKiosk } from './lib/kiosk';
 import { startBorneSignBridge, stopBorneSignBridge } from './lib/borneBridge';
+// Écrans critiques de la borne : chargés en dur (pas en lazy) pour qu'aucun
+// téléchargement de chunk ne soit requis au moment où ils s'affichent — un kiosque
+// resté ouvert longtemps pourrait sinon ne plus récupérer un chunk obsolète.
+import VeillePage from './pages/public/salle/VeillePage';
+import BorneSignaturePage from './pages/public/salle/BorneSignaturePage';
 
 // Écoute (borne, mode kiosque) des demandes de signature envoyées par le PC :
 // à réception, bascule sur l'écran de signature.
@@ -95,8 +100,6 @@ const TarifsPage = lazy(() => import('./pages/public/salle/TarifsPage'));
 const FaqPage = lazy(() => import('./pages/public/salle/FaqPage'));
 const SalleLoginPage = lazy(() => import('./pages/public/salle/SalleLoginPage'));
 const InfosPage = lazy(() => import('./pages/public/salle/InfosPage'));
-const VeillePage = lazy(() => import('./pages/public/salle/VeillePage'));
-const BorneSignaturePage = lazy(() => import('./pages/public/salle/BorneSignaturePage'));
 const RegisterGymPage = lazy(() => import('./pages/public/RegisterGymPage'));
 const GymsExplorerPage = lazy(() => import('./pages/public/GymsExplorerPage'));
 const GymPublicPage = lazy(() => import('./pages/public/GymPublicPage'));
