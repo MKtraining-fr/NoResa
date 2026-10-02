@@ -37,8 +37,8 @@ const KioskIdleReset: React.FC = () => {
           const { data } = await supabase.auth.getSession();
           if (data.session) await supabase.auth.signOut();
         } catch { /* noop */ }
-        // Ne pas interrompre une signature en cours sur la borne.
-        if (/#\/borne\/signature/.test(window.location.hash)) return;
+        // Ne pas interrompre une signature ou un paiement en cours sur la borne.
+        if (/#\/borne\/(signature|payer|merci-paiement)/.test(window.location.hash)) return;
         // Bascule sur l'écran de veille (vidéo + annonces). Une touche y ramène à
         // l'accueil ; la veille se recharge périodiquement pour récupérer les MAJ.
         if (!/#\/veille/.test(window.location.hash)) navigate('/veille', { replace: true });
@@ -66,6 +66,8 @@ import { startBorneSignBridge, stopBorneSignBridge, isBridgeSubscribed, subscrib
 // resté ouvert longtemps pourrait sinon ne plus récupérer un chunk obsolète.
 import VeillePage from './pages/public/salle/VeillePage';
 import BorneSignaturePage from './pages/public/salle/BorneSignaturePage';
+const BornePayPage = lazy(() => import('./pages/public/salle/BornePayPage'));
+const BorneMerciPaiementPage = lazy(() => import('./pages/public/salle/BorneMerciPaiementPage'));
 
 // Écoute (borne, mode kiosque) des demandes de signature envoyées par le PC :
 // à réception, bascule sur l'écran de signature.
@@ -183,6 +185,9 @@ const App: React.FC = () => {
           <Route path="/veille" element={<VeillePage />} />
           {/* Signature du contrat sur la borne (déclenchée par le PC en temps réel) */}
           <Route path="/borne/signature" element={<BorneSignaturePage />} />
+          {/* Paiement self-service sur la borne (séance / carnet / mois) */}
+          <Route path="/borne/payer" element={<BornePayPage />} />
+          <Route path="/borne/merci-paiement" element={<BorneMerciPaiementPage />} />
           {/* Mini-site public « La SaLLe » (borne + web) — univers salle, hors marketing NoResa */}
           <Route element={<SalleLayout />}>
             <Route path="/borne" element={<BornePage />} />
