@@ -15,6 +15,7 @@ const NAV = [
   { to: '/tarifs', label: 'Tarifs' },
   { to: '/infos', label: 'Infos' },
   { to: '/faq', label: 'FAQ' },
+  { to: '/borne/payer', label: 'Payer une séance' },
 ];
 
 const SalleLayout: React.FC = () => {
