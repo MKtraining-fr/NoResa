@@ -418,6 +418,37 @@ export async function mergeMembers(
   }
 }
 
+export interface EmailDuplicate {
+  id: string;
+  firstName: string;
+  lastName: string;
+  memberNumber?: string;
+  email?: string;
+  hasAccount: boolean;   // la fiche possède un compte app (user_id)
+  createdAt?: string;
+}
+
+/**
+ * Autres fiches actives (même salle) partageant le même e-mail que la fiche donnée.
+ * Sert au rapprochement : détecter le compte app auto-inscrit à relier à une fiche
+ * importée à laquelle on vient d'ajouter l'e-mail.
+ */
+export async function findEmailDuplicates(email: string, excludeId: string): Promise<EmailDuplicate[]> {
+  const term = (email || '').trim();
+  if (!term) return [];
+  const { data, error } = await supabase.rpc('find_email_duplicates', { p_email: term, p_exclude: excludeId });
+  if (error) { console.error('membersApi.findEmailDuplicates', error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    firstName: r.first_name ?? '',
+    lastName: r.last_name ?? '',
+    memberNumber: r.member_number ?? undefined,
+    email: r.email ?? undefined,
+    hasAccount: !!r.has_account,
+    createdAt: r.created_at ?? undefined,
+  }));
+}
+
 /**
  * (Re)crée le compte app de l'adhérent et lui renvoie l'e-mail d'activation
  * (lien de création de mot de passe). Idempotent. Utile si le mail initial n'est

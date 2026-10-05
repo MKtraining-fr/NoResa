@@ -9,6 +9,7 @@ interface Props {
   current: any;                 // la fiche ouverte (point de départ)
   onClose: () => void;
   onMerged: (keeperId: string) => void; // le parent recharge la liste + rouvre la fiche gardée
+  initialOther?: any | null;    // fiche pré-sélectionnée (rapprochement auto par e-mail)
 }
 
 /**
@@ -17,7 +18,7 @@ interface Props {
  * Toute l'historique (contrats, paiements, passages, compte app…) est déplacée
  * vers la fiche conservée ; l'autre est archivée. Opération côté serveur (RPC).
  */
-const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged }) => {
+const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged, initialOther }) => {
   const [q, setQ] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -31,6 +32,17 @@ const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged }
   useEffect(() => {
     if (!open) { setQ(''); setResults([]); setOther(null); setKeeperIsCurrent(true); setPreferOtherLogin(false); setErr(''); }
   }, [open]);
+
+  // Rapprochement auto : fiche pré-sélectionnée (même e-mail détecté).
+  useEffect(() => {
+    if (!open || !initialOther) return;
+    setOther(initialOther); setErr(''); setResults([]); setQ('');
+    const hasNum = (m: any) => !!(m?.memberNumber && String(m.memberNumber).trim());
+    if (hasNum(current) && !hasNum(initialOther)) setKeeperIsCurrent(true);
+    else if (!hasNum(current) && hasNum(initialOther)) setKeeperIsCurrent(false);
+    // Le doublon porte le compte app → garder son e-mail/login de connexion.
+    if (initialOther.hasAccount) setPreferOtherLogin(true);
+  }, [open, initialOther, current]);
 
   // Recherche live (débounce), en excluant la fiche courante.
   useEffect(() => {

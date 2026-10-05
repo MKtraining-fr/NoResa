@@ -10,9 +10,9 @@ import {
   User, ChevronRight, CheckCircle2, Clock, Trash2,
   ShieldAlert, HeartPulse, ImageIcon, Briefcase as JobIcon,
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload, StickyNote,
-  RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight
+  RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight, AlertTriangle
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail, findEmailDuplicates, type EmailDuplicate } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, regularizePayments, recordFormulaPayment, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
@@ -45,6 +45,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editBackup, setEditBackup] = useState<any | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergePrefill, setMergePrefill] = useState<any | null>(null);
+  const [emailDupes, setEmailDupes] = useState<EmailDuplicate[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [memberSales, setMemberSales] = useState<any[]>([]);
@@ -242,7 +244,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
   // Après une fusion : recharge la liste et rouvre la fiche conservée.
   const handleMerged = async (keeperId: string) => {
-    setMergeOpen(false);
+    setMergeOpen(false); setMergePrefill(null);
     try {
       const list = await getMembers();
       setContacts(list);
@@ -586,6 +588,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       }
       getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
       getPackStatus(selectedContact.id).then((p) => { if (active) setPackStatus(p); });
+      // Rapprochement : une autre fiche partage-t-elle cet e-mail (compte app à relier) ?
+      if (selectedContact.email) {
+        findEmailDuplicates(selectedContact.email, selectedContact.id).then((d) => { if (active) setEmailDupes(d); });
+      } else { setEmailDupes([]); }
       setVisitsLoading(true); setVisitsHasMore(true);
       getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
         if (active) { setMemberVisits(v); setVisitsHasMore(v.length === 15); setVisitsLoading(false); }
@@ -593,7 +599,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     } else {
       setMemberSales([]); setMemberContracts([]); setMemberPayments([]);
       setMemberVisits([]); setVisitCount(0); setVisitsHasMore(true);
-      setPackStatus(null);
+      setPackStatus(null); setEmailDupes([]);
       setMemberGcPayments([]); setGcPaymentsLoading(false);
     }
     return () => { active = false; };
@@ -1711,8 +1717,33 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <ShieldAlert size={13} /> Passer en profil staff (masquer des membres)
                   </button>
 
+                  {/* Rapprochement auto : une autre fiche partage cet e-mail (compte app auto-inscrit) */}
+                  {emailDupes.length > 0 && (() => {
+                    const d = emailDupes[0];
+                    const dname = `${d.firstName} ${d.lastName}`.trim() || '—';
+                    return (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-[12px] font-bold text-amber-800">Rapprochement possible</p>
+                            <p className="text-[11.5px] text-amber-700 mt-0.5 leading-relaxed">
+                              Une autre fiche utilise le même e-mail : <b>{dname}</b>
+                              {d.memberNumber ? ` (n° ${d.memberNumber})` : ''}{d.hasAccount ? ' · a un compte app' : ''}.
+                              {' '}C'est sûrement le compte créé sur l'app à relier à cette fiche.
+                            </p>
+                            <button type="button" onClick={() => { setMergePrefill(d); setMergeOpen(true); }}
+                              className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-amber-600">
+                              <Link2 size={13} /> Rapprocher les fiches
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Fusion de deux fiches en doublon */}
-                  <button type="button" onClick={() => setMergeOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-red-600">
+                  <button type="button" onClick={() => { setMergePrefill(null); setMergeOpen(true); }} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-red-600">
                     <Link2 size={13} /> Fusionner avec une fiche en doublon
                   </button>
 
@@ -2375,7 +2406,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       {webcamFor && <WebcamCapture onCapture={(f) => { if (webcamFor === 'member') applyFichePhoto(f); else applyAddPhoto(f); }} onClose={() => setWebcamFor(null)} />}
 
       {mergeOpen && selectedContact && (
-        <MergeMembersModal open={mergeOpen} current={selectedContact} onClose={() => setMergeOpen(false)} onMerged={handleMerged} />
+        <MergeMembersModal open={mergeOpen} current={selectedContact} initialOther={mergePrefill} onClose={() => { setMergeOpen(false); setMergePrefill(null); }} onMerged={handleMerged} />
       )}
     </div>
   );
