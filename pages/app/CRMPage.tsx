@@ -588,12 +588,6 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       }
       getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
       getPackStatus(selectedContact.id).then((p) => { if (active) setPackStatus(p); });
-      // Rapprochement : une autre fiche partage-t-elle le même e-mail OU le même nom
-      // (compte app auto-inscrit à relier à cette fiche) ?
-      findMemberDuplicates(
-        { email: selectedContact.email, firstName: selectedContact.firstName, lastName: selectedContact.lastName },
-        selectedContact.id,
-      ).then((d) => { if (active) setEmailDupes(d); });
       setVisitsLoading(true); setVisitsHasMore(true);
       getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
         if (active) { setMemberVisits(v); setVisitsHasMore(v.length === 15); setVisitsLoading(false); }
@@ -606,6 +600,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     }
     return () => { active = false; };
   }, [selectedContact?.id]);
+
+  // Rapprochement : détection réactive à l'e-mail/nom (une autre fiche partage le même
+  // e-mail OU le même nom → compte app auto-inscrit à relier). Se relance dès qu'on
+  // ajoute/modifie l'e-mail sur la fiche, sans rouvrir.
+  useEffect(() => {
+    let active = true;
+    const id = selectedContact?.id;
+    if (!id) { setEmailDupes([]); return; }
+    const t = setTimeout(() => {
+      findMemberDuplicates(
+        { email: selectedContact?.email, firstName: selectedContact?.firstName, lastName: selectedContact?.lastName },
+        id,
+      ).then((d) => { if (active) setEmailDupes(d); });
+    }, 300);
+    return () => { active = false; clearTimeout(t); };
+  }, [selectedContact?.id, selectedContact?.email, selectedContact?.firstName, selectedContact?.lastName]);
 
   const loadMoreVisits = async () => {
     if (!selectedContact?.id || visitsLoading || memberVisits.length === 0) return;
