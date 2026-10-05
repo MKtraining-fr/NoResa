@@ -249,33 +249,72 @@ export interface SupplierRow {
   address?: string | null;
   supplier_type?: string | null;
   productCount?: number;
+  parent_supplier_id?: string | null;
+  parentName?: string | null;   // nom du fournisseur parent (distributeur)
+  subCount?: number;            // nombre de sous-fournisseurs (marques)
 }
 
 export async function getSuppliers(): Promise<SupplierRow[]> {
   const { data, error } = await supabase
     .from('suppliers')
-    .select('id, name, contact_name, email, phone, address, supplier_type, is_active')
+    .select('id, name, contact_name, email, phone, address, supplier_type, is_active, parent_supplier_id')
     .eq('is_active', true)
     .order('name');
   if (error) { console.error('boutiqueApi.getSuppliers', error); return []; }
-  // nombre de produits par fournisseur
+  const list = (data ?? []) as any[];
+  const byId: Record<string, any> = {}; list.forEach((s) => { byId[s.id] = s; });
+  // nombre de produits par fournisseur (remonté aussi au parent)
   const { data: prods } = await supabase.from('products').select('supplier_id');
   const counts: Record<string, number> = {};
-  (prods ?? []).forEach((p: any) => { if (p.supplier_id) counts[p.supplier_id] = (counts[p.supplier_id] || 0) + 1; });
-  return (data ?? []).map((s: any) => ({ ...s, productCount: counts[s.id] || 0 }));
+  (prods ?? []).forEach((p: any) => {
+    if (!p.supplier_id) return;
+    counts[p.supplier_id] = (counts[p.supplier_id] || 0) + 1;
+    const parent = byId[p.supplier_id]?.parent_supplier_id;
+    if (parent) counts[parent] = (counts[parent] || 0) + 1;
+  });
+  const subCounts: Record<string, number> = {};
+  list.forEach((s) => { if (s.parent_supplier_id) subCounts[s.parent_supplier_id] = (subCounts[s.parent_supplier_id] || 0) + 1; });
+  return list.map((s) => ({
+    ...s,
+    productCount: counts[s.id] || 0,
+    parentName: s.parent_supplier_id ? (byId[s.parent_supplier_id]?.name ?? null) : null,
+    subCount: subCounts[s.id] || 0,
+  }));
 }
 
 export async function getSupplier(id: string): Promise<SupplierRow | null> {
   const { data, error } = await supabase.from('suppliers')
-    .select('id, name, contact_name, email, phone, address, supplier_type, notes')
+    .select('id, name, contact_name, email, phone, address, supplier_type, notes, parent_supplier_id')
     .eq('id', id).maybeSingle();
   if (error) { console.error('boutiqueApi.getSupplier', error); return null; }
-  return (data as any) || null;
+  if (!data) return null;
+  let parentName: string | null = null;
+  if ((data as any).parent_supplier_id) {
+    const { data: par } = await supabase.from('suppliers').select('name').eq('id', (data as any).parent_supplier_id).maybeSingle();
+    parentName = (par as any)?.name ?? null;
+  }
+  return { ...(data as any), parentName };
+}
+
+/** Sous-fournisseurs (marques) d'un fournisseur parent, avec leur nombre de produits. */
+export async function getSubSuppliers(parentId: string): Promise<SupplierRow[]> {
+  const { data, error } = await supabase.from('suppliers')
+    .select('id, name, contact_name, supplier_type, is_active, parent_supplier_id')
+    .eq('parent_supplier_id', parentId).eq('is_active', true).order('name');
+  if (error) { console.error('boutiqueApi.getSubSuppliers', error); return []; }
+  const children = (data ?? []) as any[];
+  if (children.length === 0) return [];
+  const ids = children.map((c) => c.id);
+  const { data: prods } = await supabase.from('products').select('supplier_id').in('supplier_id', ids);
+  const counts: Record<string, number> = {};
+  (prods ?? []).forEach((p: any) => { if (p.supplier_id) counts[p.supplier_id] = (counts[p.supplier_id] || 0) + 1; });
+  return children.map((c) => ({ ...c, productCount: counts[c.id] || 0 }));
 }
 
 export interface SupplierInput {
   name: string; contactName?: string | null; email?: string | null;
   phone?: string | null; address?: string | null; supplierType?: string | null; notes?: string | null;
+  parentSupplierId?: string | null;
 }
 
 function supplierInputToRow(p: Partial<SupplierInput>): Record<string, any> {
@@ -287,6 +326,7 @@ function supplierInputToRow(p: Partial<SupplierInput>): Record<string, any> {
   if (p.address !== undefined) row.address = p.address || null;
   if (p.supplierType !== undefined) row.supplier_type = p.supplierType || null;
   if (p.notes !== undefined) row.notes = p.notes || null;
+  if (p.parentSupplierId !== undefined) row.parent_supplier_id = p.parentSupplierId || null;
   return row;
 }
 

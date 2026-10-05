@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Truck, Loader2, Save, Package, User, Mail, Phone, MapPin } from 'lucide-react';
-import { getSupplier, updateSupplier, getSupplierProducts, SupplierInput } from '../../lib/boutiqueApi';
+import { ArrowLeft, Truck, Loader2, Save, Package, User, Mail, Phone, MapPin, Layers, ChevronRight } from 'lucide-react';
+import { getSupplier, updateSupplier, getSupplierProducts, getSubSuppliers, getSuppliers, SupplierInput, SupplierRow } from '../../lib/boutiqueApi';
 import { Product } from '../../types';
 
 const eur = (n: number) => `${(n || 0).toFixed(2).replace('.', ',')} €`;
@@ -22,19 +22,24 @@ const SupplierDetailPage: React.FC = () => {
   const [address, setAddress] = useState('');
   const [supplierType, setSupplierType] = useState('');
   const [notes, setNotes] = useState('');
+  const [parentId, setParentId] = useState('');
+  const [parentName, setParentName] = useState<string | null>(null);
+  const [subs, setSubs] = useState<SupplierRow[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<SupplierRow[]>([]);
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     let stop = false;
-    Promise.all([getSupplier(id), getSupplierProducts(id)]).then(([s, prods]) => {
+    Promise.all([getSupplier(id), getSupplierProducts(id), getSubSuppliers(id), getSuppliers()]).then(([s, prods, sub, all]) => {
       if (stop) return;
       if (!s) { setFound(false); setLoading(false); return; }
       setName(s.name || ''); setContactName(s.contact_name || ''); setEmail(s.email || '');
       setPhone(s.phone || ''); setAddress(s.address || ''); setSupplierType(s.supplier_type || '');
       setNotes((s as any).notes || '');
-      setProducts(prods); setLoading(false);
+      setParentId((s as any).parent_supplier_id || ''); setParentName(s.parentName || null);
+      setProducts(prods); setSubs(sub); setAllSuppliers(all); setLoading(false);
     });
     return () => { stop = true; };
   }, [id]);
@@ -47,8 +52,10 @@ const SupplierDetailPage: React.FC = () => {
         name: name.trim(), contactName: contactName.trim() || null, email: email.trim() || null,
         phone: phone.trim() || null, address: address.trim() || null,
         supplierType: supplierType.trim() || null, notes: notes.trim() || null,
+        parentSupplierId: parentId || null,
       };
       await updateSupplier(id, patch);
+      setParentName(parentId ? (allSuppliers.find((s) => s.id === parentId)?.name ?? null) : null);
       setMsg('Enregistré ✓');
     } catch (e: any) { setMsg(e?.message || 'Enregistrement impossible.'); }
     finally { setSaving(false); }
@@ -67,9 +74,17 @@ const SupplierDetailPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 max-w-5xl">
-      <button onClick={() => navigate('/app/boutique/fournisseurs')} className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-indigo-600">
-        <ArrowLeft size={16} /> Fournisseurs
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={() => navigate('/app/boutique/fournisseurs')} className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-indigo-600">
+          <ArrowLeft size={16} /> Fournisseurs
+        </button>
+        {parentId && parentName && (
+          <button onClick={() => navigate(`/app/boutique/fournisseur/${parentId}`)}
+            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100">
+            <Layers size={13} /> Sous-fournisseur de {parentName}
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Coordonnées */}
@@ -91,6 +106,16 @@ const SupplierDetailPage: React.FC = () => {
               <label className={label}>Type</label>
               <input value={supplierType} onChange={(e) => setSupplierType(e.target.value)} className={field} placeholder="Compléments, matériel…" />
             </div>
+          </div>
+          <div className="space-y-1">
+            <label className={label}><Layers size={11} /> Fournisseur parent (distributeur)</label>
+            <select value={parentId} onChange={(e) => setParentId(e.target.value)} className={field}>
+              <option value="">— Aucun (fournisseur principal) —</option>
+              {allSuppliers.filter((s) => s.id !== id).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-gray-400 font-semibold">Ex. une marque distribuée par RSB Distribution.</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -118,7 +143,25 @@ const SupplierDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Produits du fournisseur */}
+        {/* Colonne droite : sous-fournisseurs (si parent) + produits */}
+        <div className="space-y-6">
+        {subs.length > 0 && (
+          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+            <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-1.5"><Layers size={13} /> Marques / sous-fournisseurs ({subs.length})</h3>
+            <div className="space-y-2">
+              {subs.map((s) => (
+                <button key={s.id} onClick={() => navigate(`/app/boutique/fournisseur/${s.id}`)} className="w-full flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors text-left">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><Truck size={16} /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{s.name}</p>
+                    <p className="text-[11px] text-gray-400 font-semibold">{s.productCount ?? 0} produit{(s.productCount ?? 0) > 1 ? 's' : ''}</p>
+                  </div>
+                  <ChevronRight size={18} className="text-gray-300" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
           <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-4">Produits ({products.length})</h3>
           {products.length === 0 ? (
@@ -137,6 +180,7 @@ const SupplierDetailPage: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>

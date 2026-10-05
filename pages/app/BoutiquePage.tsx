@@ -569,6 +569,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       <div className="min-w-0">
                         <h4 className="text-sm font-semibold text-gray-900 truncate">{s.name}</h4>
                         <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">{s.supplier_type || 'fournisseur'}</p>
+                        {s.parentName && <p className="text-[10px] font-bold text-gray-400 truncate">↳ via {s.parentName}</p>}
                       </div>
                     </div>
                     <div className="space-y-1.5 text-xs font-bold text-gray-500">
@@ -577,7 +578,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
                       {s.phone && <p className="flex items-center gap-2">{s.phone}</p>}
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Produits</span>
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{(s.subCount ?? 0) > 0 ? `${s.subCount} marque${(s.subCount ?? 0) > 1 ? 's' : ''}` : 'Produits'}</span>
                       <span className="text-sm font-semibold text-gray-900">{s.productCount}</span>
                     </div>
                   </button>

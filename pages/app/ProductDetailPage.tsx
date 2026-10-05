@@ -206,7 +206,7 @@ const ProductDetailPage: React.FC = () => {
               <label className={`${label} flex items-center gap-1`}><Truck size={11} /> Fournisseur</label>
               <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={field}>
                 <option value="">— Aucun —</option>
-                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.parentName ? ` (${s.parentName})` : ''}</option>)}
               </select>
             </div>
           </div>
