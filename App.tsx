@@ -37,8 +37,10 @@ const KioskIdleReset: React.FC = () => {
           const { data } = await supabase.auth.getSession();
           if (data.session) await supabase.auth.signOut();
         } catch { /* noop */ }
-        // Ne pas interrompre une signature ou un paiement en cours sur la borne.
-        if (/#\/borne\/(signature|payer|merci-paiement)/.test(window.location.hash)) return;
+        // Ne pas interrompre une signature en cours (lecture des CGA = pauses possibles).
+        // Le paiement (/borne/payer) repart en veille s'il est abandonné : le minuteur
+        // se réinitialise à chaque frappe/toucher, donc un client actif n'est pas coupé.
+        if (/#\/borne\/signature/.test(window.location.hash)) return;
         // Bascule sur l'écran de veille (vidéo + annonces). Une touche y ramène à
         // l'accueil ; la veille se recharge périodiquement pour récupérer les MAJ.
         if (!/#\/veille/.test(window.location.hash)) navigate('/veille', { replace: true });
