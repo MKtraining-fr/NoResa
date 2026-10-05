@@ -71,6 +71,7 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [nsName, setNsName] = useState('');
   const [nsContact, setNsContact] = useState('');
+  const [nsParent, setNsParent] = useState('');
   const [creatingSupplier, setCreatingSupplier] = useState(false);
 
   const lowStock = (p: Product) => p.stock <= (p.minStockAlert ?? 3);
@@ -331,8 +332,8 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
     if (!nsName.trim() || creatingSupplier) return;
     setCreatingSupplier(true);
     try {
-      const id = await createSupplier({ name: nsName.trim(), contactName: nsContact.trim() || null });
-      setSupplierModalOpen(false); setNsName(''); setNsContact('');
+      const id = await createSupplier({ name: nsName.trim(), contactName: nsContact.trim() || null, parentSupplierId: nsParent || null });
+      setSupplierModalOpen(false); setNsName(''); setNsContact(''); setNsParent('');
       navigate(`/app/boutique/fournisseur/${id}`);
     } catch (e: any) {
       alert('Création impossible : ' + (e?.message || ''));
@@ -929,6 +930,14 @@ const BoutiquePage: React.FC<BoutiquePageProps> = ({ view = 'produits' }) => {
               <div className="space-y-1">
                 <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Contact (optionnel)</label>
                 <input value={nsContact} onChange={e => setNsContact(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" placeholder="Nom du contact" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Fournisseur parent (optionnel)</label>
+                <select value={nsParent} onChange={e => setNsParent(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
+                  <option value="">— Aucun (fournisseur principal) —</option>
+                  {suppliers.filter(s => !s.parent_supplier_id).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <p className="text-[11px] text-gray-400 font-medium">Pour créer une marque sous un distributeur (ex. RSB Distribution).</p>
               </div>
               <p className="text-[11px] text-gray-400 font-medium">Le reste (email, téléphone, adresse, notes) se complète sur la fiche.</p>
               <button onClick={handleCreateSupplier} disabled={!nsName.trim() || creatingSupplier} className="w-full py-4 bg-indigo-600 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all uppercase tracking-wide text-xs disabled:opacity-60 flex items-center justify-center gap-2">
