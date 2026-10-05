@@ -163,7 +163,7 @@ const BornePayPage: React.FC = () => {
                 : <><CreditCard size={20} /> Payer {chosen ? chosen.price : ''} par carte <ArrowRight size={18} /></>}
         </button>
         <p className="text-center text-[11px] text-gray-400 mt-3">
-          {eng ? 'Signature du contrat puis mise en place du prélèvement SEPA (page sécurisée de ta banque).'
+          {eng ? 'Signature du contrat puis prélèvement SEPA (page sécurisée de ta banque). Tu recevras un e-mail pour créer ton mot de passe et retrouver ton code d’accès dans l’app.'
                : 'Paiement sécurisé par Stripe. La carte n’est jamais conservée par la salle.'}
         </p>
       </div>
