@@ -12,7 +12,7 @@ import {
   CreditCard, ShoppingBag, CalendarCheck, Zap, Edit2, Camera, Upload, StickyNote,
   RotateCcw, Link2, Hash, FileText, Layers, CornerDownRight, AlertTriangle
 } from 'lucide-react';
-import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail, findEmailDuplicates, type EmailDuplicate } from '../../lib/membersApi';
+import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail, findMemberDuplicates, type MemberDuplicate } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
 import { getMemberPayments, regularizePayments, recordFormulaPayment, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
@@ -46,7 +46,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [editBackup, setEditBackup] = useState<any | null>(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergePrefill, setMergePrefill] = useState<any | null>(null);
-  const [emailDupes, setEmailDupes] = useState<EmailDuplicate[]>([]);
+  const [emailDupes, setEmailDupes] = useState<MemberDuplicate[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [memberSales, setMemberSales] = useState<any[]>([]);
@@ -588,10 +588,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       }
       getMemberVisitCount(selectedContact.id).then((n) => { if (active) setVisitCount(n); });
       getPackStatus(selectedContact.id).then((p) => { if (active) setPackStatus(p); });
-      // Rapprochement : une autre fiche partage-t-elle cet e-mail (compte app à relier) ?
-      if (selectedContact.email) {
-        findEmailDuplicates(selectedContact.email, selectedContact.id).then((d) => { if (active) setEmailDupes(d); });
-      } else { setEmailDupes([]); }
+      // Rapprochement : une autre fiche partage-t-elle le même e-mail OU le même nom
+      // (compte app auto-inscrit à relier à cette fiche) ?
+      findMemberDuplicates(
+        { email: selectedContact.email, firstName: selectedContact.firstName, lastName: selectedContact.lastName },
+        selectedContact.id,
+      ).then((d) => { if (active) setEmailDupes(d); });
       setVisitsLoading(true); setVisitsHasMore(true);
       getMemberVisits(selectedContact.id, { limit: 15 }).then((v) => {
         if (active) { setMemberVisits(v); setVisitsHasMore(v.length === 15); setVisitsLoading(false); }
@@ -1717,24 +1719,29 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     <ShieldAlert size={13} /> Passer en profil staff (masquer des membres)
                   </button>
 
-                  {/* Rapprochement auto : une autre fiche partage cet e-mail (compte app auto-inscrit) */}
+                  {/* Rapprochement : une autre fiche partage l'e-mail (sûr) ou le nom (à vérifier) */}
                   {emailDupes.length > 0 && (() => {
                     const d = emailDupes[0];
                     const dname = `${d.firstName} ${d.lastName}`.trim() || '—';
+                    const byEmail = d.matchType === 'email';
                     return (
                       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
                         <div className="flex items-start gap-2">
                           <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <p className="text-[12px] font-bold text-amber-800">Rapprochement possible</p>
+                            <p className="text-[12px] font-bold text-amber-800">{byEmail ? 'Rapprochement possible' : 'Doublon potentiel (même nom)'}</p>
                             <p className="text-[11.5px] text-amber-700 mt-0.5 leading-relaxed">
-                              Une autre fiche utilise le même e-mail : <b>{dname}</b>
+                              {byEmail ? 'Une autre fiche utilise le même e-mail : ' : 'Une autre fiche porte le même nom : '}
+                              <b>{dname}</b>
                               {d.memberNumber ? ` (n° ${d.memberNumber})` : ''}{d.hasAccount ? ' · a un compte app' : ''}.
-                              {' '}C'est sûrement le compte créé sur l'app à relier à cette fiche.
+                              {byEmail
+                                ? " C'est sûrement le compte créé sur l'app à relier à cette fiche."
+                                : ' Vérifie qu’il s’agit bien de la même personne avant de rapprocher (homonyme possible).'}
+                              {emailDupes.length > 1 ? ` (+${emailDupes.length - 1} autre${emailDupes.length - 1 > 1 ? 's' : ''})` : ''}
                             </p>
                             <button type="button" onClick={() => { setMergePrefill(d); setMergeOpen(true); }}
                               className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-amber-600">
-                              <Link2 size={13} /> Rapprocher les fiches
+                              <Link2 size={13} /> {byEmail ? 'Rapprocher les fiches' : 'Vérifier et rapprocher'}
                             </button>
                           </div>
                         </div>

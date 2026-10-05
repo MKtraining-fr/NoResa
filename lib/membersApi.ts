@@ -418,26 +418,32 @@ export async function mergeMembers(
   }
 }
 
-export interface EmailDuplicate {
+export interface MemberDuplicate {
   id: string;
   firstName: string;
   lastName: string;
   memberNumber?: string;
   email?: string;
-  hasAccount: boolean;   // la fiche possède un compte app (user_id)
+  hasAccount: boolean;            // la fiche possède un compte app (user_id)
   createdAt?: string;
+  matchType: 'email' | 'name';    // e-mail identique (sûr) ou même nom (à vérifier)
 }
 
 /**
- * Autres fiches actives (même salle) partageant le même e-mail que la fiche donnée.
- * Sert au rapprochement : détecter le compte app auto-inscrit à relier à une fiche
- * importée à laquelle on vient d'ajouter l'e-mail.
+ * Autres fiches actives (même salle) à rapprocher de la fiche donnée : même e-mail
+ * (sûr) OU même nom+prénom (à vérifier). Sert à relier le compte app auto-inscrit à
+ * une fiche importée (sans e-mail/téléphone, matchable seulement par le nom).
  */
-export async function findEmailDuplicates(email: string, excludeId: string): Promise<EmailDuplicate[]> {
-  const term = (email || '').trim();
-  if (!term) return [];
-  const { data, error } = await supabase.rpc('find_email_duplicates', { p_email: term, p_exclude: excludeId });
-  if (error) { console.error('membersApi.findEmailDuplicates', error); return []; }
+export async function findMemberDuplicates(
+  input: { email?: string; firstName?: string; lastName?: string }, excludeId: string,
+): Promise<MemberDuplicate[]> {
+  const { data, error } = await supabase.rpc('find_member_duplicates', {
+    p_email: (input.email || '').trim(),
+    p_first: (input.firstName || '').trim(),
+    p_last: (input.lastName || '').trim(),
+    p_exclude: excludeId,
+  });
+  if (error) { console.error('membersApi.findMemberDuplicates', error); return []; }
   return (data ?? []).map((r: any) => ({
     id: r.id,
     firstName: r.first_name ?? '',
@@ -446,6 +452,7 @@ export async function findEmailDuplicates(email: string, excludeId: string): Pro
     email: r.email ?? undefined,
     hasAccount: !!r.has_account,
     createdAt: r.created_at ?? undefined,
+    matchType: (r.match_type === 'name' ? 'name' : 'email') as 'email' | 'name',
   }));
 }
 
