@@ -87,6 +87,28 @@ export async function startMemberMandate(
   return data as { authorisation_url: string; billing_request_id: string };
 }
 
+/**
+ * Souscription self-service d'un abonnement AVEC engagement (prélèvement SEPA) avec
+ * CONTRAT SIGNÉ (app + borne). Crée le contrat + PDF signé (e-mail) puis le mandat
+ * GoCardless. Renvoie l'URL de la page RIB. L'app passe le JWT du membre
+ * automatiquement ; la borne (non authentifiée) fournit l'identité.
+ */
+export async function selfSubscribe(input: {
+  label: string; price: number;
+  consentCga: boolean; consentMedical: boolean; consentImage?: boolean;
+  signature: string; redirectUrl: string;
+  firstName?: string; lastName?: string; email?: string; phone?: string;
+}): Promise<{ authorisation_url: string; member_id?: string; contract_number?: string }> {
+  const { data, error } = await supabase.functions.invoke('self-subscribe', { body: input });
+  if (error) {
+    let msg = error.message || 'Souscription indisponible';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    throw new Error(msg);
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as { authorisation_url: string; member_id?: string; contract_number?: string };
+}
+
 export interface GocardlessStats {
   mandates_active: number;
   collected_30d: number;

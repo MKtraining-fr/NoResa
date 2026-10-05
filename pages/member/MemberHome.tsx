@@ -9,7 +9,8 @@ import {
   getMyMember, getHourlyOccupancy, affluenceLevel, getMyGym, getMyPackStatus, getMemberFormulas,
   type MyMember, type HourOccupancy, type MyGym, type MyPackStatus, type MemberFormula,
 } from '../../lib/memberSelfApi';
-import { startMemberMandate } from '../../lib/gocardless';
+import { startMemberMandate, selfSubscribe } from '../../lib/gocardless';
+import ContractSignatureSheet from '../../components/ContractSignatureSheet';
 import { startStripePayment } from '../../lib/stripe';
 
 /**
@@ -294,6 +295,7 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [sel, setSel] = useState<ActivSel | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [showContract, setShowContract] = useState(false);
 
   useEffect(() => { getMemberFormulas().then(setFormulas).catch(() => {}); }, []);
 
@@ -307,13 +309,37 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const pay = async () => {
     if (!sel) return;
+    // Abonnement avec engagement (mandat SEPA) : on passe par la SIGNATURE DU CONTRAT
+    // (mêmes obligations qu'au comptoir) avant la mise en place du prélèvement.
+    if (sel.kind === 'eng' || sel.kind === 'annual3') { setErr(''); setShowContract(true); return; }
+    // Sans engagement / annuel 1 fois : paiement instantané Stripe.
     setBusy(true); setErr('');
     try {
       const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
-      let res: { authorisation_url: string };
-      if (sel.kind === 'noeng') res = await startStripePayment(sel.key, redirect);
-      else if (sel.kind === 'annual1') res = await startStripePayment('annee', redirect);
-      else res = await startMemberMandate(sel.label, sel.price, redirect); // eng | annual3 -> mandat SEPA GoCardless
+      const res = sel.kind === 'annual1'
+        ? await startStripePayment('annee', redirect)
+        : await startStripePayment((sel as any).key, redirect);
+      const w = window.open(res.authorisation_url, '_blank');
+      if (!w) window.location.href = res.authorisation_url;
+      onClose();
+    } catch (e: any) {
+      setErr(e?.message || 'Indisponible pour le moment.');
+      setBusy(false);
+    }
+  };
+
+  // Contrat signé -> crée le contrat + PDF (e-mail) puis ouvre la page RIB GoCardless.
+  const onContractSigned = async (r: { consentCga: boolean; consentMedical: boolean; consentImage: boolean; signature: string }) => {
+    if (!sel) return;
+    setBusy(true); setErr('');
+    try {
+      const redirect = `${window.location.origin}${window.location.pathname}#/membre`;
+      const res = await selfSubscribe({
+        label: sel.label, price: sel.price,
+        consentCga: r.consentCga, consentMedical: r.consentMedical, consentImage: r.consentImage,
+        signature: r.signature, redirectUrl: redirect,
+      });
+      setShowContract(false);
       const w = window.open(res.authorisation_url, '_blank');
       if (!w) window.location.href = res.authorisation_url;
       onClose();
@@ -388,14 +414,24 @@ const RachatSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         {err && <p className="text-[11px] text-red-600 font-semibold mt-3 text-center">{err}</p>}
         <button onClick={pay} disabled={busy || !sel} className="mt-4 w-full bg-brand text-white py-3.5 rounded-2xl font-extrabold text-[15px] disabled:opacity-50">
-          {busy ? 'Connexion à ta banque…' : isMandate ? 'Mettre en place le prélèvement' : 'Payer & valider'}
+          {busy ? 'Un instant…' : isMandate ? 'Lire et signer mon contrat' : 'Payer & valider'}
         </button>
         <p className="text-center text-[10.5px] text-gray-400 font-semibold mt-2.5">
           {isMandate
-            ? 'Signature du mandat SEPA via ta banque · accès activé après validation.'
+            ? 'Signature du contrat puis mise en place du prélèvement SEPA · accès activé après validation.'
             : 'Paiement instantané via ta banque (open banking) · accès activé après confirmation.'}
         </p>
       </div>
+
+      <ContractSignatureSheet
+        open={showContract}
+        busy={busy}
+        signerName={sel?.label}
+        summary={sel ? `${sel.label} · ${eur(sel.price)}${sel.kind === 'eng' ? '/mois' : ''}` : undefined}
+        submitLabel="Signer et mettre en place le prélèvement"
+        onClose={() => { if (!busy) setShowContract(false); }}
+        onSubmit={onContractSigned}
+      />
     </div>
   );
 };
