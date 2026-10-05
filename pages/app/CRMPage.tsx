@@ -15,7 +15,7 @@ import {
 import { getMembers, saveMember, deleteMember, uploadMemberPhoto, getPhotoUrl, createMember, patchMember, getGymId, getArchivedMembers, restoreMember, hardDeleteMember, updateMemberNumber, linkMandate, updateCardNumber, generateCardNumber, updateKeypadCode, generateKeypadCode, setMemberStaff, resendActivationEmail } from '../../lib/membersApi';
 import { getGroupTree, GroupNode } from '../../lib/groupsApi';
 import { enqueueAccessCommand, getMemberVisits, getMemberVisitCount, getPackStatus, type MemberVisit, type PackStatus } from '../../lib/accessApi';
-import { getMemberPayments, regularizePayments, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
+import { getMemberPayments, regularizePayments, recordFormulaPayment, REGULARIZE_METHODS, type MemberPayment } from '../../lib/paymentsApi';
 import { getMemberSales, getInvoiceUrl, getProducts, viewInvoice } from '../../lib/boutiqueApi';
 import { startMandateSetup, getMemberGocardlessPayments, changeFormula, setupMandateForMember, cancelSubscriptionKeepMandate, type GocardlessPayment } from '../../lib/gocardless';
 import { getMemberContracts, getContractUrl, deleteContract } from '../../lib/contractsApi';
@@ -63,7 +63,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [visitsHasMore, setVisitsHasMore] = useState(true);
   const [packStatus, setPackStatus] = useState<PackStatus | null>(null);
   const [editingFormula, setEditingFormula] = useState(false);
-  const [formulaDraft, setFormulaDraft] = useState<{ label: string; price: string; periodicity: string; start: string; end: string; method: string }>({ label: '', price: '', periodicity: '', start: '', end: '', method: '' });
+  const [formulaDraft, setFormulaDraft] = useState<{ label: string; price: string; periodicity: string; start: string; end: string; method: string; amount: string }>({ label: '', price: '', periodicity: '', start: '', end: '', method: '', amount: '' });
   const [savingFormula, setSavingFormula] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [detailTab, setDetailTab] = useState<'profil' | 'activite' | 'finance'>('profil');
@@ -616,7 +616,8 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       periodicity: selectedContact?.periodicity || '',
       start: selectedContact?.subscriptionStart || '',
       end: selectedContact?.subscriptionEnd || '',
-      method: selectedContact?.paymentMethod || '',
+      method: selectedContact?.paymentMethod || 'Prélèvement',
+      amount: '',
     });
     setEditingFormula(true);
   };
@@ -640,53 +641,51 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     if (!selectedContact?.id) return;
     if (!formulaDraft.label || formulaDraft.price === '') { alert('Choisis une formule.'); return; }
     const price = Number(formulaDraft.price);
-    const isPrelevementFormula = [25.9, 29.9, 59.9].includes(price);
+    const method = formulaDraft.method || 'Prélèvement';
     const hasMandate = !!(selectedContact.gocardlessMandateId) && (selectedContact.gocardlessStatus === 'mandate_active' || selectedContact.gocardlessStatus === 'mandate_submitted');
 
-    // CAS A — produit SANS prélèvement : rétrogradation (si mandat) ou simple changement.
-    if (!isPrelevementFormula) {
-      if (hasMandate) {
-        // Rétrogradation : vérifier l'engagement (12 mois depuis le début), avertir si pas fini.
-        const start = selectedContact.subscriptionStart ? new Date(selectedContact.subscriptionStart) : null;
-        if (start && !isNaN(start.getTime())) {
-          const engEnd = new Date(start); engEnd.setMonth(engEnd.getMonth() + 12);
-          if (new Date() < engEnd) {
-            const force = window.confirm(`⚠️ L'engagement de ce membre n'est pas terminé (jusqu'au ${engEnd.toLocaleDateString('fr-FR')}).\n\nRésilier quand même et passer à « ${formulaDraft.label} » ? (cas exceptionnel)`);
-            if (!force) return;
-          }
-        }
-        const okDown = window.confirm(`Rétrograder vers « ${formulaDraft.label} » : l'abonnement GoCardless sera annulé, le mandat conservé (réutilisable plus tard). Continuer ?`);
-        if (!okDown) return;
-        setSavingFormula(true);
-        try {
-          const res = await cancelSubscriptionKeepMandate(selectedContact.id, formulaDraft.label, price, formulaDraft.method || undefined, formulaDraft.periodicity || undefined);
-          if (res.error) { alert('Échec : ' + res.error); return; }
-          updateField('subscription', formulaDraft.label);
-          updateField('price', price);
-          setContacts(await getMembers());
-          if (selectedContact.gocardlessCustomerId || selectedContact.gocardlessMandateId) getMemberGocardlessPayments(selectedContact.id).then((p) => setMemberGcPayments(p));
-          setEditingFormula(false);
-          alert(`Rétrogradation effectuée : ${res.cancelled.length} abonnement(s) annulé(s), mandat conservé.`);
-        } catch (err: any) { console.error(err); alert(err?.message || 'Échec de la rétrogradation.'); }
-        finally { setSavingFormula(false); }
-        return;
-      }
-      // Pas de mandat -> simple mise à jour du produit (aucun GoCardless).
+    // ========================================================================
+    // ENCAISSEMENT DIRECT (CB / Espèces / Chèque / Virement) — pas de prélèvement.
+    // On met à jour la formule, on encaisse le montant (CA) et on ouvre l'accès
+    // jusqu'à la date de fin éventuelle. Un prélèvement en cours est ARRÊTÉ (mandat gardé).
+    // ========================================================================
+    if (method !== 'Prélèvement') {
+      const amount = formulaDraft.amount !== '' ? Number(formulaDraft.amount) : price;
+      if (isNaN(amount) || amount < 0) { alert('Montant à encaisser invalide.'); return; }
+      const end = formulaDraft.end || null;
+      const msg = `Changer pour « ${formulaDraft.label} » et encaisser ${amount.toFixed(2).replace('.', ',')} € en ${method}`
+        + (end ? `, accès jusqu'au ${new Date(end).toLocaleDateString('fr-FR')}` : '')
+        + (hasMandate ? `.\n\n⚠️ Le prélèvement automatique en cours sera ARRÊTÉ (mandat conservé).` : '.')
+        + `\n\nContinuer ?`;
+      if (!window.confirm(msg)) return;
       setSavingFormula(true);
       try {
-        const res = await changeFormula(selectedContact.id, formulaDraft.label, price);
-        if (res.error) { alert('Échec : ' + res.error); return; }
+        // Stoppe le prélèvement en cours s'il y en a un (conserve le mandat réutilisable).
+        if (hasMandate) {
+          const resCancel = await cancelSubscriptionKeepMandate(selectedContact.id, formulaDraft.label, price, method, formulaDraft.periodicity || undefined);
+          if (resCancel.error) { alert("Échec de l'arrêt du prélèvement : " + resCancel.error); return; }
+        }
+        await recordFormulaPayment({
+          memberId: selectedContact.id, label: formulaDraft.label, price, method,
+          amount, date: todayStr, end,
+        });
         updateField('subscription', formulaDraft.label);
         updateField('price', price);
+        if (end) updateField('subscriptionEnd', end);
         setContacts(await getMembers());
+        setMemberPayments(await getMemberPayments(selectedContact.id));
+        if (selectedContact.gocardlessCustomerId || selectedContact.gocardlessMandateId) getMemberGocardlessPayments(selectedContact.id).then((p) => setMemberGcPayments(p));
         setEditingFormula(false);
-        alert('Formule mise à jour.');
-      } catch (err: any) { console.error(err); alert(err?.message || 'Impossible de changer la formule.'); }
+        alert(`Formule changée et ${amount.toFixed(2).replace('.', ',')} € encaissé(s) en ${method}.`);
+      } catch (err: any) { console.error(err); alert(err?.message || "Échec de l'encaissement."); }
       finally { setSavingFormula(false); }
       return;
     }
 
-    // CAS B — formule à prélèvement, membre SANS mandat : mise en place du mandat (RIB).
+    // ========================================================================
+    // PRÉLÈVEMENT SEPA (GoCardless)
+    // ========================================================================
+    // CAS B — membre SANS mandat : mise en place du mandat (RIB).
     if (!hasMandate) {
       const okSetup = window.confirm(`« ${formulaDraft.label} » est une formule en prélèvement SEPA.\n\nCe membre n'a pas encore de mandat : il va être redirigé vers GoCardless pour saisir son RIB et signer le mandat. L'abonnement sera créé automatiquement après la signature.\n\nContinuer ?`);
       if (!okSetup) return;
@@ -1893,6 +1892,10 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           </button>
                         );
                       };
+                      const METHODS = ['Prélèvement', 'CB', 'Espèces', 'Chèque', 'Virement'];
+                      const method = formulaDraft.method || 'Prélèvement';
+                      const isCash = method !== 'Prélèvement';
+                      const amountStr = formulaDraft.amount !== '' ? formulaDraft.amount : (formulaDraft.price || '');
                       return (
                         <div className="p-5 bg-white border border-gray-100 rounded-2xl space-y-4">
                           <div className="space-y-1.5">
@@ -1900,26 +1903,61 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             <div className="grid grid-cols-1 gap-2">{recurringList.map(Opt)}</div>
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sans engagement / produits (rétrogradation)</label>
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sans engagement / produits</label>
                             <div className="grid grid-cols-1 gap-2">{downgradeList.map(Opt)}</div>
                           </div>
-                          {selDowngrade && hasMandate ? (
-                            <p className="text-[11px] font-bold text-red-600 bg-red-50 rounded-xl px-3 py-2 leading-relaxed">
-                              Rétrogradation : l'abonnement GoCardless sera <b>annulé</b>, le <b>mandat conservé</b>. L'engagement (12 mois) sera vérifié avant.
+
+                          {/* Mode de paiement */}
+                          <div className="space-y-1.5 pt-1">
+                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
+                            <div className="flex flex-wrap gap-2">
+                              {METHODS.map((m) => (
+                                <button key={m} type="button" onClick={() => setFormulaDraft({ ...formulaDraft, method: m })}
+                                  className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${method === m ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+                                  {m}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Encaissement direct (hors prélèvement) : montant + date de fin d'accès */}
+                          {isCash && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Montant encaissé (€)</label>
+                                <input type="number" step="0.01" min="0" value={amountStr}
+                                  onChange={(e) => setFormulaDraft({ ...formulaDraft, amount: e.target.value })}
+                                  placeholder={formulaDraft.price || '0'}
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-100" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Accès jusqu'au (facultatif)</label>
+                                <input type="date" value={formulaDraft.end || ''}
+                                  onChange={(e) => setFormulaDraft({ ...formulaDraft, end: e.target.value })}
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-100" />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Info selon le mode choisi */}
+                          {isCash ? (
+                            <p className="text-[11px] font-bold text-green-700 bg-green-50 rounded-xl px-3 py-2 leading-relaxed">
+                              Encaissement direct en <b>{method}</b> : la formule est mise à jour et le montant entre dans le CA.
+                              {hasMandate && <> Le <b>prélèvement automatique en cours sera arrêté</b> (mandat conservé).</>}
+                              {formulaDraft.end && <> Accès ouvert jusqu'au <b>{new Date(formulaDraft.end).toLocaleDateString('fr-FR')}</b>.</>}
                             </p>
-                          ) : !selDowngrade && hasMandate ? (
+                          ) : hasMandate ? (
                             <p className="text-[11px] font-bold text-amber-600 bg-amber-50 rounded-xl px-3 py-2 leading-relaxed">
-                              Membre en prélèvement : GoCardless sera mis à jour (ancien abonnement annulé, nouveau créé, prélevé le 10).
-                            </p>
-                          ) : !selDowngrade && !hasMandate ? (
-                            <p className="text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 leading-relaxed">
-                              Formule à prélèvement : le membre sera redirigé vers GoCardless pour saisir son RIB (création du mandat).
+                              Prélèvement : GoCardless sera mis à jour (ancien abonnement annulé, nouveau créé, prélevé le 10).
                             </p>
                           ) : (
-                            <p className="text-[11px] font-bold text-gray-400 px-1">Pas de prélèvement : seule la formule NoResa sera modifiée.</p>
+                            <p className="text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 leading-relaxed">
+                              Prélèvement : le membre sera redirigé vers GoCardless pour saisir son RIB (création du mandat).
+                            </p>
                           )}
+
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : 'Appliquer la formule'}</button>
+                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : (isCash ? 'Encaisser et appliquer' : 'Appliquer la formule')}</button>
                             <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
                           </div>
                         </div>

@@ -43,3 +43,24 @@ export async function regularizePayments(
   if (error) { console.error('regularizePayments', error); throw error; }
   return (data as number) ?? 0;
 }
+
+/**
+ * Change la formule d'un membre avec encaissement direct (hors prélèvement) :
+ * met à jour la fiche, enregistre le paiement (CA) et ouvre l'accès jusqu'à p_end.
+ * `method` = libellé Espèces / CB / Chèque / Virement.
+ */
+export async function recordFormulaPayment(input: {
+  memberId: string; label: string; price: number; method: string;
+  amount: number; date: string; end?: string | null;
+}): Promise<void> {
+  const { error } = await supabase.rpc('record_formula_payment', {
+    p_member: input.memberId,
+    p_label: input.label,
+    p_price: input.price,
+    p_method: input.method,
+    p_amount: input.amount,
+    p_date: input.date,
+    p_end: input.end || null,
+  });
+  if (error) { console.error('recordFormulaPayment', error); throw error; }
+}
