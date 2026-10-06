@@ -44,6 +44,38 @@ export async function requestCancellation(reason: string, message?: string): Pro
   return { ok: true, effectiveDate: (data as any)?.request?.effective_date, emailed: (data as any)?.emailed };
 }
 
+/** Motifs légitimes de résiliation anticipée pendant l'engagement (CGA art. 1). */
+export const EARLY_MOTIFS = [
+  'Empêchement médical (> 1 mois)',
+  'Déménagement / mutation (> 30 km)',
+  'Licenciement',
+];
+
+/**
+ * Demande de résiliation ANTICIPÉE pour motif légitime (pendant l'engagement),
+ * avec justificatif obligatoire (image ou PDF). Soumise à validation de la salle.
+ */
+export async function requestEarlyCancellation(
+  reason: string, message: string, file: File,
+): Promise<{ ok: boolean; effectiveDate?: string; error?: string }> {
+  const dataUrl: string = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ''));
+    fr.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+    fr.readAsDataURL(file);
+  });
+  const { data, error } = await supabase.functions.invoke('cancellation-request', {
+    body: { early: true, reason, message, justificatif: dataUrl, justificatif_name: file.name },
+  });
+  if (error) {
+    let msg = error.message || 'Demande impossible';
+    try { const ctx = await (error as any).context?.json?.(); if (ctx?.error) msg = ctx.error; } catch { /* noop */ }
+    return { ok: false, error: msg };
+  }
+  if ((data as any)?.error) return { ok: false, error: (data as any).error };
+  return { ok: true, effectiveDate: (data as any)?.request?.effective_date };
+}
+
 // ---- Côté staff ----
 
 export interface CancellationRequest {
@@ -67,6 +99,9 @@ export interface CancellationRequest {
   startDate: string | null;
   /** Date de début d'engagement inconnue (adhérent importé) : à vérifier avant de valider. */
   startUnknown: boolean;
+  /** Résiliation anticipée pour motif légitime (justificatif joint). */
+  early: boolean;
+  justificatifPath: string | null;
 }
 
 const mapReq = (r: any): CancellationRequest => ({
@@ -89,7 +124,16 @@ const mapReq = (r: any): CancellationRequest => ({
   engagement: r.engagement === true,
   startDate: r.start_date ?? null,
   startUnknown: r.start_unknown === true,
+  early: r.early === true,
+  justificatifPath: r.justificatif_path ?? null,
 });
+
+/** URL signée (1 h) pour consulter le justificatif joint à une demande anticipée. */
+export async function cancellationDocUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from('contracts').createSignedUrl(path, 3600);
+  if (error) { console.error('cancellationDocUrl', error); return null; }
+  return data?.signedUrl ?? null;
+}
 
 export async function listCancellationRequests(status: string | null = 'pending'): Promise<CancellationRequest[]> {
   const { data, error } = await supabase.rpc('list_cancellation_requests', { p_status: status });

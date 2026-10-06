@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, LogOut, Clock, ShieldCheck, AlertTriangle } from 'lucide-react';
-import { getMyCancellationStatus, requestCancellation, CancellationStatus } from '../lib/cancellationApi';
+import { Loader2, LogOut, Clock, ShieldCheck, AlertTriangle, Paperclip } from 'lucide-react';
+import {
+  getMyCancellationStatus, requestCancellation, requestEarlyCancellation,
+  EARLY_MOTIFS, CancellationStatus,
+} from '../lib/cancellationApi';
 
 const MOTIFS = [
   'Déménagement',
@@ -23,8 +26,28 @@ const CancellationCard: React.FC = () => {
   const [done, setDone] = useState<string | null>(null);
   const [err, setErr] = useState('');
 
+  // Résiliation anticipée pour motif légitime (pendant l'engagement)
+  const [earlyOpen, setEarlyOpen] = useState(false);
+  const [earlyMotif, setEarlyMotif] = useState(EARLY_MOTIFS[0]);
+  const [earlyMsg, setEarlyMsg] = useState('');
+  const [earlyFile, setEarlyFile] = useState<File | null>(null);
+  const [earlyBusy, setEarlyBusy] = useState(false);
+  const [earlyErr, setEarlyErr] = useState('');
+
   const load = () => { getMyCancellationStatus().then((s) => { setSt(s); setLoading(false); }); };
   useEffect(() => { load(); }, []);
+
+  const submitEarly = async () => {
+    if (!earlyFile) { setEarlyErr('Merci de joindre un justificatif.'); return; }
+    if (!window.confirm('Envoyer la demande de résiliation anticipée pour motif légitime ?\n\nLa salle vérifiera le justificatif avant de valider.')) return;
+    setEarlyBusy(true); setEarlyErr('');
+    try {
+      const r = await requestEarlyCancellation(earlyMotif, earlyMsg, earlyFile);
+      if (!r.ok) setEarlyErr(r.error || 'Demande impossible.');
+      else { setDone(r.effectiveDate ?? null); setEarlyOpen(false); load(); }
+    } catch (e: any) { setEarlyErr(e?.message || 'Demande impossible.'); }
+    finally { setEarlyBusy(false); }
+  };
 
   const submit = async () => {
     if (!window.confirm(`Confirmer la demande de résiliation ?\n\nTon accès resterait actif jusqu'au ${dmy(st?.effectiveDate ?? null)} (préavis d'un mois).\nLa salle doit valider ta demande.`)) return;
@@ -58,7 +81,7 @@ const CancellationCard: React.FC = () => {
     );
   }
 
-  // Non éligible : on explique pourquoi
+  // Non éligible : on explique pourquoi, et on ouvre la voie « motif légitime » si engagement en cours
   if (!st.eligible) {
     return (
       <div className="bg-white border border-gray-100 rounded-3xl p-4">
@@ -70,6 +93,64 @@ const CancellationCard: React.FC = () => {
           {st.reason || 'La résiliation en ligne n\'est pas disponible pour ton abonnement.'}
           {st.engagement && st.engagementEnd ? ' Tu pourras résilier en ligne à partir de cette date.' : ''}
         </p>
+
+        {st.engagement && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <p className="text-[12px] text-gray-600 leading-relaxed">
+              <b>Un imprévu ?</b> Tu peux demander une résiliation anticipée pour un motif légitime
+              (empêchement médical de plus d'un mois, déménagement ou mutation à plus de 30 km, licenciement),
+              sur présentation d'un justificatif.
+            </p>
+
+            {!earlyOpen ? (
+              <button onClick={() => setEarlyOpen(true)}
+                className="mt-3 w-full border-2 border-gray-200 text-gray-700 py-3 rounded-2xl font-extrabold text-[13px] active:scale-[0.99] transition-transform">
+                Résiliation pour motif légitime
+              </button>
+            ) : (
+              <div className="mt-3 space-y-2.5">
+                <div>
+                  <label className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400">Motif</label>
+                  <select value={earlyMotif} onChange={(e) => setEarlyMotif(e.target.value)}
+                    className="w-full mt-1 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 text-sm font-semibold outline-none">
+                    {EARLY_MOTIFS.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400">Justificatif (photo ou PDF)</label>
+                  <label className="mt-1 w-full flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 text-sm font-semibold text-gray-600 cursor-pointer">
+                    <Paperclip size={15} className="text-gray-400 shrink-0" />
+                    <span className="truncate">{earlyFile ? earlyFile.name : 'Choisir un fichier…'}</span>
+                    <input type="file" accept="image/*,application/pdf" className="hidden"
+                      onChange={(e) => { setEarlyFile(e.target.files?.[0] ?? null); setEarlyErr(''); }} />
+                  </label>
+                </div>
+                <div>
+                  <label className="text-[10px] font-extrabold uppercase tracking-wide text-gray-400">Message (facultatif)</label>
+                  <textarea value={earlyMsg} onChange={(e) => setEarlyMsg(e.target.value)} rows={2}
+                    placeholder="Précise ta situation…"
+                    className="w-full mt-1 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2.5 text-sm outline-none resize-none" />
+                </div>
+                {earlyErr && (
+                  <p className="text-[12px] text-red-600 font-semibold flex items-start gap-1.5">
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" /> {earlyErr}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button onClick={() => { setEarlyOpen(false); setEarlyErr(''); }}
+                    className="flex-1 border-2 border-gray-200 text-gray-600 py-3 rounded-2xl font-extrabold text-[13px]">
+                    Annuler
+                  </button>
+                  <button onClick={submitEarly} disabled={earlyBusy}
+                    className="flex-1 bg-gray-900 text-white py-3 rounded-2xl font-extrabold text-[13px] flex items-center justify-center gap-2 disabled:opacity-50">
+                    {earlyBusy ? <Loader2 size={15} className="animate-spin" /> : null} Envoyer
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-[11px] text-gray-400 mt-2">Pour toute question, contacte la salle.</p>
       </div>
     );

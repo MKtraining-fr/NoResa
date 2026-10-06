@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Check, X, Loader2, RefreshCw, UserRound, AlertTriangle, CreditCard } from 'lucide-react';
-import { listCancellationRequests, reviewCancellation, CancellationRequest } from '../../lib/cancellationApi';
+import { LogOut, Check, X, Loader2, RefreshCw, UserRound, AlertTriangle, CreditCard, Paperclip, ShieldAlert } from 'lucide-react';
+import { listCancellationRequests, reviewCancellation, cancellationDocUrl, CancellationRequest } from '../../lib/cancellationApi';
 
 const dmy = (iso: string | null) => (iso ? new Date(iso.slice(0, 10) + 'T00:00:00').toLocaleDateString('fr-FR') : '—');
 const dt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
@@ -14,7 +14,17 @@ const CancellationsPage: React.FC = () => {
   const [rows, setRows] = useState<CancellationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const openJustificatif = async (r: CancellationRequest) => {
+    if (!r.justificatifPath) return;
+    setOpening(r.id);
+    const url = await cancellationDocUrl(r.justificatifPath);
+    setOpening(null);
+    if (url) window.open(url, '_blank');
+    else alert('Justificatif indisponible.');
+  };
   const openFiche = (memberId: string) =>
     navigate(`/app/crm/membres?member=${memberId}&from=${encodeURIComponent('/app/finance/resiliations')}`);
 
@@ -92,6 +102,12 @@ const CancellationsPage: React.FC = () => {
                     </button>
                     {r.memberNumber && <span className="text-[11px] text-gray-400">#{r.memberNumber}</span>}
                     {r.engagement && <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md">Engagement</span>}
+                    {r.early && (
+                      <span title="Résiliation anticipée pour motif légitime — vérifiez le justificatif."
+                        className="text-[10px] font-bold uppercase tracking-wide text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                        <ShieldAlert size={10} /> Anticipée / motif légitime
+                      </span>
+                    )}
                     {r.engagement && r.startUnknown && (
                       <span title="Aucune date d'inscription en base : impossible de vérifier automatiquement les 12 mois d'engagement."
                         className="text-[10px] font-bold uppercase tracking-wide text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md flex items-center gap-1">
@@ -112,6 +128,12 @@ const CancellationsPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {r.justificatifPath && (
+                    <button onClick={() => openJustificatif(r)} disabled={opening === r.id}
+                      className="flex items-center gap-1.5 bg-rose-600 text-white px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-rose-700 disabled:opacity-50">
+                      {opening === r.id ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />} Justificatif
+                    </button>
+                  )}
                   <button onClick={() => openFiche(r.memberId)} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-[13px] font-semibold hover:bg-gray-50">
                     <UserRound size={13} /> Fiche
                   </button>
