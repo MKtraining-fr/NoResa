@@ -233,6 +233,41 @@ export async function getMyDocuments(): Promise<MyDocument[]> {
   }));
 }
 
+// --- Historique des prélèvements GoCardless (temps réel, inclut l'avant-NoResa) -----
+
+export interface MyGcPayment {
+  id: string;
+  amount: number;
+  status: string;      // confirmed | paid_out | pending_submission | submitted | failed | cancelled | charged_back
+  chargeDate: string | null;
+  description: string | null;
+}
+
+/** Libellé + tonalité d'un statut de prélèvement GoCardless, pour l'affichage. */
+export function gcStatusInfo(status: string): { label: string; tone: 'ok' | 'pending' | 'fail' } {
+  switch (status) {
+    case 'confirmed':
+    case 'paid_out': return { label: 'Payé', tone: 'ok' };
+    case 'pending_submission':
+    case 'pending_customer_approval':
+    case 'submitted': return { label: 'En cours', tone: 'pending' };
+    case 'failed': return { label: 'Échoué', tone: 'fail' };
+    case 'cancelled': return { label: 'Annulé', tone: 'fail' };
+    case 'charged_back': return { label: 'Rejeté', tone: 'fail' };
+    default: return { label: status, tone: 'pending' };
+  }
+}
+
+/** Mes prélèvements GoCardless (du plus récent au plus ancien, historique complet). */
+export async function getMyGocardlessPayments(): Promise<MyGcPayment[]> {
+  const { data, error } = await supabase.functions.invoke('my-gocardless-payments', { body: {} });
+  if (error) { console.error('memberSelfApi.getMyGocardlessPayments', error); return []; }
+  return ((data as any)?.payments ?? []).map((p: any) => ({
+    id: p.id, amount: Number(p.amount) || 0, status: p.status,
+    chargeDate: p.charge_date ?? null, description: p.description ?? null,
+  }));
+}
+
 // --- Carnet de séances (solde) ---------------------------------------------
 
 export interface MyPackStatus { isPack: boolean; total: number; used: number; remaining: number }

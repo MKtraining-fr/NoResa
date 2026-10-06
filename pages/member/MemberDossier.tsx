@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, Receipt, Download, Loader2, FileSignature, LogOut, FileBadge, Clock, Check, X } from 'lucide-react';
+import { FileText, Receipt, Download, Loader2, FileSignature, LogOut, FileBadge, Clock, Check, X, CreditCard } from 'lucide-react';
 import CancellationCard from '../../components/CancellationCard';
 import {
   getMyContracts, getMyInvoices, signedPdfUrl,
   getMyDocuments, requestMyDocument, DOCUMENT_LABELS,
-  type MyContract, type MyInvoice, type MyDocument,
+  getMyGocardlessPayments, gcStatusInfo,
+  type MyContract, type MyInvoice, type MyDocument, type MyGcPayment,
 } from '../../lib/memberSelfApi';
 
 const fmtEur = (n: number | null) => (n == null ? '—' : `${n.toFixed(2).replace('.', ',')} €`);
@@ -15,6 +16,8 @@ const MemberDossier: React.FC = () => {
   const [contracts, setContracts] = useState<MyContract[]>([]);
   const [invoices, setInvoices] = useState<MyInvoice[]>([]);
   const [docs, setDocs] = useState<MyDocument[]>([]);
+  const [gcPays, setGcPays] = useState<MyGcPayment[]>([]);
+  const [gcLoading, setGcLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState<string | null>(null);
   const curYear = new Date().getFullYear();
@@ -27,6 +30,7 @@ const MemberDossier: React.FC = () => {
       const [c, i, d] = await Promise.all([getMyContracts(), getMyInvoices(), getMyDocuments()]);
       setContracts(c); setInvoices(i); setDocs(d); setLoading(false);
     })();
+    getMyGocardlessPayments().then(setGcPays).finally(() => setGcLoading(false));
   }, []);
 
   const askDoc = async (kind: string, year: number) => {
@@ -100,6 +104,32 @@ const MemberDossier: React.FC = () => {
             </button>
           </div>
         ))}
+      </section>
+
+      {/* Prélèvements (abonnement SEPA) — historique complet depuis GoCardless */}
+      <section className="space-y-3">
+        <h3 className="text-[11px] font-extrabold uppercase tracking-wide text-gray-400 flex items-center gap-1.5"><CreditCard size={13} /> Mes prélèvements</h3>
+        {gcLoading ? (
+          <div className="bg-white border border-gray-100 rounded-3xl p-4 flex justify-center text-gray-300"><Loader2 className="animate-spin" size={18} /></div>
+        ) : gcPays.length === 0 ? (
+          <EmptyCard text="Aucun prélèvement enregistré." />
+        ) : (
+          <div className="bg-white border border-gray-100 rounded-3xl divide-y divide-gray-50 shadow-sm overflow-hidden">
+            {gcPays.map((p) => {
+              const si = gcStatusInfo(p.status);
+              const tone = si.tone === 'ok' ? 'text-green-600' : si.tone === 'fail' ? 'text-red-500' : 'text-amber-600';
+              return (
+                <div key={p.id} className="px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900">{fmtEur(p.amount)}</p>
+                    <p className="text-[11px] text-gray-400 font-semibold">{fmtDate(p.chargeDate)}{p.description ? ` · ${p.description}` : ''}</p>
+                  </div>
+                  <span className={`text-[11px] font-extrabold uppercase tracking-wide ${tone}`}>{si.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* Attestations & factures annuelles — demande, générées par la salle */}
