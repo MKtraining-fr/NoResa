@@ -6,6 +6,7 @@ import {
   MessageThread, ChatMessage, DayHours,
 } from '../../lib/messagesApi';
 import { resolvePhotoUrls } from '../../lib/accessApi';
+import DocumentRequestsPanel from '../../components/DocumentRequestsPanel';
 
 const fmtTime = (s: string) => new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 const fmtDay = (s: string) => {
@@ -32,6 +33,7 @@ const MessageriePage: React.FC = () => {
   const [hoursOpen, setHoursOpen] = useState(false);
   const [hoursDraft, setHoursDraft] = useState<DayHours[]>(defaultOpeningHours());
   const [savingHours, setSavingHours] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState(0);
 
   const endRef = useRef<HTMLDivElement>(null);
   const activeId = active?.member_id;
@@ -105,6 +107,7 @@ const MessageriePage: React.FC = () => {
           <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             Messagerie
             {totalUnread > 0 && <span className="text-xs font-semibold bg-indigo-600 text-white px-2 py-0.5 rounded-full">{totalUnread}</span>}
+            {pendingDocs > 0 && <span className="text-xs font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full" title="Demandes de documents en attente">{pendingDocs} doc{pendingDocs > 1 ? 's' : ''}</span>}
           </h1>
           <p className="text-sm text-gray-500">Messages des adhérents depuis l'application client.</p>
         </div>
@@ -118,6 +121,9 @@ const MessageriePage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Demandes de documents (attestations / factures annuelles) */}
+      <DocumentRequestsPanel onCountChange={setPendingDocs} />
 
       {/* 2 panneaux */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4" style={{ minHeight: '60vh' }}>

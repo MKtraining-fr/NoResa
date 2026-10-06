@@ -197,6 +197,42 @@ export async function getMyInvoices(): Promise<MyInvoice[]> {
   }));
 }
 
+// --- Demandes de documents (attestation / facture annuelle) ----------------
+
+export interface MyDocument {
+  id: string;
+  kind: 'attestation_adhesion' | 'attestation_paiement' | 'facture_annuelle' | string;
+  year: number;
+  status: 'pending' | 'done' | 'refused' | string;
+  pdfPath: string | null;
+  note: string | null;
+  createdAt: string | null;
+  doneAt: string | null;
+}
+
+export const DOCUMENT_LABELS: Record<string, string> = {
+  attestation_adhesion: "Attestation d'adhésion",
+  attestation_paiement: 'Attestation de paiement',
+  facture_annuelle: 'Facture annuelle',
+};
+
+/** Dépose une demande de document (traitée ensuite par la salle). Idempotent si déjà en attente. */
+export async function requestMyDocument(kind: string, year = 0): Promise<void> {
+  const { error } = await supabase.rpc('request_my_document', { p_kind: kind, p_year: year });
+  if (error) { console.error('memberSelfApi.requestMyDocument', error); throw error; }
+}
+
+/** Mes demandes / documents (du plus récent au plus ancien). */
+export async function getMyDocuments(): Promise<MyDocument[]> {
+  const { data, error } = await supabase.rpc('my_documents');
+  if (error) { console.error('memberSelfApi.getMyDocuments', error); return []; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id, kind: r.kind, year: Number(r.year) || 0, status: r.status,
+    pdfPath: r.pdf_path ?? null, note: r.note ?? null,
+    createdAt: r.created_at ?? null, doneAt: r.done_at ?? null,
+  }));
+}
+
 // --- Carnet de séances (solde) ---------------------------------------------
 
 export interface MyPackStatus { isPack: boolean; total: number; used: number; remaining: number }
