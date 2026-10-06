@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Megaphone, Loader2, Tag, Calendar, AlertTriangle, Info } from 'lucide-react';
 import { getPublicAnnouncements, PublicAnnouncement, AnnouncementCategory } from '../../../lib/announcementsApi';
 import { parseVideo } from '../../../lib/videoEmbed';
@@ -32,7 +33,17 @@ const Media: React.FC<{ url: string }> = ({ url }) => {
 
 const InfosPage: React.FC = () => {
   const [items, setItems] = useState<PublicAnnouncement[] | null>(null);
+  const [params] = useSearchParams();
+  const focusId = params.get('focus');
+  const focusRef = useRef<HTMLElement>(null);
   useEffect(() => { getPublicAnnouncements().then(setItems); }, []);
+
+  // Met en avant l'annonce ciblée (venue de la borne) : scroll + anneau temporaire.
+  useEffect(() => {
+    if (items && focusId && focusRef.current) {
+      focusRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [items, focusId]);
 
   return (
     <div className="max-w-3xl mx-auto px-5 py-12">
@@ -52,8 +63,10 @@ const InfosPage: React.FC = () => {
         <div className="mt-8 space-y-5">
           {items.map((a) => {
             const c = CAT[a.category] || CAT.info;
+            const focused = a.id === focusId;
             return (
-              <article key={a.id} className="border border-gray-100 rounded-3xl p-6 bg-white shadow-sm">
+              <article key={a.id} ref={focused ? focusRef : undefined}
+                className={`rounded-3xl p-6 bg-white shadow-sm border transition-all ${focused ? 'border-red-300 ring-4 ring-red-100' : 'border-gray-100'}`}>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-lg ${c.cls}`}>
                     <c.Icon size={13} /> {c.label}

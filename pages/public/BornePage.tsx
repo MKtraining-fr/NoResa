@@ -1,9 +1,41 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { UserPlus, CreditCard, ArrowRight, Camera, Dumbbell, Tag, HelpCircle, Megaphone } from 'lucide-react';
+import { UserPlus, CreditCard, ArrowRight, Camera, Dumbbell, Tag, HelpCircle, Megaphone, AlertTriangle } from 'lucide-react';
 import { setKiosk } from '../../lib/kiosk';
+import { getPublicAnnouncements, isImportantAnnouncement, PublicAnnouncement } from '../../lib/announcementsApi';
 
 const RED = '#C81E1E';
+
+const CAT_LABEL: Record<string, string> = { info: 'Info', promo: 'Promo', event: 'Événement', alert: 'À la une' };
+
+/** Bandeau d'annonce en haut de l'accueil borne : attire l'œil et ouvre la page Infos. */
+const AnnouncementBanner: React.FC<{ a: PublicAnnouncement }> = ({ a }) => {
+  const important = isImportantAnnouncement(a);
+  return (
+    <Link to={`/infos?focus=${a.id}`}
+      className="block relative overflow-hidden text-white active:scale-[0.995] transition-transform"
+      style={{ background: important
+        ? 'linear-gradient(90deg,#8E1414 0%,#C81E1E 50%,#E0531F 100%)'
+        : `linear-gradient(90deg,${RED} 0%,#a81818 100%)` }}>
+      {/* reflet qui balaie le bandeau */}
+      <span className="borne-shine" aria-hidden />
+      {important && <span className="borne-halo" aria-hidden />}
+      <div className="relative max-w-6xl mx-auto px-5 py-3.5 flex items-center gap-3">
+        <span className={`w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0 ${important ? 'borne-wiggle' : ''}`}>
+          {important ? <AlertTriangle size={18} /> : <Megaphone size={18} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+            {important ? '⚠ À la une' : (CAT_LABEL[a.category] || 'Info')}
+          </span>
+          <span className="block text-[15px] sm:text-lg font-extrabold truncate">{a.title}</span>
+        </span>
+        <span className="hidden sm:inline text-sm font-bold text-white/90 whitespace-nowrap">Voir l'info</span>
+        <ArrowRight size={20} className="borne-nudge shrink-0" />
+      </div>
+    </Link>
+  );
+};
 
 /**
  * Accueil du mini-site / borne « La SaLLe » (dans SalleLayout).
@@ -13,12 +45,21 @@ const RED = '#C81E1E';
 const BornePage: React.FC = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const [latest, setLatest] = useState<PublicAnnouncement | null>(null);
 
   useEffect(() => {
     const k = params.get('kiosk');
     if (k === '1') setKiosk(true);
     else if (k === '0') { setKiosk(false); navigate('/', { replace: true }); }
   }, [params, navigate]);
+
+  // Dernière annonce publiée : mise en avant « à la une » (Alerte) d'abord, sinon la plus récente.
+  useEffect(() => {
+    getPublicAnnouncements().then((items) => {
+      if (!items.length) return setLatest(null);
+      setLatest(items.find(isImportantAnnouncement) ?? items[0]);
+    });
+  }, []);
 
   const sections = [
     { to: '/decouverte', icon: Camera, label: 'Découverte', sub: 'La salle en images' },
@@ -30,6 +71,23 @@ const BornePage: React.FC = () => {
 
   return (
     <div>
+      <style>{`
+        @keyframes borneShine { 0% { transform: translateX(-120%) skewX(-20deg); } 60%,100% { transform: translateX(320%) skewX(-20deg); } }
+        .borne-shine { position:absolute; top:0; bottom:0; left:0; width:35%;
+          background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+          animation:borneShine 3.8s ease-in-out infinite; pointer-events:none; }
+        @keyframes borneNudge { 0%,100% { transform:translateX(0); } 50% { transform:translateX(5px); } }
+        .borne-nudge { animation:borneNudge 1.3s ease-in-out infinite; }
+        @keyframes borneWiggle { 0%,100% { transform:rotate(-7deg); } 50% { transform:rotate(7deg); } }
+        .borne-wiggle { animation:borneWiggle .9s ease-in-out infinite; }
+        @keyframes borneHalo { 0%,100% { box-shadow:inset 0 0 0 0 rgba(255,255,255,0); } 50% { box-shadow:inset 0 0 40px 0 rgba(255,220,150,.55); } }
+        .borne-halo { position:absolute; inset:0; animation:borneHalo 1.6s ease-in-out infinite; pointer-events:none; }
+        @media (prefers-reduced-motion: reduce) { .borne-shine,.borne-nudge,.borne-wiggle,.borne-halo { animation:none; } }
+      `}</style>
+
+      {/* Bandeau d'annonce (visible immédiatement sur l'accueil borne) */}
+      {latest && <AnnouncementBanner a={latest} />}
+
       {/* Hero */}
       <section className="text-white" style={{ background: `radial-gradient(120% 80% at 85% -20%, #d8352f 0%, rgba(216,53,47,0) 45%), linear-gradient(160deg, ${RED} 0%, ${RED} 45%, #8E1414 100%)` }}>
         <div className="max-w-6xl mx-auto px-5 pt-14 pb-16 sm:pt-20 sm:pb-20">

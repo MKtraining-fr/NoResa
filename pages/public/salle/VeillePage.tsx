@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Hand } from 'lucide-react';
-import { getPublicAnnouncements, PublicAnnouncement, AnnouncementCategory } from '../../../lib/announcementsApi';
+import { getPublicAnnouncements, isImportantAnnouncement, PublicAnnouncement, AnnouncementCategory } from '../../../lib/announcementsApi';
 import { parseVideo } from '../../../lib/videoEmbed';
 
 const RED = '#C81E1E';
@@ -12,6 +12,7 @@ const RED = '#C81E1E';
  * ------------------------------------------------------------------ */
 const VEILLE_VIDEO = '';
 const SLIDE_MS = 10000;        // durée d'une annonce
+const IMPORTANT_MS = 15000;    // durée d'une annonce « à la une » (plus longue)
 const VIDEO_MS = 30000;        // durée max d'une slide vidéo
 const REFRESH_ANNONCES_MS = 5 * 60 * 1000;   // recharge les annonces
 const RELOAD_MS = 20 * 60 * 1000;            // rechargement complet (récupère les MAJ)
@@ -48,9 +49,11 @@ const VeillePage: React.FC = () => {
     return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
   }, []);
 
-  // Toute interaction -> retour à l'accueil borne
+  // Toute interaction -> destination selon la slide courante : une annonce « à la une »
+  // ouvre directement la page Infos (l'info apparaît), sinon retour à l'accueil borne.
+  const targetRef = useRef('/borne');
   useEffect(() => {
-    const dismiss = () => navigate('/borne', { replace: true });
+    const dismiss = () => navigate(targetRef.current, { replace: true });
     const evts = ['pointerdown', 'keydown', 'touchstart'] as const;
     evts.forEach((e) => window.addEventListener(e, dismiss, { passive: true }));
     return () => evts.forEach((e) => window.removeEventListener(e, dismiss));
@@ -59,7 +62,15 @@ const VeillePage: React.FC = () => {
   const slides = useMemo<Slide[]>(() => {
     const s: Slide[] = [];
     if (VEILLE_VIDEO) s.push({ kind: 'video', url: VEILLE_VIDEO });
-    items.forEach((a) => s.push({ kind: 'annonce', a }));
+    const important = items.filter(isImportantAnnouncement);
+    const normal = items.filter((a) => !isImportantAnnouncement(a));
+    // Les « à la une » passent d'abord…
+    important.forEach((a) => s.push({ kind: 'annonce', a }));
+    // …puis on alterne annonces courantes / « à la une » pour qu'elles reviennent souvent.
+    normal.forEach((a, i) => {
+      s.push({ kind: 'annonce', a });
+      if (important.length) s.push({ kind: 'annonce', a: important[i % important.length] });
+    });
     return s;
   }, [items]);
 
@@ -69,7 +80,8 @@ const VeillePage: React.FC = () => {
     if (slides.length <= 1) { setIdx(0); return; }
     if (idx >= slides.length) { setIdx(0); return; }
     const cur = slides[idx];
-    const d = cur?.kind === 'video' ? VIDEO_MS : SLIDE_MS;
+    const d = cur?.kind === 'video' ? VIDEO_MS
+      : (cur?.kind === 'annonce' && isImportantAnnouncement(cur.a)) ? IMPORTANT_MS : SLIDE_MS;
     const t = setTimeout(() => setIdx((i) => (i + 1) % slides.length), d);
     return () => clearTimeout(t);
   }, [idx, slides]);
@@ -78,10 +90,25 @@ const VeillePage: React.FC = () => {
   const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const redBg = `radial-gradient(120% 80% at 85% -10%, #d8352f 0%, rgba(216,53,47,0) 45%), linear-gradient(160deg, ${RED} 0%, ${RED} 45%, #8E1414 100%)`;
+  const aLaUneBg = `radial-gradient(130% 90% at 80% -10%, #ef6a2a 0%, rgba(239,106,42,0) 45%), linear-gradient(160deg, #C81E1E 0%, #a81414 55%, #7a0f0f 100%)`;
   const current = slides[idx];
+  const important = current?.kind === 'annonce' && isImportantAnnouncement(current.a);
+  // Destination au toucher (lue par l'écouteur global via la ref)
+  targetRef.current = important && current?.kind === 'annonce' ? `/infos?focus=${current.a.id}` : '/borne';
+  const bg = current?.kind === 'video' ? '#000' : important ? aLaUneBg : redBg;
 
   return (
-    <div className="fixed inset-0 text-white overflow-hidden ui-crisp" style={{ background: current?.kind === 'video' ? '#000' : redBg }}>
+    <div className="fixed inset-0 text-white overflow-hidden ui-crisp" style={{ background: bg }}>
+      <style>{`
+        @keyframes veilleHalo { 0%,100% { box-shadow:inset 0 0 0 0 rgba(255,210,120,0); } 50% { box-shadow:inset 0 0 160px 0 rgba(255,210,120,.45); } }
+        .veille-halo { position:absolute; inset:0; animation:veilleHalo 1.8s ease-in-out infinite; pointer-events:none; }
+        @keyframes veilleBadge { 0%,100% { transform:scale(1); } 50% { transform:scale(1.06); } }
+        .veille-badge { animation:veilleBadge 1.3s ease-in-out infinite; }
+        @keyframes veilleNudge { 0%,100% { transform:translateX(0); } 50% { transform:translateX(8px); } }
+        .veille-nudge { animation:veilleNudge 1.2s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .veille-halo,.veille-badge,.veille-nudge { animation:none; } }
+      `}</style>
+      {important && <span className="veille-halo" aria-hidden />}
       {/* Contenu principal */}
       {!current ? (
         // Aucune annonce ni vidéo : veille de marque
@@ -101,7 +128,13 @@ const VeillePage: React.FC = () => {
         })()
       ) : (
         <div key={idx} className="absolute inset-0 flex flex-col justify-center px-12 sm:px-24 pt-24 pb-32 animate-in fade-in duration-700">
-          <span className="self-start text-sm font-extrabold uppercase tracking-widest bg-white/20 rounded-full px-4 py-1.5">{CAT_LABEL[current.a.category] || 'Info'}</span>
+          {important ? (
+            <span className="veille-badge self-start inline-flex items-center gap-2 text-base font-extrabold uppercase tracking-[0.2em] bg-white text-[#C81E1E] rounded-full px-5 py-2 shadow-lg">
+              ⚠ À la une
+            </span>
+          ) : (
+            <span className="self-start text-sm font-extrabold uppercase tracking-widest bg-white/20 rounded-full px-4 py-1.5">{CAT_LABEL[current.a.category] || 'Info'}</span>
+          )}
           <h1 className="mt-6 text-6xl sm:text-7xl font-extrabold tracking-tight text-balance max-w-5xl">{current.a.title}</h1>
           {current.a.body && <p className="mt-6 text-2xl sm:text-3xl font-semibold text-white/95 max-w-4xl leading-snug whitespace-pre-line line-clamp-6">{current.a.body}</p>}
           {current.a.mediaUrl && parseVideo(current.a.mediaUrl).kind === 'link' && (
@@ -125,8 +158,10 @@ const VeillePage: React.FC = () => {
             {slides.map((_, i) => <span key={i} className={`h-1.5 rounded-full transition-all ${i === idx ? 'w-8 bg-white' : 'w-3 bg-white/40'}`} />)}
           </div>
         )}
-        <p className="inline-flex items-center gap-2 text-lg font-bold bg-white/15 rounded-full px-6 py-3 backdrop-blur-sm animate-pulse">
-          <Hand size={20} /> Touchez l'écran pour commencer
+        <p className={`inline-flex items-center gap-2 font-bold rounded-full px-6 py-3 backdrop-blur-sm ${important ? 'text-xl bg-white text-[#C81E1E] shadow-lg' : 'text-lg bg-white/15 animate-pulse'}`}>
+          {important
+            ? <><Hand size={22} className="veille-nudge" /> Touchez l'écran pour lire l'info</>
+            : <><Hand size={20} /> Touchez l'écran pour commencer</>}
         </p>
       </div>
     </div>

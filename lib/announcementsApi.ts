@@ -4,6 +4,10 @@ import { supabase } from './supabaseClient';
 
 export type AnnouncementCategory = 'info' | 'event' | 'alert' | 'promo';
 
+/** Annonce « à la une » = catégorie Alerte → mise en avant renforcée (borne/veille). */
+export const isImportantAnnouncement = (a: { category: AnnouncementCategory }): boolean =>
+  a.category === 'alert';
+
 export interface Announcement {
   id: string;
   title: string;
