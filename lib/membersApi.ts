@@ -418,6 +418,46 @@ export async function mergeMembers(
   }
 }
 
+export interface MemberByEmail {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  status?: string;
+  memberNumber?: string;
+  hasAccount: boolean;
+}
+
+/**
+ * Cherche une fiche active existante par e-mail (pour reprendre une fiche auto-inscrite
+ * au moment d'une inscription au comptoir → anti-doublon). Renvoie la plus pertinente
+ * (compte app d'abord). Staff uniquement (RLS).
+ */
+export async function findMemberByEmail(email: string): Promise<MemberByEmail | null> {
+  const term = (email || '').trim();
+  if (!term || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(term)) return null;
+  const { data, error } = await supabase.from('members')
+    .select('id, first_name, last_name, email, phone, address, postal_code, city, status, member_number, user_id, created_at')
+    .ilike('email', term).is('archived_at', null)
+    .order('created_at', { ascending: false }).limit(10);
+  if (error) { console.error('membersApi.findMemberByEmail', error); return null; }
+  const rows = (data ?? []) as any[];
+  if (rows.length === 0) return null;
+  // Priorité : fiche avec compte app, sinon la plus récente.
+  const best = rows.find((r) => r.user_id) || rows[0];
+  return {
+    id: best.id, firstName: best.first_name ?? '', lastName: best.last_name ?? '',
+    email: best.email ?? undefined, phone: best.phone ?? undefined,
+    address: best.address ?? undefined, postalCode: best.postal_code ?? undefined, city: best.city ?? undefined,
+    status: best.status ?? undefined, memberNumber: best.member_number ?? undefined,
+    hasAccount: !!best.user_id,
+  };
+}
+
 export interface MemberDuplicate {
   id: string;
   firstName: string;

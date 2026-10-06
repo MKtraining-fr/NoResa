@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { getGymId, createMember, patchMember, uploadMemberPhoto, isCardNumberTaken, generateKeypadCode } from './membersApi';
-import { startMandateSetup } from './gocardless';
+import { startMandateSetup, setupMandateForMember } from './gocardless';
 import { enqueueAccessCommand } from './accessApi';
 
 // --- Catalogue des formules (grille du contrat A.R.A.P.S) -------------------
@@ -192,6 +192,9 @@ export interface InscriptionData {
   // Mandat SEPA déjà amorcé pendant l'étape Formule (fiche + mandat créés en amont) :
   // le submit complète alors CETTE fiche au lieu d'en recréer une (évite les doublons).
   existingMandateMemberId?: string | null;
+  // Fiche existante reprise (ex. auto-inscription du membre par e-mail) : l'inscription
+  // COMPLÈTE cette fiche au lieu d'en créer une nouvelle (anti-doublon au comptoir).
+  existingMemberId?: string | null;
   // Période (utile pour les contrats à courte durée)
   subscriptionStart?: string;   // 'YYYY-MM-DD'
   subscriptionEnd?: string;     // 'YYYY-MM-DD'
@@ -239,10 +242,18 @@ export async function beginInscriptionMandate(d: InscriptionData): Promise<{ mem
   if (!gymId) throw new Error('Impossible de déterminer la salle (gym_id).');
   if (d.formulaPaymentMethod !== 'Prélèvement') throw new Error('Le mandat ne concerne que le règlement par prélèvement.');
   if (!d.email) throw new Error('Un email est requis pour le mandat de prélèvement (à renseigner à l\'étape Identité).');
-  const r = await startMandateSetup({
-    firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone,
-    gymId, subscriptionLabel: d.formula.label, price: d.formula.price,
-  });
+  // Fiche existante reprise : on crée le mandat SUR CETTE fiche (anti-doublon) ; sinon GoCardless en crée une.
+  const r = d.existingMemberId
+    ? await (async () => {
+        const base = typeof window !== 'undefined' ? window.location.origin : 'https://noresa.pages.dev';
+        const redirect = `${base}/#/app/crm?member=${d.existingMemberId}&gcpoll=1`;
+        const res = await setupMandateForMember(d.existingMemberId!, d.formula.label, d.formula.price ?? 0, redirect);
+        return { member_id: d.existingMemberId!, authorisation_url: res.authorisation_url };
+      })()
+    : await startMandateSetup({
+        firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone,
+        gymId, subscriptionLabel: d.formula.label, price: d.formula.price,
+      });
   await patchMember(r.member_id, {
     address: d.address || null, city: d.city || null, postal_code: d.postalCode || null,
     periodicity: d.formula.periodicity || null, payment_method_label: 'Prélèvement',
@@ -262,9 +273,20 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
     throw new Error(`Le numéro de badge ${d.cardNumber} est déjà attribué à un membre actif.`);
   }
 
-  // Code clavier 6 chiffres : généré automatiquement pour chaque membre (en plus du badge éventuel)
+  // Code clavier 6 chiffres : généré automatiquement pour chaque membre (en plus du badge éventuel).
+  // Si on reprend une fiche existante qui a DÉJÀ un code, on le conserve (pas d'écrasement).
   let keypadCode = '';
   try { keypadCode = await generateKeypadCode(); } catch (e) { console.error('generateKeypadCode', e); }
+  let existingBadge: string | null = null;
+  if (d.existingMemberId) {
+    try {
+      const { data: cur } = await supabase.from('members').select('keypad_code, rfid_badge').eq('id', d.existingMemberId).maybeSingle();
+      if (cur?.keypad_code && String(cur.keypad_code).trim()) keypadCode = String(cur.keypad_code);
+      existingBadge = (cur?.rfid_badge as string) || null;
+    } catch (e) { console.error('read existing member', e); }
+  }
+  // Badge : on garde l'éventuel badge existant si aucun nouveau n'est saisi.
+  const effBadge = d.cardNumber || existingBadge || null;
 
   let memberId: string;
   let authorisationUrl: string | undefined;
@@ -277,6 +299,14 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       // Mandat déjà amorcé à l'étape Formule : on complète CETTE fiche (pas de doublon,
       // pas de second mandat). Le lien RIB a déjà été présenté dans l'autre onglet.
       memberId = d.existingMandateMemberId;
+    } else if (d.existingMemberId) {
+      // Fiche existante reprise + prélèvement : on crée le mandat SUR CETTE fiche (anti-doublon).
+      if (!d.email) throw new Error('Un email est requis pour un règlement par prélèvement automatique.');
+      const base = typeof window !== 'undefined' ? window.location.origin : 'https://noresa.pages.dev';
+      const redirect = `${base}/#/app/crm?member=${d.existingMemberId}&gcpoll=1`;
+      const r = await setupMandateForMember(d.existingMemberId, d.formula.label, d.formula.price ?? 0, redirect);
+      memberId = d.existingMemberId;
+      authorisationUrl = r.authorisation_url;
     } else {
       if (!d.email) throw new Error('Un email est requis pour un règlement par prélèvement automatique.');
       const r = await startMandateSetup({
@@ -306,12 +336,27 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
       payment_method_label: d.formulaPaymentMethod || 'Prélèvement',
       subscription_start: d.subscriptionStart || null,
       subscription_end: d.subscriptionEnd || null,
-      rfid_badge: d.cardNumber || null,
-      qr_code: d.cardNumber || null,
+      rfid_badge: effBadge,
+      qr_code: effBadge,
       keypad_code: keypadCode || null,
       group_name: d.groupName || null,
       subgroup_name: d.subgroupName || null,
       commercial_id: d.commercialId || null,
+    });
+  } else if (d.existingMemberId) {
+    // Fiche existante reprise (hors prélèvement) : on la COMPLÈTE au lieu de créer un doublon.
+    memberId = d.existingMemberId;
+    await patchMember(memberId, {
+      first_name: d.firstName, last_name: d.lastName,
+      email: d.email || null, phone: d.phone || null,
+      address: d.address || null, city: d.city || null, postal_code: d.postalCode || null,
+      subscription_label: d.formula.label, price: d.formula.price ?? null,
+      periodicity: d.formula.periodicity || null, payment_method_label: d.formulaPaymentMethod || null,
+      subscription_start: d.subscriptionStart || null, subscription_end: d.subscriptionEnd || null,
+      rfid_badge: effBadge, qr_code: effBadge, keypad_code: keypadCode || null,
+      group_name: d.groupName || null, subgroup_name: d.subgroupName || null,
+      commercial_id: d.commercialId || null, paid_by: d.paidBy || null,
+      status: 'active', access_blocked: false, access_block_reason: null, access_blocked_at: null,
     });
   } else {
     const m = await createMember({
@@ -352,14 +397,14 @@ export async function submitInscription(d: InscriptionData): Promise<Inscription
 
   // Accès : on pousse vers le contrôleur (via le pont) le badge ET/OU le code clavier.
   // Ne bloque jamais l'inscription en cas d'échec.
-  if (d.cardNumber || keypadCode) {
+  if (effBadge || keypadCode) {
     try {
       const { data: mrow } = await supabase.from('members')
         .select('member_number').eq('id', memberId).maybeSingle();
       const pin = mrow?.member_number ? String(mrow.member_number) : '';
       if (pin) {
         await enqueueAccessCommand({
-          memberId, pin, cardNumber: d.cardNumber || null, keypadCode: keypadCode || null,
+          memberId, pin, cardNumber: effBadge, keypadCode: keypadCode || null,
           name: `${d.firstName} ${d.lastName}`, action: 'grant',
         });
       }

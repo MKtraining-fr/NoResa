@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
   CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2, ChevronDown,
-  Send, CheckCircle2,
+  Send, CheckCircle2, AlertTriangle, Link2,
 } from 'lucide-react';
 import WebcamCapture from '../../components/WebcamCapture';
 import {
   FORMULAS, BADGE, SERVICES, PAYMENT_METHODS,
   submitInscription, beginInscriptionMandate, getContractUrl, Formula, InscriptionResult,
 } from '../../lib/contractsApi';
-import { generateCardNumber, listStaff, patchMember } from '../../lib/membersApi';
+import { generateCardNumber, listStaff, patchMember, findMemberByEmail, type MemberByEmail } from '../../lib/membersApi';
 import type { Member } from '../../types';
 import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
@@ -36,6 +36,9 @@ const InscriptionPage: React.FC = () => {
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  // Reprise d'une fiche existante (ex. auto-inscription du membre) détectée par e-mail.
+  const [existingMemberId, setExistingMemberId] = useState<string | null>(null);
+  const [emailMatch, setEmailMatch] = useState<MemberByEmail | null>(null);
   const [profession, setProfession] = useState('');
   const [company, setCompany] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -72,6 +75,29 @@ const InscriptionPage: React.FC = () => {
       if (p.email) setEmail(p.email);
     } catch { /* ignore */ }
   }, []);
+
+  // Détection d'une fiche existante par e-mail (ex. membre auto-inscrit sur la borne) :
+  // anti-doublon → on propose de reprendre sa fiche plutôt que d'en créer une nouvelle.
+  useEffect(() => {
+    const e = email.trim();
+    if (!e || existingMemberId) { setEmailMatch(null); return; }
+    let active = true;
+    const t = setTimeout(() => {
+      findMemberByEmail(e).then((m) => { if (active) setEmailMatch(m || null); });
+    }, 500);
+    return () => { active = false; clearTimeout(t); };
+  }, [email, existingMemberId]);
+
+  const loadExistingMember = (m: MemberByEmail) => {
+    setExistingMemberId(m.id);
+    if (m.firstName) setFirstName(m.firstName);
+    if (m.lastName) setLastName(m.lastName);
+    if (m.phone) setPhone(m.phone);
+    if (m.address) setAddress(m.address);
+    if (m.postalCode) setPostalCode(m.postalCode);
+    if (m.city) setCity(m.city);
+    setEmailMatch(null);
+  };
 
   const handleGenerateCard = async () => {
     setGenningCard(true);
@@ -306,6 +332,7 @@ const InscriptionPage: React.FC = () => {
         subscriptionStart: subStart || undefined, subscriptionEnd: subEnd || undefined,
         groupName: groupName || undefined, subgroupName: subgroupName || undefined,
         commercialId: commercialId || undefined,
+        existingMemberId: existingMemberId || undefined,
         services: [], consentCga: false, consentMedical: false, signatureDataUrl: '', signerName: '', totalDue: 0,
       });
       setMandateMemberId(r.memberId); setMandateUrl(r.authorisationUrl);
@@ -348,6 +375,7 @@ const InscriptionPage: React.FC = () => {
         subgroupName: subgroupName || undefined,
         commercialId: commercialId || undefined,
         existingMandateMemberId: mandateMemberId || undefined,
+        existingMemberId: existingMemberId || undefined,
         subscriptionStart: subStart || undefined,
         subscriptionEnd: subEnd || undefined,
         formula, formulaPaymentMethod, badgePaymentMethod, includeBadge,
@@ -376,6 +404,7 @@ const InscriptionPage: React.FC = () => {
   const reset = () => {
     setStep(0); setCivility('Monsieur'); setFirstName(''); setLastName(''); setBirthDate('');
     setNationality('Française'); setAddress(''); setPostalCode(''); setCity(''); setPhone(''); setEmail('');
+    setExistingMemberId(null); setEmailMatch(null);
     setProfession(''); setCompany(''); setFormulaKey(''); setFreeAmount(''); setFreeLabel(''); setFormulaPaymentMethod(''); setBadgePaymentMethod('CB');
     setServices({}); setConsentCga(false); setConsentMedical(false); setError(''); setResult(null); setSigEmpty(true);
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
@@ -475,6 +504,34 @@ const InscriptionPage: React.FC = () => {
         {/* ÉTAPE 0 — Identité */}
         {step === 0 && (
           <div className="space-y-5">
+            {/* Reprise d'une fiche existante (anti-doublon) */}
+            {existingMemberId ? (
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-3.5 flex items-center justify-between gap-3">
+                <p className="text-[12px] font-bold text-green-800 flex items-center gap-2">
+                  <CheckCircle2 size={16} /> Fiche existante reprise — l'inscription complétera cette fiche (pas de doublon).
+                </p>
+                <button type="button" onClick={() => setExistingMemberId(null)} className="text-[11px] font-bold text-gray-400 hover:text-gray-700 shrink-0">Créer une nouvelle fiche</button>
+              </div>
+            ) : emailMatch && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[12px] font-bold text-amber-800">Un compte existe déjà pour cet e-mail</p>
+                    <p className="text-[11.5px] text-amber-700 mt-0.5 leading-relaxed">
+                      <b>{`${emailMatch.firstName} ${emailMatch.lastName}`.trim() || '—'}</b>
+                      {emailMatch.memberNumber ? ` · n° ${emailMatch.memberNumber}` : ''}
+                      {emailMatch.status === 'prospect' ? ' · prospect' : ''}
+                      {emailMatch.hasAccount ? ' · compte app' : ''}. Reprends sa fiche pour éviter un doublon (ses infos sont pré-remplies).
+                    </p>
+                    <button type="button" onClick={() => loadExistingMember(emailMatch)}
+                      className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-amber-600">
+                      <Link2 size={13} /> Reprendre cette fiche
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-5">
               <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
                 {photoPreview ? <img src={photoPreview} alt="" className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={32} />}
