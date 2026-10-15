@@ -299,10 +299,12 @@ export type PurchaseKind = 'month' | 'pack10' | 'session1';
 /** Déduit le type d'accès d'un produit acheté (sinon null = produit hors accès). */
 export function purchaseKindForProduct(name: string, price: number): PurchaseKind | null {
   const n = (name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Détection par le NOM uniquement : un produit boutique à 45 € (preworkout…) ne doit
+  // JAMAIS être pris pour un carnet. Seuls « 10 Séances », « 1 séance », « 1 mois »
+  // (catégorie Abonnements & Séances) ouvrent un accès ; le prix ne suffit pas (collision 45 €).
+  if (n.includes('carnet')) return 'pack10';
   if (n.includes('seance')) return n.includes('10') ? 'pack10' : 'session1';
-  if (price === 45) return 'pack10';
-  if (price === 5) return 'session1';
-  if (price === 40 || n.includes('mois')) return 'month';
+  if (n.includes('mois') || n.includes('mensuel')) return 'month';
   return null;
 }
 
