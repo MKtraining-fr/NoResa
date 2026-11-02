@@ -9,7 +9,7 @@ export interface StatsSummary {
   active_members: number;
   boutique_revenue: number;
   sales_count: number;
-  access: Record<string, AccessBreak>; // { seance:{n,ca}, carnet:{...}, mois:{...}, annee:{...} }
+  access: Record<string, AccessBreak>; // { seance:{n,ca}, carnet, mois, annee, inscription, formule, regul }
 }
 
 const EMPTY_SUMMARY: StatsSummary = {
@@ -65,7 +65,7 @@ export async function getStatsSubscriptions(): Promise<SubsDist> {
   return { by_formula: r.by_formula ?? [], mandates_active: r.mandates_active ?? 0 };
 }
 
-/** CA « encaissé » d'une période = ventes boutique + recharges d'accès (hors prélèvements récurrents GoCardless). */
+/** CA « encaissé » d'une période = ventes boutique + accès et abonnements réglés directement (hors prélèvements récurrents GoCardless). */
 export function summaryRevenue(s: StatsSummary): number {
   const access = Object.values(s.access || {}).reduce((a, v) => a + (Number(v.ca) || 0), 0);
   return (Number(s.boutique_revenue) || 0) + access;

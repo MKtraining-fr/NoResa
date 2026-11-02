@@ -102,6 +102,9 @@ const StatsPage: React.FC = () => {
       { key: 'carnet', label: 'Carnets de 10' },
       { key: 'mois', label: 'Mois' },
       { key: 'annee', label: 'Année' },
+      { key: 'inscription', label: 'Inscriptions encaissées' },
+      { key: 'formule', label: 'Changements de formule' },
+      { key: 'regul', label: 'Impayés régularisés' },
     ];
     return defs.map((d) => ({ label: d.label, n: a[d.key]?.n || 0, ca: a[d.key]?.ca || 0 }));
   }, [cur]);
@@ -149,7 +152,7 @@ const StatsPage: React.FC = () => {
             <KpiCard icon={<Users size={16} />} label="Membres actifs" value={String(cur.active_members)} tint="text-gray-600 bg-gray-100" />
             <KpiCard icon={<ShoppingBag size={16} />} label="Panier moyen" value={eur(basket)} tint="text-amber-600 bg-amber-50" />
           </div>
-          <p className="text-[11px] text-gray-400 -mt-3">Le « CA encaissé » couvre la boutique et les recharges d'accès (séances/carnets/mois). Les prélèvements récurrents (abonnements) sont suivis dans Finance / GoCardless.</p>
+          <p className="text-[11px] text-gray-400 -mt-3">Le « CA encaissé » couvre la boutique, les recharges d'accès et les abonnements réglés au comptoir (inscriptions, changements de formule, impayés régularisés). Les prélèvements récurrents sont suivis dans Finance / GoCardless.</p>
 
           {/* Inscriptions vs résiliations */}
           <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
@@ -190,7 +193,7 @@ const StatsPage: React.FC = () => {
           {/* Produits d'accès ponctuels + boutique */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-2"><Ticket size={13} /> Produits d'accès ponctuels</h3>
+              <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-2"><Ticket size={13} /> Accès et abonnements encaissés</h3>
               <div className="space-y-2">
                 {accessRows.map((r) => (
                   <div key={r.label} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
