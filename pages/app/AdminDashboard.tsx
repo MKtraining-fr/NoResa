@@ -13,6 +13,7 @@ import { getProducts } from '../../lib/boutiqueApi';
 import { startMandateSetup, getGocardlessStats, GocardlessStats } from '../../lib/gocardless';
 import { countMemberDues } from '../../lib/unpaidApi';
 import { countPendingCancellations } from '../../lib/cancellationApi';
+import DuplicateAlertsBanner from '../../components/DuplicateAlertsBanner';
 import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 
@@ -251,6 +252,9 @@ const AdminDashboard: React.FC = () => {
           <span className="text-[12px] font-bold text-indigo-700 uppercase tracking-wide">Voir →</span>
         </button>
       )}
+
+      {/* Alerte doublons possibles (même nom, autre e-mail) */}
+      <DuplicateAlertsBanner />
 
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

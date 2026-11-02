@@ -28,6 +28,7 @@ const RegisterMemberPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(false);
+  const [possibleDuplicate, setPossibleDuplicate] = useState(false);
   const [token, setToken] = useState('');
   const widgetRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +62,7 @@ const RegisterMemberPage: React.FC = () => {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j?.error || "L'inscription a échoué.");
+      setPossibleDuplicate(j?.possible_duplicate === true);
       setDone(true);
     } catch (e: any) {
       setErr(e?.message || "Inscription indisponible pour le moment.");
@@ -86,6 +88,11 @@ const RegisterMemberPage: React.FC = () => {
           <div className="mt-4 flex items-center justify-center gap-2 text-[12px] font-bold text-gray-400">
             <Mail size={15} /> Pense à vérifier tes spams
           </div>
+          {possibleDuplicate && (
+            <p className="mt-4 text-left text-[13px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-2xl p-3 leading-relaxed">
+              Une fiche existe peut-être déjà à ton nom. Si tu es déjà adhérent, adresse-toi à l'accueil pour regrouper tes comptes et garder tes séances.
+            </p>
+          )}
           <button onClick={() => navigate('/connexion-salle')} className="mt-6 w-full text-white font-bold py-3.5 rounded-2xl shadow-xl" style={{ backgroundColor: RED }}>Aller à la connexion</button>
         </div>
       </div>
