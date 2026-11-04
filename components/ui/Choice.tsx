@@ -11,18 +11,20 @@ interface SegmentedProps<T extends string> {
   onChange: (value: T) => void;
   /** primary : règlement, civilité. neutral : filtres (vue du planning, catégories). */
   tone?: 'primary' | 'neutral';
+  /** lg : 44 px, pour les écrans utilisés sur tablette. */
+  size?: 'md' | 'lg';
   className?: string;
 }
 
 /** Choix exclusif court. */
-export function Segmented<T extends string>({ options, value, onChange, tone = 'primary', className = '' }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ options, value, onChange, tone = 'primary', size = 'md', className = '' }: SegmentedProps<T>) {
   const active = tone === 'primary' ? 'bg-primary text-white font-semibold' : 'bg-ink text-white font-semibold';
   return (
     <div role="radiogroup" className={`inline-flex flex-wrap border border-subtle ${className}`}>
       {options.map((o, i) => (
         <button
           key={o.value} type="button" role="radio" aria-checked={o.value === value} onClick={() => onChange(o.value)}
-          className={`h-9 px-3 flex items-center text-base transition-colors ${i > 0 ? 'border-l border-subtle' : ''} ${o.value === value ? active : 'bg-surface text-ink hover:bg-ground'}`}
+          className={`${size === 'lg' ? 'h-11' : 'h-9'} px-3 flex items-center text-base transition-colors ${i > 0 ? 'border-l border-subtle' : ''} ${o.value === value ? active : 'bg-surface text-ink hover:bg-ground'}`}
         >
           {o.label}
         </button>
@@ -44,11 +46,13 @@ interface OptionGridProps<T extends string> {
   onSelect: (value: T) => void;
   title?: React.ReactNode;
   help?: React.ReactNode;
+  columns?: 3 | 4;
 }
 
 /** Grille à filets pour choisir une formule ou un service. */
-export function OptionGrid<T extends string>({ options, selected, onSelect, title, help }: OptionGridProps<T>) {
+export function OptionGrid<T extends string>({ options, selected, onSelect, title, help, columns = 3 }: OptionGridProps<T>) {
   const isSelected = (v: T) => (Array.isArray(selected) ? selected.includes(v) : selected === v);
+  const empty = (columns - (options.length % columns)) % columns;
   return (
     <div>
       {(title || help) && (
@@ -57,7 +61,7 @@ export function OptionGrid<T extends string>({ options, selected, onSelect, titl
           {help && <span className="text-xs text-muted">{help}</span>}
         </div>
       )}
-      <div className="grid grid-cols-3 gap-px bg-subtle border border-subtle">
+      <div className={`grid gap-px bg-subtle border border-subtle ${columns === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
         {options.map((o) => {
           const on = isSelected(o.value);
           return (
@@ -70,6 +74,7 @@ export function OptionGrid<T extends string>({ options, selected, onSelect, titl
             </button>
           );
         })}
+        {Array.from({ length: empty }, (_, i) => <span key={i} aria-hidden className="hidden sm:block bg-surface" />)}
       </div>
     </div>
   );

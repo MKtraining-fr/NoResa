@@ -7,7 +7,7 @@ const PageHeader: React.FC<{ title: React.ReactNode; subtitle?: React.ReactNode;
       <h1 className="text-2xl font-extrabold text-ink">{title}</h1>
       {subtitle && <p className="text-base text-muted mt-0.5">{subtitle}</p>}
     </div>
-    {actions && <div className="ml-auto flex gap-2 shrink-0">{actions}</div>}
+    {actions && <div className="ml-auto flex flex-wrap justify-end gap-2 shrink-0 max-w-full">{actions}</div>}
   </header>
 );
 

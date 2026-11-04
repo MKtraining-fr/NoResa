@@ -10,9 +10,9 @@ const Stepper: React.FC<{ steps: React.ReactNode[]; current: number; className?:
       const done = i < current;
       const active = i === current;
       return (
-        <li key={i} aria-current={active ? 'step' : undefined} className={`py-2 flex items-center gap-1.5 ${done || active ? 'border-t-4 border-primary -mt-0.5' : ''} ${active ? 'font-extrabold text-ink' : done ? 'text-ink' : 'text-muted'}`}>
+        <li key={i} aria-current={active ? 'step' : undefined} className={`py-2 flex items-center gap-1.5 min-w-0 ${done || active ? 'border-t-4 border-primary -mt-0.5' : ''} ${active ? 'font-extrabold text-ink' : done ? 'text-ink' : 'text-muted'}`}>
           {done ? <Check size={14} className="text-primary shrink-0" /> : <span className="tabular-nums">{i + 1}</span>}
-          <span>{label}</span>
+          <span className="truncate">{label}</span>
         </li>
       );
     })}

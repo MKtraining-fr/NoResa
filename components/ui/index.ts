@@ -1,5 +1,5 @@
 export { default as Button, IconButton } from './Button';
-export { Field, Input, Textarea, Select, Checkbox } from './Field';
+export { Field, FieldLabel, Input, Textarea, Select, Checkbox } from './Field';
 export { Segmented, OptionGrid } from './Choice';
 export { default as Tabs } from './Tabs';
 export { default as Tag, StatusTag } from './Tag';

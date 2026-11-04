@@ -13,14 +13,19 @@ interface FieldProps {
   children: React.ReactNode;
 }
 
+/** Libellé seul, pour un contrôle qui ne peut pas vivre dans un <label> (boutons de choix). */
+export const FieldLabel: React.FC<{ required?: boolean; optional?: boolean; children: React.ReactNode }> = ({ required, optional, children }) => (
+  <span className="block text-sm font-semibold text-ink mb-1.5">
+    {children}
+    {required && <span className="text-primary"> *</span>}
+    {optional && <span className="font-normal text-muted"> (facultatif)</span>}
+  </span>
+);
+
 /** Libellé au-dessus, en casse normale, aide ou erreur en dessous. */
 export const Field: React.FC<FieldProps> = ({ label, required, optional, hint, error, className = '', children }) => (
   <label className={`block ${className}`}>
-    <span className="block text-sm font-semibold text-ink mb-1.5">
-      {label}
-      {required && <span className="text-primary"> *</span>}
-      {optional && <span className="font-normal text-muted"> (facultatif)</span>}
-    </span>
+    <FieldLabel required={required} optional={optional}>{label}</FieldLabel>
     <FieldContext.Provider value={{ invalid: !!error }}>{children}</FieldContext.Provider>
     {error ? (
       <span className="flex items-center gap-1.5 text-sm text-danger-text mt-1.5"><CircleAlert size={14} className="shrink-0" /> {error}</span>

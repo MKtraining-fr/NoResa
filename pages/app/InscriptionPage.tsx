@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { eur } from '../../lib/format';
 import { useNavigate } from 'react-router-dom';
 import {
-  UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
-  CreditCard, Loader2, BadgeCheck, PartyPopper, Camera, Upload, Building2, ChevronDown,
-  Send, CheckCircle2, AlertTriangle, Link2,
+  ArrowLeft, ArrowRight, Check, Eraser, FileText,
+  CreditCard, Loader2, Camera, Upload, Building2,
+  Send, CheckCircle2,
 } from 'lucide-react';
 import WebcamCapture from '../../components/WebcamCapture';
 import {
@@ -16,9 +16,30 @@ import type { Member } from '../../types';
 import { getGroupTree, getGroupsFlat, effectiveBillingRule, GroupNode, MemberGroup } from '../../lib/groupsApi';
 import { markProspectConverted } from '../../lib/prospectsApi';
 import { requestBorneSignature } from '../../lib/borneBridge';
+import { Alert, Button, Checkbox, Field, FieldLabel, Input, OptionGrid, PageHeader, Segmented, Select, Stepper } from '../../components/ui';
 
 const STEPS = ['Identité', 'Formule', 'Récapitulatif', 'Signature'];
-const RED = '#C81E1E';
+
+// Noms courts de l'écran, dans l'ordre d'affichage. Les libellés complets de FORMULAS partent dans le contrat.
+const FORMULA_NAMES: Record<string, string> = {
+  classique_prelev: 'Classique · prélèvement',
+  famille_etudiant_mensuel: 'Famille / Étudiant · prélèvement',
+  suivi_formation: 'Suivi + Formation',
+  classique_comptant: 'Classique · comptant',
+  famille_etudiant_comptant: 'Famille / Étudiant · comptant',
+  seance: 'Séance',
+  pack10: 'Pack 10 séances',
+  mois: '1 mois',
+};
+const formulaRank = (key: string) => { const i = Object.keys(FORMULA_NAMES).indexOf(key); return i < 0 ? 99 : i; };
+const formulaDetail = (f: Formula) => {
+  const period = f.periodicity === 'Mensuel' ? ' / mois' : f.periodicity === 'Annuel' ? ' / an' : '';
+  return `${eur(f.price)}${period}${f.key === 'classique_prelev' ? ' · le 10' : ''}`;
+};
+const formulaOptions = (group: string) => FORMULAS
+  .filter((f) => f.group === group)
+  .sort((a, b) => formulaRank(a.key) - formulaRank(b.key))
+  .map((f) => ({ value: f.key, name: FORMULA_NAMES[f.key] ?? f.label, detail: formulaDetail(f) }));
 
 const InscriptionPage: React.FC = () => {
   const navigate = useNavigate();
@@ -132,8 +153,6 @@ const InscriptionPage: React.FC = () => {
   // Badge désormais OPTIONNEL (plus obligatoire) : ajouté seulement si coché.
   const [wantBadge, setWantBadge] = useState(false);
   const [services, setServices] = useState<Record<string, boolean>>({});
-  // Groupe de formules déplié à l'étape Formule (accordéon : repliés par défaut).
-  const [openGrp, setOpenGrp] = useState<string | null>(null);
   // Mandat SEPA amorcé dès l'étape Formule (fiche + mandat créés, RIB ouvert dans un onglet).
   const [mandateMemberId, setMandateMemberId] = useState<string | null>(null);
   const [mandateUrl, setMandateUrl] = useState('');
@@ -303,14 +322,6 @@ const InscriptionPage: React.FC = () => {
 
   const toggleService = (key: string) => setServices((s) => ({ ...s, [key]: !s[key] }));
 
-  // À l'arrivée sur l'étape Formule avec une formule déjà choisie, on déplie son groupe.
-  useEffect(() => {
-    if (step === 1 && openGrp === null && formulaKey) {
-      setOpenGrp(formulaKey === 'libre' ? 'Sans engagement' : (FORMULAS.find((f) => f.key === formulaKey)?.group ?? null));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, formulaKey]);
-
   // Annule le mandat amorcé (archive la fiche orpheline créée par GoCardless).
   const cancelEarlyMandate = async (silent = false) => {
     const id = mandateMemberId;
@@ -410,7 +421,6 @@ const InscriptionPage: React.FC = () => {
     setPhoto(null); setPhotoPreview(''); setSubStart(today); setSubEnd(''); setCardNumber('');
     setGroupName(''); setSubgroupName(''); setCommercialId('');
     setMandateMemberId(null); setMandateUrl(''); setMandateMsg(''); mandateCtx.current = null;
-    setOpenGrp(null);
   };
 
   const openContract = async () => {
@@ -419,437 +429,293 @@ const InscriptionPage: React.FC = () => {
     if (url) window.open(url, '_blank');
   };
 
-  // --- Styles utilitaires -----------------------------------------------------
-  const field = 'w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none text-base';
-  const label = 'block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1.5';
-
   // ===== Écran de succès =====
   if (result) {
     const g: any = result.generate || {};
     return (
-      <div className="max-w-2xl mx-auto py-10 px-4 text-center">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-          <PartyPopper className="text-green-600" size={40} />
-        </div>
-        <h1 className="text-3xl font-semibold text-gray-900">Inscription enregistrée !</h1>
-        <p className="text-gray-500 mt-2">Contrat n° <b>{result.contractNumber}</b> généré et signé.</p>
-        <p className="text-sm mt-1 text-gray-500">
-          {g.emailed ? '✉️ Contrat envoyé par email à l\u2019adhérent.' : (g.email_reason || 'Email non envoyé.')}
-        </p>
+      <div className="max-w-[760px] mx-auto space-y-4">
+        <PageHeader
+          title="Inscription enregistrée"
+          subtitle={<>Contrat n° <span className="font-semibold text-ink tabular-nums">{result.contractNumber}</span> généré et signé. {g.emailed ? 'Contrat envoyé par e-mail à l’adhérent.' : (g.email_reason || 'E-mail non envoyé.')}</>}
+        />
 
         {result.keypadCode && (
-          <div className="mt-6 p-5 rounded-2xl bg-gray-900 text-white flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="text-left">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-300">Code d'accès (clavier) à communiquer</p>
-              <p className="text-4xl font-black tracking-[0.25em] mt-0.5">{result.keypadCode}</p>
+          <div className="p-5 bg-ink text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-sm text-line">Code d'accès clavier à communiquer</p>
+              <p className="text-4xl font-extrabold tracking-[0.25em] tabular-nums mt-0.5">{result.keypadCode}</p>
             </div>
-            <button onClick={() => { try { navigator.clipboard.writeText(result.keypadCode!); } catch { /* noop */ } }}
-              className="shrink-0 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 font-bold text-sm">Copier le code</button>
+            <button type="button" onClick={() => { try { navigator.clipboard.writeText(result.keypadCode!); } catch { /* noop */ } }}
+              className="shrink-0 h-11 px-4 border border-line font-extrabold hover:bg-ink-2 transition-colors">Copier le code</button>
           </div>
         )}
 
-        <div className="mt-8 flex flex-col gap-3 items-center">
-          <button onClick={openContract} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-gray-900 text-white font-bold hover:bg-gray-800">
-            <FileText size={18} /> Voir le contrat signé (PDF)
-          </button>
-
-          {result.authorisationUrl && (
-            <div className="w-full mt-2 p-5 rounded-2xl border-2 border-dashed" style={{ borderColor: RED }}>
-              <p className="font-bold text-gray-900 mb-1">Dernière étape : le prélèvement SEPA</p>
-              <p className="text-sm text-gray-500 mb-4">L'adhérent saisit son IBAN et valide son mandat sur la page sécurisée GoCardless.</p>
-              <button onClick={() => { window.location.href = result.authorisationUrl!; }} className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl text-white font-bold w-full" style={{ backgroundColor: RED }}>
-                <CreditCard size={18} /> Mettre en place le prélèvement
-              </button>
-            </div>
-          )}
-
-          <div className="flex flex-wrap justify-center gap-3 mt-4">
-            <button onClick={() => navigate(`/app/crm?member=${result.memberId}`)} className="px-6 py-3 rounded-xl text-white font-bold" style={{ backgroundColor: RED }}>Voir la fiche du client</button>
-            <button onClick={reset} className="px-6 py-3 rounded-xl border border-gray-200 font-bold text-gray-700 hover:bg-gray-50">Nouvelle inscription</button>
+        {result.authorisationUrl && (
+          <div className="p-5 bg-surface border-2 border-primary">
+            <p className="font-extrabold text-ink">Dernière étape : le prélèvement SEPA</p>
+            <p className="text-muted mt-0.5 mb-4">L'adhérent saisit son IBAN et valide son mandat sur la page sécurisée GoCardless.</p>
+            <Button size="lg" icon={CreditCard} onClick={() => { window.location.href = result.authorisationUrl!; }}>Mettre en place le prélèvement</Button>
           </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 border-t-2 border-ink pt-3.5">
+          <Button size="lg" variant={result.authorisationUrl ? 'secondary' : 'primary'} icon={FileText} onClick={openContract}>Voir le contrat signé (PDF)</Button>
+          <Button size="lg" variant="secondary" onClick={() => navigate(`/app/crm?member=${result.memberId}`)}>Voir la fiche du client</Button>
+          <Button size="lg" variant="ghost" onClick={reset} className="ml-auto">Nouvelle inscription</Button>
         </div>
       </div>
     );
   }
 
-  // ===== Wizard =====
+  // ===== Parcours =====
   return (
-    <div className="max-w-3xl mx-auto py-6 px-4">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white" style={{ backgroundColor: RED }}>
-          <UserPlus size={24} />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Nouvelle inscription</h1>
-          <p className="text-sm text-gray-500">Contrat d'adhésion A.R.A.P.S</p>
-        </div>
-      </div>
+    <div className="max-w-[760px] mx-auto space-y-4">
+      <PageHeader title="Nouvelle inscription" subtitle="Contrat d'adhésion A.R.A.P.S" ruled={false} />
+      <Stepper steps={STEPS} current={step} />
 
-      {/* Stepper */}
-      <div className="flex items-center mb-8">
-        {STEPS.map((s, i) => (
-          <React.Fragment key={s}>
-            <div className="flex flex-col items-center">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${i < step ? 'text-white' : i === step ? 'text-white' : 'bg-gray-100 text-gray-400'}`} style={{ backgroundColor: i <= step ? RED : undefined }}>
-                {i < step ? <Check size={16} /> : i + 1}
-              </div>
-              <span className={`text-[11px] mt-1 font-semibold ${i === step ? 'text-gray-900' : 'text-gray-400'}`}>{s}</span>
-            </div>
-            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-2 ${i < step ? '' : 'bg-gray-100'}`} style={{ backgroundColor: i < step ? RED : undefined }} />}
-          </React.Fragment>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
-        {/* ÉTAPE 0 — Identité */}
+      <div className="bg-surface border border-line px-6 py-5">
+        {/* ÉTAPE 0 : identité */}
         {step === 0 && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Reprise d'une fiche existante (anti-doublon) */}
             {existingMemberId ? (
-              <div className="rounded-2xl border border-green-200 bg-green-50 p-3.5 flex items-center justify-between gap-3">
-                <p className="text-[12px] font-bold text-green-800 flex items-center gap-2">
-                  <CheckCircle2 size={16} /> Fiche existante reprise — l'inscription complétera cette fiche (pas de doublon).
-                </p>
-                <button type="button" onClick={() => setExistingMemberId(null)} className="text-[11px] font-bold text-gray-400 hover:text-gray-700 shrink-0">Créer une nouvelle fiche</button>
+              <div className="flex items-center gap-3 px-4 py-3 bg-success-soft text-success-text">
+                <CheckCircle2 size={18} className="shrink-0" />
+                <p className="min-w-0"><span className="font-extrabold">Fiche existante reprise.</span> L'inscription complétera cette fiche, sans créer de doublon.</p>
+                <button type="button" onClick={() => setExistingMemberId(null)} className="ml-auto shrink-0 font-extrabold hover:underline">Créer une nouvelle fiche</button>
               </div>
             ) : emailMatch && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-[12px] font-bold text-amber-800">Un compte existe déjà pour cet e-mail</p>
-                    <p className="text-[11.5px] text-amber-700 mt-0.5 leading-relaxed">
-                      <b>{`${emailMatch.firstName} ${emailMatch.lastName}`.trim() || '—'}</b>
-                      {emailMatch.memberNumber ? ` · n° ${emailMatch.memberNumber}` : ''}
-                      {emailMatch.status === 'prospect' ? ' · prospect' : ''}
-                      {emailMatch.hasAccount ? ' · compte app' : ''}. Reprends sa fiche pour éviter un doublon (ses infos sont pré-remplies).
-                    </p>
-                    <button type="button" onClick={() => loadExistingMember(emailMatch)}
-                      className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-amber-600">
-                      <Link2 size={13} /> Reprendre cette fiche
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <Alert tone="warning" title="Un compte existe déjà pour cet e-mail." action={{ label: 'Reprendre cette fiche', onClick: () => loadExistingMember(emailMatch) }}>
+                <span className="font-semibold">{`${emailMatch.firstName} ${emailMatch.lastName}`.trim() || '—'}</span>
+                {emailMatch.memberNumber ? ` · n° ${emailMatch.memberNumber}` : ''}
+                {emailMatch.status === 'prospect' ? ' · prospect' : ''}
+                {emailMatch.hasAccount ? ' · compte app' : ''}. Reprends sa fiche pour éviter un doublon : ses informations seront préremplies.
+              </Alert>
             )}
-            <div className="flex items-center gap-5">
-              <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-                {photoPreview ? <img src={photoPreview} alt="" className="w-full h-full object-cover" /> : <Camera className="text-gray-300" size={32} />}
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="w-24 h-24 bg-ground border border-line overflow-hidden flex items-center justify-center shrink-0">
+                {photoPreview ? <img src={photoPreview} alt="" className="w-full h-full object-cover" /> : <Camera className="text-muted" size={32} />}
               </div>
-              <div>
-                <span className={label}>Photo de l'adhérent <span className="text-red-600">*</span></span>
-                <p className="text-xs text-gray-400 mb-1.5">Obligatoire — sert uniquement à l'identification (photo de profil), jamais diffusée.</p>
+              <div className="min-w-0">
+                <FieldLabel required>Photo de l'adhérent</FieldLabel>
+                <p className="text-sm text-muted mb-2">Sert uniquement à l'identification (photo de profil), jamais diffusée.</p>
                 <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhoto} />
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => setWebcamOpen(true)} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold" style={{ backgroundColor: RED }}>
-                    <Camera size={18} /> Webcam
-                  </button>
-                  <button onClick={() => photoInputRef.current?.click()} className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-gray-200 font-semibold text-gray-700 hover:bg-gray-50">
-                    <Upload size={18} /> Importer
-                  </button>
-                  {photoPreview && <button onClick={() => { setPhoto(null); setPhotoPreview(''); }} className="text-sm text-gray-400 hover:text-red-600">Retirer</button>}
+                  <Button size="lg" variant="secondary" icon={Camera} onClick={() => setWebcamOpen(true)}>Webcam</Button>
+                  <Button size="lg" variant="secondary" icon={Upload} onClick={() => photoInputRef.current?.click()}>Importer</Button>
+                  {photoPreview && <Button variant="ghost" onClick={() => { setPhoto(null); setPhotoPreview(''); }}>Retirer</Button>}
                 </div>
               </div>
             </div>
             <div>
-              <span className={label}>Civilité</span>
-              <div className="flex gap-3">
-                {['Madame', 'Monsieur'].map((c) => (
-                  <button key={c} onClick={() => setCivility(c)} className={`px-5 py-3 rounded-xl border font-semibold ${civility === c ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: civility === c ? RED : undefined }}>{c}</button>
-                ))}
-              </div>
+              <FieldLabel>Civilité</FieldLabel>
+              <Segmented size="lg" value={civility} onChange={setCivility} options={[{ value: 'Madame', label: 'Madame' }, { value: 'Monsieur', label: 'Monsieur' }]} />
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div><span className={label}>Prénom *</span><input className={field} value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div>
-              <div><span className={label}>Nom *</span><input className={field} value={lastName} onChange={(e) => setLastName(e.target.value)} /></div>
+              <Field label="Prénom" required><Input fieldSize="lg" value={firstName} onChange={(e) => setFirstName(e.target.value)} /></Field>
+              <Field label="Nom" required><Input fieldSize="lg" value={lastName} onChange={(e) => setLastName(e.target.value)} /></Field>
             </div>
-            <div><span className={label}>Adresse</span><input className={field} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+            <Field label="Adresse"><Input fieldSize="lg" value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div><span className={label}>Code postal</span><input className={field} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} /></div>
-              <div><span className={label}>Ville</span><input className={field} value={city} onChange={(e) => setCity(e.target.value)} /></div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div><span className={label}>Date de naissance</span><input type="date" className={field} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
-              <div><span className={label}>Nationalité</span><input className={field} value={nationality} onChange={(e) => setNationality(e.target.value)} /></div>
+              <Field label="Code postal"><Input fieldSize="lg" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} /></Field>
+              <Field label="Ville"><Input fieldSize="lg" value={city} onChange={(e) => setCity(e.target.value)} /></Field>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div><span className={label}>Téléphone</span><input className={field} value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
-              <div><span className={label}>Email {formulaPaymentMethod === 'Prélèvement' ? '*' : ''}</span><input type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+              <Field label="Date de naissance"><Input fieldSize="lg" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></Field>
+              <Field label="Nationalité"><Input fieldSize="lg" value={nationality} onChange={(e) => setNationality(e.target.value)} /></Field>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div><span className={label}>Profession</span><input className={field} value={profession} onChange={(e) => setProfession(e.target.value)} /></div>
-              <div><span className={label}>Entreprise</span><input className={field} value={company} onChange={(e) => setCompany(e.target.value)} /></div>
+              <Field label="Téléphone"><Input fieldSize="lg" value={phone} onChange={(e) => setPhone(e.target.value)} /></Field>
+              <Field label="E-mail" required={formulaPaymentMethod === 'Prélèvement'}><Input fieldSize="lg" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <span className={label}>Groupe</span>
-                <select className={field} value={groupName} onChange={(e) => { setGroupName(e.target.value); setSubgroupName(''); }}>
-                  <option value="">— Aucun —</option>
+              <Field label="Profession"><Input fieldSize="lg" value={profession} onChange={(e) => setProfession(e.target.value)} /></Field>
+              <Field label="Entreprise"><Input fieldSize="lg" value={company} onChange={(e) => setCompany(e.target.value)} /></Field>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Groupe">
+                <Select fieldSize="lg" value={groupName} onChange={(e) => { setGroupName(e.target.value); setSubgroupName(''); }}>
+                  <option value="">Aucun</option>
                   {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <span className={label}>Sous-groupe</span>
-                <select className={field} value={subgroupName} onChange={(e) => setSubgroupName(e.target.value)} disabled={!groupName || subOptions.length === 0}>
-                  <option value="">{!groupName ? '— Choisir un groupe —' : subOptions.length === 0 ? '— Aucun sous-groupe —' : '— Aucun —'}</option>
+                </Select>
+              </Field>
+              <Field label="Sous-groupe">
+                <Select fieldSize="lg" value={subgroupName} onChange={(e) => setSubgroupName(e.target.value)} disabled={!groupName || subOptions.length === 0}>
+                  <option value="">{!groupName ? 'Choisir un groupe' : subOptions.length === 0 ? 'Aucun sous-groupe' : 'Aucun'}</option>
                   {subOptions.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                </select>
-              </div>
+                </Select>
+              </Field>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <span className={label}>Commercial</span>
-                <select className={field} value={commercialId} onChange={(e) => setCommercialId(e.target.value)}>
-                  <option value="">— Aucun —</option>
+              <Field label="Commercial" hint={staffList.length === 0 ? 'Ajoutez vos commerciaux dans « Équipe & Staff ».' : undefined}>
+                <Select fieldSize="lg" value={commercialId} onChange={(e) => setCommercialId(e.target.value)}>
+                  <option value="">Aucun</option>
                   {staffList.map((s) => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
-                </select>
-                {staffList.length === 0 && (
-                  <span className="text-[11px] text-gray-400 mt-1 block">Ajoutez vos commerciaux dans « Équipe & Staff ».</span>
-                )}
-              </div>
+                </Select>
+              </Field>
             </div>
           </div>
         )}
 
-        {/* ÉTAPE 1 — Formule */}
+        {/* ÉTAPE 1 : formule */}
         {step === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {billingRule ? (
-              <div className="p-4 rounded-2xl border-2 space-y-2" style={{ borderColor: RED, backgroundColor: '#fdeaea' }}>
-                <div className="flex items-center gap-2 font-bold text-gray-900">
-                  <Building2 size={18} style={{ color: RED }} /> Formule imposée par le groupe
+              <div className="p-4 bg-primary-soft border-2 border-primary space-y-1">
+                <div className="flex items-center gap-2 font-extrabold text-primary-dark">
+                  <Building2 size={18} /> Formule imposée par le groupe
                 </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-semibold text-gray-900 text-sm">{formula?.label}</span>
-                  <span className="font-bold" style={{ color: RED }}>{eur(formula?.price ?? 0)}/mois</span>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-semibold text-ink">{formula?.label}</span>
+                  <span className="font-extrabold text-primary-dark tabular-nums">{eur(formula?.price ?? 0)} / mois</span>
                 </div>
-                <div className="text-[13px] text-gray-700">
-                  Réglé par <span className="font-semibold">{billingRule.payerName}</span> — facturé mensuellement à l'association (virement).
-                </div>
-                <div className="text-[11px] text-gray-500">
-                  L'inscription est verrouillée : la formule et le mode de règlement sont définis par les règles du groupe/sous-groupe.
-                </div>
+                <p className="text-ink">
+                  Réglé par <span className="font-semibold">{billingRule.payerName}</span>, facturé mensuellement à l'association (virement).
+                </p>
+                <p className="text-sm text-muted">
+                  L'inscription est verrouillée : la formule et le mode de règlement sont définis par les règles du groupe ou du sous-groupe.
+                </p>
               </div>
-            ) : (['Engagement', 'Sans engagement'] as const).map((grp) => {
-              const grpTitle = grp === 'Engagement' ? 'Avec abonnement (engagement)' : 'Sans abonnement (à la carte)';
-              const isOpen = openGrp === grp;
-              const selInGroup = !!formulaKey && (grp === 'Sans engagement'
-                ? (formulaKey === 'libre' || FORMULAS.some((f) => f.key === formulaKey && f.group === grp))
-                : FORMULAS.some((f) => f.key === formulaKey && f.group === grp));
-              const selLabel = !selInGroup ? '' : (formulaKey === 'libre'
-                ? `Accès à montant libre${Number(freeAmount) > 0 ? ` — ${eur(Number(freeAmount))}` : ''}`
-                : (() => { const f = FORMULAS.find((x) => x.key === formulaKey); return f ? `${f.label.split('—')[0].trim()} · ${eur(f.price)}${f.recurring ? '/mois' : ''}` : ''; })());
-              return (
-                <div key={grp} className="border-2 border-gray-200 rounded-2xl overflow-hidden">
-                  <button type="button" onClick={() => setOpenGrp(isOpen ? null : grp)}
-                    className="w-full flex items-center justify-between gap-2 px-4 py-3.5 bg-gray-50 hover:bg-gray-100 transition-colors">
-                    <span className="font-bold text-gray-900 text-sm">{grpTitle}</span>
-                    <div className="flex items-center gap-2 min-w-0">
-                      {selInGroup && <span className="text-[12px] font-semibold truncate" style={{ color: RED }}>{selLabel}</span>}
-                      <ChevronDown size={18} className={`shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                  </button>
-                  {isOpen && (
-                    <div className="grid sm:grid-cols-2 gap-3 p-3">
-                      {FORMULAS.filter((f) => f.group === grp).map((f) => (
-                        <button key={f.key} onClick={() => setFormulaKey(f.key)} className={`text-left p-4 rounded-2xl border-2 transition ${formulaKey === f.key ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === f.key ? '#fdeaea' : undefined, borderColor: formulaKey === f.key ? RED : undefined }}>
-                          <div className="font-bold text-gray-900 text-sm leading-snug">{f.label}</div>
-                          <div className="mt-1 font-semibold" style={{ color: RED }}>{eur(f.price)}{f.recurring ? '/mois' : ''}</div>
-                        </button>
-                      ))}
-                      {grp === 'Sans engagement' && (
-                        <div onClick={() => setFormulaKey('libre')} className={`text-left p-4 rounded-2xl border-2 transition cursor-pointer ${formulaKey === 'libre' ? 'border-transparent ring-2' : 'border-gray-200 hover:border-gray-300'}`} style={{ backgroundColor: formulaKey === 'libre' ? '#fdeaea' : undefined, borderColor: formulaKey === 'libre' ? RED : undefined }}>
-                          <div className="font-bold text-gray-900 text-sm leading-snug">Accès à montant libre</div>
-                          <div className="mt-1 flex items-center gap-1.5">
-                            <input type="number" step="0.01" min="0" value={freeAmount}
-                              onChange={(e) => setFreeAmount(e.target.value)}
-                              onClick={(e) => { e.stopPropagation(); setFormulaKey('libre'); }}
-                              onFocus={() => setFormulaKey('libre')}
-                              placeholder="0,00"
-                              className="w-24 bg-transparent font-semibold outline-none border-b-2 border-gray-300 focus:border-red-500 text-base" style={{ color: RED }} />
-                            <span className="font-semibold" style={{ color: RED }}>€</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <div>
-              <span className={label}>Période d'abonnement</span>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="text-[11px] text-gray-400">Début</span>
-                  <input type="date" className={field} value={subStart} onChange={(e) => setSubStart(e.target.value)} />
-                </div>
-                <div>
-                  <span className="text-[11px] text-gray-400">Fin {formula && !formula.recurring ? '' : '(facultatif)'}</span>
-                  <input type="date" className={field} value={subEnd} onChange={(e) => setSubEnd(e.target.value)} />
-                </div>
-              </div>
-              {formula?.recurring && <p className="text-[11px] text-gray-400 mt-1">Formule avec engagement reconduit tacitement : la date de fin est facultative.</p>}
-              {formulaKey === 'libre' && <p className="text-[11px] mt-1" style={{ color: RED }}>Date de fin obligatoire : l'accès sera automatiquement bloqué ce jour-là.</p>}
-            </div>
-
-            {!billingRule && (
-              <div>
-                <span className={label}>Règlement de la formule</span>
-                <div className="flex flex-wrap gap-2">
-                  {PAYMENT_METHODS.map((m) => (
-                    <button key={m} onClick={() => setFormulaPaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${formulaPaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: formulaPaymentMethod === m ? RED : undefined }}>{m}</button>
-                  ))}
-                </div>
-              </div>
+            ) : (
+              <>
+                <OptionGrid title="Avec abonnement · engagement" help="Prélèvements reconduits tacitement" options={formulaOptions('Engagement')} selected={formulaKey} onSelect={setFormulaKey} />
+                <OptionGrid
+                  title="Sans abonnement · à la carte" help="Date de fin obligatoire pour le montant libre" columns={4}
+                  options={[...formulaOptions('Sans engagement'), { value: 'libre', name: 'Montant libre', detail: Number(freeAmount) > 0 ? eur(Number(freeAmount)) : 'Libellé + montant' }]}
+                  selected={formulaKey} onSelect={setFormulaKey}
+                />
+                {formulaKey === 'libre' && (
+                  <div className="grid sm:grid-cols-[1fr_160px] gap-3">
+                    <Field label="Libellé" optional><Input fieldSize="lg" value={freeLabel} onChange={(e) => setFreeLabel(e.target.value)} placeholder="Accès, montant libre" /></Field>
+                    <Field label="Montant (€)" required><Input fieldSize="lg" type="number" step="0.01" min="0" value={freeAmount} onChange={(e) => setFreeAmount(e.target.value)} placeholder="0,00" /></Field>
+                  </div>
+                )}
+              </>
             )}
+
+            <div className="grid sm:grid-cols-[1fr_1fr_auto] gap-3">
+              <Field label="Début"><Input fieldSize="lg" type="date" value={subStart} onChange={(e) => setSubStart(e.target.value)} /></Field>
+              <Field label="Fin" required={formulaKey === 'libre'} optional={!formula || formula.recurring}><Input fieldSize="lg" type="date" value={subEnd} onChange={(e) => setSubEnd(e.target.value)} /></Field>
+              {!billingRule && (
+                <div>
+                  <FieldLabel>Règlement</FieldLabel>
+                  <Segmented size="lg" value={formulaPaymentMethod} onChange={setFormulaPaymentMethod} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
+                </div>
+              )}
+            </div>
+            {formulaKey === 'libre' && <p className="text-sm text-primary">L'accès sera automatiquement bloqué le jour de la date de fin.</p>}
 
             {/* Prélèvement SEPA : possibilité de faire signer le mandat (RIB) dès maintenant. */}
             {!billingRule && formulaPaymentMethod === 'Prélèvement' && (
-              <div className="p-4 rounded-2xl border" style={{ borderColor: '#f0c9c9', backgroundColor: '#fdf3f3' }}>
-                <div className="flex items-center gap-2 font-bold text-gray-900"><CreditCard size={18} style={{ color: RED }} /> Mandat de prélèvement (RIB)</div>
+              <div className="p-4 bg-ground-2 border border-line">
+                <div className="flex items-center gap-2 font-extrabold text-ink"><CreditCard size={18} /> Mandat de prélèvement (RIB)</div>
                 {!mandateMemberId ? (
                   <>
-                    <p className="text-[12px] text-gray-500 mt-1">Vous pouvez faire signer le mandat dès maintenant : il s'ouvre dans un nouvel onglet, l'inscription reste ici. Sinon, il sera proposé à la fin.</p>
-                    <button type="button" onClick={startMandateEarly} disabled={mandateBusy || !email.trim()}
-                      className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm disabled:opacity-50" style={{ backgroundColor: RED }}>
-                      {mandateBusy ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />} Faire signer le mandat (nouvel onglet)
-                    </button>
-                    {!email.trim() && <p className="text-[11px] text-gray-400 mt-1">Renseignez l'email à l'étape Identité pour activer le mandat.</p>}
+                    <p className="text-muted mt-1 mb-3">Vous pouvez faire signer le mandat dès maintenant : il s'ouvre dans un nouvel onglet, l'inscription reste ici. Sinon, il sera proposé à la fin.</p>
+                    <Button variant="secondary" onClick={startMandateEarly} disabled={mandateBusy || !email.trim()}>
+                      {mandateBusy ? <Loader2 size={16} className="animate-spin" /> : <CreditCard size={16} />} Faire signer le mandat
+                    </Button>
+                    {!email.trim() && <p className="text-sm text-muted mt-1.5">Renseignez l'e-mail à l'étape Identité pour activer le mandat.</p>}
                   </>
                 ) : (
                   <div className="mt-1 space-y-2">
-                    <p className="text-[12px] font-semibold text-green-700 flex items-center gap-1.5"><Check size={14} /> Mandat lancé — le RIB se remplit dans l'autre onglet. Continuez l'inscription, il est déjà rattaché.</p>
+                    <p className="font-semibold text-success-text flex items-center gap-1.5"><Check size={16} className="shrink-0" /> Mandat lancé : le RIB se remplit dans l'autre onglet. Continuez l'inscription, il est déjà rattaché.</p>
                     <div className="flex flex-wrap items-center gap-3">
-                      <button type="button" onClick={() => window.open(mandateUrl, '_blank', 'noopener')} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-800 underline">Rouvrir le lien RIB</button>
-                      <button type="button" onClick={() => cancelEarlyMandate(false)} className="text-[12px] font-bold text-gray-400 hover:text-red-600">Annuler le mandat</button>
+                      <Button variant="ghost" onClick={() => window.open(mandateUrl, '_blank', 'noopener')}>Rouvrir le lien RIB</Button>
+                      <Button variant="ghost" onClick={() => cancelEarlyMandate(false)}>Annuler le mandat</Button>
                     </div>
                   </div>
                 )}
-                {mandateMsg && <p className="text-[11px] font-semibold text-red-600 mt-2">{mandateMsg}</p>}
-              </div>
-            )}
-
-            {badgeEligible && (
-              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 space-y-3">
-                <label className="flex items-center justify-between gap-3 cursor-pointer">
-                  <span className="flex items-center gap-2 font-bold text-gray-900"><BadgeCheck size={18} style={{ color: RED }} /> Badge (optionnel) — {eur(BADGE.price)}</span>
-                  <span className="relative inline-flex items-center">
-                    <input type="checkbox" className="sr-only peer" checked={wantBadge} onChange={(e) => setWantBadge(e.target.checked)} />
-                    <span className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-red-500 transition-colors" />
-                    <span className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
-                  </span>
-                </label>
-                {!wantBadge && <p className="text-[11px] text-gray-400">Le badge n'est plus obligatoire. Active-le seulement si l'adhérent en prend un.</p>}
-                {wantBadge && (<>
-                <div>
-                  <span className={label}>Numéro de badge</span>
-                  <div className="flex gap-2">
-                    <input className={field} value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ex. 3616701" />
-                    <button type="button" onClick={handleGenerateCard} disabled={genningCard} className="shrink-0 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-                      {genningCard ? '…' : 'Générer'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-gray-400 mt-1">Saisis le numéro imprimé sur le badge.</p>
-                </div>
-                <div>
-                  <span className={label}>Règlement du badge</span>
-                  <div className="flex flex-wrap gap-2">
-                    {['Espèces', 'CB', 'Chèque', 'Prélèvement'].map((m) => (
-                      <button key={m} onClick={() => setBadgePaymentMethod(m)} className={`px-4 py-2.5 rounded-xl border font-semibold text-sm ${badgePaymentMethod === m ? 'text-white border-transparent' : 'border-gray-200 text-gray-600'}`} style={{ backgroundColor: badgePaymentMethod === m ? RED : undefined }}>{m}</button>
-                    ))}
-                  </div>
-                </div>
-                </>)}
+                {mandateMsg && <p className="text-sm font-semibold text-danger-text mt-2">{mandateMsg}</p>}
               </div>
             )}
 
             <div>
-              <span className={label}>Services complémentaires (optionnel)</span>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {SERVICES.map((s) => (
-                  <button key={s.key} onClick={() => toggleService(s.key)} className={`flex items-center justify-between p-4 rounded-2xl border-2 ${services[s.key] ? 'border-transparent' : 'border-gray-200'}`} style={{ backgroundColor: services[s.key] ? '#fdeaea' : undefined, borderColor: services[s.key] ? RED : undefined }}>
-                    <span className="font-semibold text-gray-800">{s.label}</span>
-                    <span className="font-bold" style={{ color: RED }}>{eur(s.price)}</span>
-                  </button>
-                ))}
+              <FieldLabel optional>Options</FieldLabel>
+              <div className="grid sm:grid-cols-3 gap-2">
+                {badgeEligible && <OptionCheck label="Badge d'accès" price={BADGE.price} checked={wantBadge} onChange={setWantBadge} />}
+                {SERVICES.map((s) => <OptionCheck key={s.key} label={s.label} price={s.price} checked={!!services[s.key]} onChange={() => toggleService(s.key)} />)}
               </div>
             </div>
+
+            {includeBadge && (
+              <div className="p-4 bg-ground-2 border border-line space-y-3">
+                <Field label="Numéro de badge" hint="Saisis le numéro imprimé sur le badge.">
+                  <div className="flex gap-2">
+                    <Input fieldSize="lg" value={cardNumber} onChange={(e) => setCardNumber(e.target.value)} placeholder="ex. 3616701" />
+                    <Button size="lg" variant="secondary" onClick={handleGenerateCard} disabled={genningCard}>{genningCard ? 'Génération…' : 'Générer'}</Button>
+                  </div>
+                </Field>
+                <div>
+                  <FieldLabel>Règlement du badge</FieldLabel>
+                  <Segmented size="lg" value={badgePaymentMethod} onChange={setBadgePaymentMethod} options={['Espèces', 'CB', 'Chèque', 'Prélèvement'].map((m) => ({ value: m, label: m }))} />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ÉTAPE 2 — Récap */}
+        {/* ÉTAPE 2 : récapitulatif */}
         {step === 2 && (
-          <div className="space-y-5">
-            <h2 className="text-lg font-semibold text-gray-900">Récapitulatif</h2>
-            <div className="rounded-2xl border border-gray-100 divide-y">
+          <div className="space-y-4">
+            <h2 className="text-xl font-extrabold text-ink">Récapitulatif</h2>
+            <div className="border border-line">
               <Row k="Adhérent" v={`${civility} ${firstName} ${lastName}`} />
               {(address || city) && <Row k="Adresse" v={[address, [postalCode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ')} />}
-              {email && <Row k="Email" v={email} />}
+              {email && <Row k="E-mail" v={email} />}
               {phone && <Row k="Téléphone" v={phone} />}
-              <Row k="Formule" v={`${formula?.label || '—'} (${eur(formula?.price || 0)}${formula?.recurring ? '/mois' : ''})`} />
+              <Row k="Formule" v={`${formula?.label || '—'} (${eur(formula?.price || 0)}${formula?.recurring ? ' / mois' : ''})`} />
               <Row k="Règlement formule" v={formulaPaymentMethod} />
-              {includeBadge && <Row k="Badge (optionnel)" v={`${eur(BADGE.price)} — réglé par ${badgePaymentMethod}`} />}
+              {includeBadge && <Row k="Badge" v={`${eur(BADGE.price)}, réglé par ${badgePaymentMethod}`} />}
               {chosenServices.map((s) => <Row key={s.key} k={s.label} v={eur(s.price)} />)}
-              <div className="flex justify-between px-4 py-3 font-semibold text-base" style={{ color: RED }}>
-                <span>TOTAL À L'INSCRIPTION</span><span>{eur(total)}</span>
+              <div className="flex justify-between gap-4 px-4 py-3 border-t-2 border-ink font-extrabold text-lg text-ink">
+                <span>Total à l'inscription</span><span className="tabular-nums">{eur(total)}</span>
               </div>
             </div>
 
-            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-xs text-amber-800">
-              Les déclarations ci-dessous sont <b>validées par le client lui-même sur la borne</b> lors de la signature.
+            <Alert tone="warning">
+              Les déclarations ci-dessous sont validées par le client lui-même sur la borne lors de la signature.
               Ne les cochez ici que si le client signe directement sur ce PC (secours).
+            </Alert>
+            <div>
+              <Checkbox checked={consentCga} onChange={(e) => setConsentCga(e.target.checked)} label={<>Je déclare avoir pris connaissance des <span className="font-semibold">Conditions générales d'adhésion</span> et du Règlement intérieur.</>} />
+              <Checkbox checked={consentMedical} onChange={(e) => setConsentMedical(e.target.checked)} label={<>Je déclare avoir fait contrôler par un médecin mon <span className="font-semibold">aptitude à pratiquer une activité sportive</span>.</>} />
             </div>
-            <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentCga} onChange={(e) => setConsentCga(e.target.checked)} />
-              <span className="text-sm text-gray-700">Je déclare avoir pris connaissance des <b>Conditions générales d'adhésion</b> et du Règlement intérieur.</span>
-            </label>
-            <label className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="mt-1 w-5 h-5 accent-red-600" checked={consentMedical} onChange={(e) => setConsentMedical(e.target.checked)} />
-              <span className="text-sm text-gray-700">Je déclare avoir fait contrôler par un médecin mon <b>aptitude à pratiquer une activité sportive</b>.</span>
-            </label>
-            <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-xs text-gray-500">
-              <b>Droit à l'image :</b> la photo est prise pour l'identification de l'adhérent (sécurité) et utilisée uniquement comme photo de profil. Elle n'est jamais rendue publique, ni diffusée, ni communiquée à des tiers.
-            </div>
+            <Alert tone="info" title="Droit à l'image :">
+              la photo est prise pour l'identification de l'adhérent (sécurité) et utilisée uniquement comme photo de profil. Elle n'est jamais rendue publique, ni diffusée, ni communiquée à des tiers.
+            </Alert>
           </div>
         )}
 
-        {/* ÉTAPE 3 — Signature */}
+        {/* ÉTAPE 3 : signature */}
         {step === 3 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Signature de l'adhérent</h2>
+            <h2 className="text-xl font-extrabold text-ink">Signature de l'adhérent</h2>
 
             {/* Faire signer sur la borne (pont temps réel) */}
-            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+            <div className="p-4 bg-ground-2 border border-line">
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-gray-800">Faire signer sur la borne</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Le client signe directement sur l'écran tactile de la salle.</p>
+                <div className="min-w-0">
+                  <p className="font-extrabold text-ink">Faire signer sur la borne</p>
+                  <p className="text-muted mt-0.5">Le client signe directement sur l'écran tactile de la salle.</p>
                 </div>
                 {!borneWaiting ? (
-                  <button type="button" onClick={signOnBorne} disabled={submitting}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-bold text-sm shrink-0 disabled:opacity-50"
-                    style={{ backgroundColor: RED }}>
-                    <Send size={16} /> Envoyer à la borne
-                  </button>
+                  <Button size="lg" variant="secondary" icon={Send} onClick={signOnBorne} disabled={submitting} className="shrink-0">Envoyer à la borne</Button>
                 ) : (
-                  <button type="button" onClick={cancelBorne}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm shrink-0 text-gray-600 bg-white border border-gray-200">
-                    <Loader2 size={16} className="animate-spin" /> Annuler
-                  </button>
+                  <Button size="lg" variant="secondary" onClick={cancelBorne} className="shrink-0"><Loader2 size={16} className="animate-spin" /> Annuler</Button>
                 )}
               </div>
-              {borneStatus && <p className="text-xs font-semibold mt-3 text-gray-600">{borneStatus}</p>}
+              {borneStatus && <p className="font-semibold mt-3 text-ink-2">{borneStatus}</p>}
               {remoteSig && (
-                <div className="mt-3 flex items-center gap-3 text-sm font-semibold text-green-700">
+                <div className="mt-3 flex items-center gap-2 font-semibold text-success-text">
                   <CheckCircle2 size={18} /> Signature reçue de la borne
-                  {borneAcq && <span className="text-gray-400 font-medium">· {borneAcq}</span>}
+                  {borneAcq && <span className="text-muted font-normal">· {borneAcq}</span>}
                 </div>
               )}
             </div>
 
-            <p className="text-sm text-gray-500">Ou signez ci-dessous avec le doigt.</p>
-            <div className="relative rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 overflow-hidden">
+            <p className="text-muted">Ou signez ci-dessous avec le doigt.</p>
+            <div className="relative border-2 border-dashed border-subtle bg-surface overflow-hidden">
               <canvas
                 ref={canvasRef}
                 className="w-full"
@@ -859,27 +725,28 @@ const InscriptionPage: React.FC = () => {
                 onPointerUp={onUp}
                 onPointerLeave={onUp}
               />
-              {sigEmpty && <span className="absolute inset-0 flex items-center justify-center text-gray-300 font-semibold pointer-events-none">Signez ici</span>}
+              {sigEmpty && <span className="absolute inset-0 flex items-center justify-center text-subtle font-semibold pointer-events-none">Signez ici</span>}
             </div>
-            <button onClick={() => { clearSig(); setRemoteSig(null); }} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"><Eraser size={16} /> Effacer</button>
+            <Button variant="ghost" icon={Eraser} onClick={() => { clearSig(); setRemoteSig(null); }}>Effacer</Button>
           </div>
         )}
 
-        {error && <div className="mt-5 p-3 rounded-xl bg-red-50 text-red-700 text-sm font-semibold">{error}</div>}
+        {error && <Alert tone="danger" className="mt-4">{error}</Alert>}
+      </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-8">
-          <button onClick={back} disabled={step === 0 || submitting} className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl font-bold ${step === 0 ? 'text-gray-300' : 'text-gray-600 hover:bg-gray-100'}`}>
-            <ArrowLeft size={18} /> Retour
-          </button>
+      {/* Navigation */}
+      <div className="flex items-center gap-5 border-t-2 border-ink pt-3.5">
+        <button type="button" onClick={back} disabled={step === 0 || submitting} className={`h-11 inline-flex items-center gap-2 font-extrabold ${step === 0 || submitting ? 'text-subtle cursor-not-allowed' : 'text-ink hover:text-primary transition-colors'}`}>
+          <ArrowLeft size={16} /> Retour
+        </button>
+        {formula && <span className="ml-auto text-muted">Total : <span className="font-extrabold text-ink tabular-nums">{eur(total)}{formula.recurring && total === formula.price ? ' / mois' : ''}</span></span>}
+        <div className={formula ? '' : 'ml-auto'}>
           {step < 3 ? (
-            <button onClick={next} disabled={!canNext()} className={`inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl text-white font-bold ${canNext() ? '' : 'opacity-40 cursor-not-allowed'}`} style={{ backgroundColor: RED }}>
-              Continuer <ArrowRight size={18} />
-            </button>
+            <Button size="lg" iconRight={ArrowRight} onClick={next} disabled={!canNext()}>Continuer</Button>
           ) : (
-            <button onClick={submit} disabled={submitting || sigEmpty} className={`inline-flex items-center gap-2 px-8 py-3.5 rounded-2xl text-white font-bold ${submitting || sigEmpty ? 'opacity-50 cursor-not-allowed' : ''}`} style={{ backgroundColor: RED }}>
-              {submitting ? <><Loader2 size={18} className="animate-spin" /> Création…</> : <><Check size={18} /> Valider l'inscription</>}
-            </button>
+            <Button size="lg" onClick={submit} disabled={submitting || sigEmpty}>
+              {submitting ? <><Loader2 size={16} className="animate-spin" /> Création…</> : <><Check size={16} /> Valider l'inscription</>}
+            </Button>
           )}
         </div>
       </div>
@@ -890,10 +757,18 @@ const InscriptionPage: React.FC = () => {
 };
 
 const Row: React.FC<{ k: string; v: string }> = ({ k, v }) => (
-  <div className="flex justify-between px-4 py-3 text-sm">
-    <span className="text-gray-500">{k}</span>
-    <span className="font-semibold text-gray-900 text-right">{v}</span>
+  <div className="flex justify-between gap-4 px-4 py-2.5 border-b border-line-soft last:border-b-0">
+    <span className="text-muted">{k}</span>
+    <span className="font-semibold text-ink text-right">{v}</span>
   </div>
+);
+
+const OptionCheck: React.FC<{ label: string; price: number; checked: boolean; onChange: (checked: boolean) => void }> = ({ label, price, checked, onChange }) => (
+  <label className={`flex items-center gap-2 px-2.5 py-2 border cursor-pointer transition-colors ${checked ? 'border-primary bg-primary-soft' : 'border-subtle hover:bg-ground-2'}`}>
+    <input type="checkbox" className="h-4 w-4 shrink-0" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <span className="flex-1 min-w-0">{label}</span>
+    <span className="font-extrabold tabular-nums">{eur(price)}</span>
+  </label>
 );
 
 export default InscriptionPage;
