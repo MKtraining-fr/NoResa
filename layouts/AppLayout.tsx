@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { APP_NAV_ITEMS, MOCK_MEMBERS, MOCK_PARTNERS, MOCK_PRODUCTS } from '../constants';
 import { searchMembers } from '../lib/membersApi';
+import { useAuth } from '../lib/AuthContext';
 
 const initials = (a?: string, b?: string) =>
   `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
@@ -14,6 +15,7 @@ import {
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   
@@ -33,6 +35,11 @@ const AppLayout: React.FC = () => {
     }, 250);
     return () => clearTimeout(t);
   }, [searchQuery]);
+
+  const handleSignOut = async () => {
+    try { await signOut(); } catch (e) { console.error('signOut', e); }
+    navigate('/connexion', { replace: true });
+  };
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev => 
@@ -135,7 +142,7 @@ const AppLayout: React.FC = () => {
 
         <div className="p-4 border-t border-slate-800 shrink-0">
           <button 
-            onClick={() => navigate('/')}
+            onClick={handleSignOut}
             className={`flex items-center space-x-3 w-full p-3 rounded-2xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all ${!isSidebarOpen && 'justify-center'}`}
           >
             <LogOut size={20} />
