@@ -37,19 +37,19 @@ export const MOCK_SESSIONS = [
 ];
 
 export const APP_NAV_ITEMS = [
-  { label: 'Dashboard', path: '/app', icon: LayoutDashboard },
+  { label: 'Tableau de bord', path: '/app', icon: LayoutDashboard },
   { label: 'CRM', path: '/app/crm', icon: Users, subItems: ['Membres', 'Prospects', 'Partenaires'] },
   { label: 'Planning', path: '/app/planning', icon: Calendar, subItems: ['Cours'] },
   { label: 'Finance', path: '/app/finance', icon: Wallet, subItems: ['Abonnements', 'Paiements', { label: 'Impayés', slug: 'impayes' }, { label: 'Résiliations', slug: 'resiliations' }, { label: 'Statistiques', slug: 'statistiques' }] },
   { label: 'Boutique', path: '/app/boutique', icon: ShoppingBag, subItems: ['Produits', 'Ventes', 'Fournisseurs'] },
-  { label: 'Contrôle d\'Accès', path: '/app/acces', icon: DoorOpen },
-  { label: 'Musique', path: '/app/musique', icon: Radio },
-  { label: 'Climatisation', path: '/app/climatisation', icon: Snowflake },
-  { label: 'Surveillance', path: '/app/surveillance', icon: Cctv },
-  { label: 'Equipe', path: '/app/equipe', icon: ArrowRightLeft },
-  { label: 'Messagerie', path: '/app/messagerie', icon: MessageSquare },
-  { label: 'Annonces', path: '/app/annonces', icon: Megaphone },
-  { label: 'Paramètres', path: '/app/parametres', icon: Settings },
+  { label: 'Contrôle d\'accès', path: '/app/acces', icon: DoorOpen },
+  { label: 'Musique', path: '/app/musique', icon: Radio, group: 'Salle' },
+  { label: 'Climatisation', path: '/app/climatisation', icon: Snowflake, group: 'Salle' },
+  { label: 'Surveillance', path: '/app/surveillance', icon: Cctv, group: 'Salle' },
+  { label: 'Messagerie', path: '/app/messagerie', icon: MessageSquare, group: 'Communication' },
+  { label: 'Annonces', path: '/app/annonces', icon: Megaphone, group: 'Communication' },
+  { label: 'Équipe', path: '/app/equipe', icon: ArrowRightLeft, group: 'Réglages' },
+  { label: 'Paramètres', path: '/app/parametres', icon: Settings, group: 'Réglages' },
 ];
 
 // Barre du bas de l'espace membre : 2 items à gauche du bouton QR central, 2 à droite.
