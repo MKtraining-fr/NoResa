@@ -154,7 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Cet appareil seulement : les autres postes du même compte restent connectés.
+    await supabase.auth.signOut({ scope: 'local' });
   };
 
   const role = profile?.role ?? null;

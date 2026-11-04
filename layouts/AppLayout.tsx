@@ -4,7 +4,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { APP_NAV_ITEMS, MOCK_MEMBERS, MOCK_PARTNERS, MOCK_PRODUCTS } from '../constants';
 import { searchMembers } from '../lib/membersApi';
 import { phone as formatPhone } from '../lib/format';
-
+
 const initials = (a?: string, b?: string) =>
   `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
 import { ChevronDown, ChevronRight, LogOut, Search, Bell, Menu, PanelLeftClose, X, ArrowUpRight } from 'lucide-react';
@@ -13,6 +13,7 @@ import { IconButton } from '../components/ui';
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   
@@ -32,6 +33,11 @@ const AppLayout: React.FC = () => {
     }, 250);
     return () => clearTimeout(t);
   }, [searchQuery]);
+
+  const handleSignOut = async () => {
+    try { await signOut(); } catch (e) { console.error('signOut', e); }
+    navigate('/connexion', { replace: true });
+  };
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev => 
@@ -140,7 +146,7 @@ const AppLayout: React.FC = () => {
         </nav>
 
         <button
-          onClick={() => navigate('/')}
+          onClick={handleSignOut}
           title={isSidebarOpen ? undefined : 'Déconnexion'}
           className={`flex items-center gap-3 py-3 border-t border-ink-2 text-line hover:text-white transition-colors shrink-0 ${isSidebarOpen ? 'px-4' : 'justify-center'}`}
         >
