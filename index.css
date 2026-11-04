@@ -7,6 +7,59 @@
   --brand: #4f46e5;
   --brand-dark: #4338ca;
   --brand-soft: #eef2ff;
+
+  /* Échelle Tailwind d'origine : rendu de l'espace membre, de la borne et des sites. */
+  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --fs-xs: 0.75rem;   --lh-xs: 1rem;
+  --fs-sm: 0.875rem;  --lh-sm: 1.25rem;
+  --fs-base: 1rem;    --lh-base: 1.5rem;
+  --fs-lg: 1.125rem;  --lh-lg: 1.75rem;
+  --fs-xl: 1.25rem;   --lh-xl: 1.75rem;
+  --fs-2xl: 1.5rem;   --lh-2xl: 2rem;
+  --fs-3xl: 1.875rem; --lh-3xl: 2.25rem;
+  --fs-4xl: 2.25rem;  --lh-4xl: 2.5rem;
+  --fs-5xl: 3rem;     --lh-5xl: 1;
+  --fs-6xl: 3.75rem;  --lh-6xl: 1;
+  --fs-7xl: 4.5rem;   --lh-7xl: 1;
+  --fs-8xl: 6rem;     --lh-8xl: 1;
+  --fs-9xl: 8rem;     --lh-9xl: 1;
+  --fw-thin: 100; --fw-extralight: 200; --fw-light: 300; --fw-normal: 400; --fw-medium: 500;
+  --fw-semibold: 600; --fw-bold: 700; --fw-extrabold: 800; --fw-black: 900;
+  --radius-sm: 0.125rem; --radius: 0.25rem; --radius-md: 0.375rem; --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem; --radius-2xl: 1rem; --radius-3xl: 1.5rem;
+}
+
+/* Charte NoResa : back-office (posée sur la racine de AppLayout). */
+.theme-noresa {
+  --font-sans: 'Archivo', system-ui, sans-serif;
+  --fs-xs: 12px;   --lh-xs: 16px;
+  --fs-sm: 13px;   --lh-sm: 18px;
+  --fs-base: 14px; --lh-base: 20px;
+  --fs-md: 15px;   --lh-md: 22px;
+  --fs-lg: 17px;   --lh-lg: 22px;
+  --fs-xl: 20px;   --lh-xl: 26px;
+  --fs-2xl: 28px;  --lh-2xl: 32px; --ls-2xl: -0.015em;
+  --fs-3xl: 32px;  --lh-3xl: 36px; --ls-3xl: -0.02em;
+  --fs-4xl: 44px;  --lh-4xl: 46px; --ls-4xl: -0.02em;
+  --fs-5xl: 64px;  --lh-5xl: 64px; --ls-5xl: -0.03em;
+  --fw-thin: 400; --fw-extralight: 400; --fw-light: 400; --fw-normal: 400; --fw-medium: 400;
+  --fw-semibold: 600; --fw-bold: 600; --fw-extrabold: 800; --fw-black: 800;
+  --radius-sm: 0; --radius: 0; --radius-md: 0; --radius-lg: 0;
+  --radius-xl: 0; --radius-2xl: 0; --radius-3xl: 0;
+
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-base);
+  color: theme('colors.ink');
+  -webkit-font-smoothing: antialiased;
+}
+.theme-noresa table { font-variant-numeric: tabular-nums; }
+.theme-noresa ::selection { background: rgba(200, 30, 30, 0.25); }
+.theme-noresa input[type="checkbox"], .theme-noresa input[type="radio"] { accent-color: theme('colors.primary.DEFAULT'); }
+
+@layer base {
+  /* Spécificité basse : les champs migrés et les utilitaires gardent la main. */
+  :where(.theme-noresa) :focus-visible { outline: 2px solid theme('colors.primary.DEFAULT'); outline-offset: 2px; }
 }
 
 body {

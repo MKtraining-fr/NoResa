@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { eur } from '../../lib/format';
 import { useNavigate } from 'react-router-dom';
 import {
   UserPlus, ArrowLeft, ArrowRight, Check, Eraser, FileText,
@@ -166,7 +167,6 @@ const InscriptionPage: React.FC = () => {
   const badgeEligible = formula?.group === 'Engagement';
   const includeBadge = badgeEligible && wantBadge;
   const total = (formula ? formula.price : 0) + (includeBadge ? BADGE.price : 0) + chosenServices.reduce((a, s) => a + s.price, 0);
-  const eur = (n: number) => `${(n || 0).toFixed(2).replace('.', ',')} €`;
 
   // Mode de règlement + période par défaut selon la formule
   useEffect(() => {
