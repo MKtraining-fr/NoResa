@@ -1693,7 +1693,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         <button type="button" onClick={saveScheduledBlock} disabled={accessBusy || !scheduleDate} className="bg-ink text-white px-3 py-1.5 font-semibold text-xs disabled:opacity-50">Programmer</button>
                         <button type="button" onClick={() => { setScheduleOpen(false); setScheduleDate(''); setScheduleReason(''); }} className="text-xs font-semibold text-muted px-2">Fermer</button>
                       </div>
-                      <p className="text-[10.5px] text-muted">L'accès sera coupé automatiquement à cette date (sans tolérance).</p>
+                      <p className="text-xs text-muted">L'accès sera coupé automatiquement à cette date (sans tolérance).</p>
                     </div>
                   ) : (
                     <button type="button" onClick={() => setScheduleOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-warning-text">
@@ -1717,7 +1717,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <AlertTriangle size={16} className="text-warning-text shrink-0 mt-0.5" />
                           <div className="flex-1">
                             <p className="text-xs font-semibold text-warning-text">{byEmail ? 'Rapprochement possible' : 'Doublon potentiel (même nom)'}</p>
-                            <p className="text-[11.5px] text-warning-text mt-0.5 leading-relaxed">
+                            <p className="text-xs text-warning-text mt-0.5 leading-relaxed">
                               {byEmail ? 'Une autre fiche utilise le même e-mail : ' : 'Une autre fiche porte le même nom : '}
                               <b>{dname}</b>
                               {d.memberNumber ? ` (n° ${d.memberNumber})` : ''}{d.hasAccount ? ' · a un compte app' : ''}.
@@ -2112,7 +2112,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             className="w-full flex items-center justify-center gap-2 bg-warning text-white px-4 py-2.5 font-semibold text-xs hover:bg-warning disabled:opacity-50">
                             <CreditCard size={14} /> {resumingMandate ? 'Ouverture…' : 'Faire signer le mandat (RIB)'}
                           </button>
-                          <p className="text-[10.5px] text-muted px-1">Ouvre la page GoCardless de saisie du RIB — le client signe sur place, ici.</p>
+                          <p className="text-xs text-muted px-1">Ouvre la page GoCardless de saisie du RIB — le client signe sur place, ici.</p>
                         </div>
                       )}
                       {selectedContact.gocardlessCustomerId && (
