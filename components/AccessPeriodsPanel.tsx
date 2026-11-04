@@ -9,10 +9,10 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' });
 
 const STATUS: Record<AccessPeriod['status'], { label: string; cls: string }> = {
-  scheduled: { label: 'À venir', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  active: { label: 'En cours', cls: 'bg-green-50 text-green-700 border-green-200' },
-  ended: { label: 'Terminé', cls: 'bg-gray-100 text-gray-500 border-gray-200' },
-  cancelled: { label: 'Annulé', cls: 'bg-gray-100 text-gray-400 border-gray-200 line-through' },
+  scheduled: { label: 'À venir', cls: 'bg-warning-soft text-warning-text border-warning-soft' },
+  active: { label: 'En cours', cls: 'bg-success-soft text-success-text border-success-soft' },
+  ended: { label: 'Terminé', cls: 'bg-line-soft text-muted border-line' },
+  cancelled: { label: 'Annulé', cls: 'bg-line-soft text-muted border-line line-through' },
 };
 
 const PAYMENTS = ['Espèces', 'Carte bancaire', 'Chèque', 'Virement'];
@@ -93,14 +93,14 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl p-3 space-y-3">
+    <div className="bg-surface border border-line p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-muted flex items-center gap-1.5">
           <CalendarClock size={13} /> Ventes à la période
         </span>
         {!open && (
           <button type="button" onClick={() => setOpen(true)}
-            className="flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800">
+            className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-dark">
             <Plus size={13} /> Nouvelle vente
           </button>
         )}
@@ -108,28 +108,28 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
 
       {/* Liste des passes */}
       {loading ? (
-        <div className="py-3 flex justify-center text-gray-300"><Loader2 size={16} className="animate-spin" /></div>
+        <div className="py-3 flex justify-center text-subtle"><Loader2 size={16} className="animate-spin" /></div>
       ) : periods.length === 0 ? (
-        <p className="text-[12px] text-gray-400">Aucune vente à la période. Utilise « Nouvelle vente » pour une entrée à la semaine, etc.</p>
+        <p className="text-xs text-muted">Aucune vente à la période. Utilise « Nouvelle vente » pour une entrée à la semaine, etc.</p>
       ) : (
         <div className="space-y-1.5">
           {periods.map((p) => {
             const st = STATUS[p.status];
             const cancellable = p.status === 'active' || p.status === 'scheduled';
             return (
-              <div key={p.id} className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2">
-                <Ticket size={14} className="text-gray-400 shrink-0" />
+              <div key={p.id} className="flex items-center gap-2 bg-ground-2 border border-line px-3 py-2">
+                <Ticket size={14} className="text-muted shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-gray-900 truncate">
+                  <p className="text-sm font-semibold text-ink truncate">
                     {p.label}
-                    {p.amount_cents != null && <span className="text-gray-400 font-normal"> · {(p.amount_cents / 100).toFixed(2)} €</span>}
+                    {p.amount_cents != null && <span className="text-muted font-normal"> · {(p.amount_cents / 100).toFixed(2)} €</span>}
                   </p>
-                  <p className="text-[11px] text-gray-500">{fmt(p.starts_on)} → {fmt(p.ends_on)}</p>
+                  <p className="text-xs text-muted">{fmt(p.starts_on)} → {fmt(p.ends_on)}</p>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${st.cls}`}>{st.label}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 border ${st.cls}`}>{st.label}</span>
                 {cancellable && (
                   <button type="button" onClick={() => doCancel(p)} disabled={busy}
-                    className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50" title="Annuler">
+                    className="p-1 text-muted hover:text-danger-text hover:bg-danger-soft disabled:opacity-50" title="Annuler">
                     <X size={14} />
                   </button>
                 )}
@@ -141,72 +141,72 @@ const AccessPeriodsPanel: React.FC<Props> = ({ memberId, onChanged }) => {
 
       {/* Formulaire de création */}
       {open && (
-        <div className="border-t border-gray-100 pt-3 space-y-2.5">
+        <div className="border-t border-line pt-3 space-y-2.5">
           <div className="flex gap-1.5">
             <button type="button" onClick={() => setMode('sale')}
-              className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg border ${mode === 'sale' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+              className={`flex-1 text-xs font-semibold py-1.5 border ${mode === 'sale' ? 'bg-primary text-white border-primary' : 'bg-surface text-muted border-line'}`}>
               Vente (encaissement)
             </button>
             <button type="button" onClick={() => setMode('manual')}
-              className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg border ${mode === 'manual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+              className={`flex-1 text-xs font-semibold py-1.5 border ${mode === 'manual' ? 'bg-primary text-white border-primary' : 'bg-surface text-muted border-line'}`}>
               Accès simple (sans vente)
             </button>
           </div>
 
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Libellé (ex. Entrée semaine)"
-            className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            className="w-full bg-ground-2 border border-line px-2.5 py-2 text-sm font-semibold outline-none" />
 
           {mode === 'sale' && (
             <input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Montant €"
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+              className="w-full bg-ground-2 border border-line px-2.5 py-2 text-sm font-semibold outline-none" />
           )}
 
           <div className="flex items-center gap-2">
             <div className="flex-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Début</label>
+              <label className="text-xs font-semibold text-muted">Début</label>
               <input type="date" value={startsOn} max={endsOn || undefined} onChange={(e) => setStartsOn(e.target.value)}
-                className="w-full mt-0.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none" />
+                className="w-full mt-0.5 bg-ground-2 border border-line px-2.5 py-1.5 text-sm outline-none" />
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Fin (incluse)</label>
+              <label className="text-xs font-semibold text-muted">Fin (incluse)</label>
               <input type="date" value={endsOn} min={startsOn || undefined} onChange={(e) => setEndsOn(e.target.value)}
-                className="w-full mt-0.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-medium outline-none" />
+                className="w-full mt-0.5 bg-ground-2 border border-line px-2.5 py-1.5 text-sm outline-none" />
             </div>
           </div>
 
           {mode === 'sale' && (
             <div className="flex items-center gap-2">
               <select value={payment} onChange={(e) => setPayment(e.target.value)}
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-2 text-sm font-medium outline-none">
+                className="flex-1 bg-ground-2 border border-line px-2.5 py-2 text-sm outline-none">
                 {PAYMENTS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
           )}
 
-          {msg && <p className="text-[12px] text-red-600 font-semibold">{msg}</p>}
+          {msg && <p className="text-xs text-danger-text font-semibold">{msg}</p>}
 
           <div className="flex items-center gap-2 pt-0.5">
             {mode === 'manual' ? (
               <button type="button" onClick={doManual} disabled={busy || !validCommon}
-                className="flex-1 flex items-center justify-center gap-1.5 bg-gray-900 text-white py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-black disabled:opacity-40">
+                className="flex-1 flex items-center justify-center gap-1.5 bg-ink text-white py-2 text-xs font-semibold hover:bg-black disabled:opacity-40">
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Activer sur la période
               </button>
             ) : (
               <>
                 <button type="button" onClick={doCash} disabled={busy || !validSale}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-gray-900 text-white py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-black disabled:opacity-40">
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-ink text-white py-2 text-xs font-semibold hover:bg-black disabled:opacity-40">
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <Banknote size={14} />} Encaisser
                 </button>
                 <button type="button" onClick={doStripe} disabled={busy || !validSale}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 text-white py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-40">
+                  className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-white py-2 text-xs font-semibold hover:bg-primary-dark disabled:opacity-40">
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />} Payer par carte
                 </button>
               </>
             )}
-            <button type="button" onClick={reset} disabled={busy} className="px-2 text-[11px] font-bold text-gray-400 hover:text-gray-600">Fermer</button>
+            <button type="button" onClick={reset} disabled={busy} className="px-2 text-xs font-semibold text-muted hover:text-ink-2">Fermer</button>
           </div>
           {mode === 'sale' && (
-            <p className="text-[10.5px] text-gray-400">Espèces/CB : encaissement enregistré tout de suite. Carte : un onglet de paiement s'ouvre, l'encaissement est enregistré à la confirmation.</p>
+            <p className="text-[10.5px] text-muted">Espèces/CB : encaissement enregistré tout de suite. Carte : un onglet de paiement s'ouvre, l'encaissement est enregistré à la confirmation.</p>
           )}
         </div>
       )}

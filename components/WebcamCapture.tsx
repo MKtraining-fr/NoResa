@@ -48,20 +48,20 @@ const WebcamCapture: React.FC<{ onCapture: (file: File) => void; onClose: () => 
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="font-bold text-gray-900 flex items-center gap-2"><Camera size={18} /> Prendre une photo</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500"><X size={18} /></button>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-ink/50" onClick={onClose}>
+      <div className="bg-surface w-full max-w-lg shadow-modal overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between">
+          <h3 className="font-semibold text-ink flex items-center gap-2"><Camera size={18} /> Prendre une photo</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-line-soft text-muted"><X size={18} /></button>
         </div>
         <div className="p-5">
           {err ? (
             <div className="py-10 text-center">
-              <AlertCircle size={30} className="mx-auto text-red-500" />
-              <p className="mt-3 text-sm font-semibold text-gray-700">{err}</p>
+              <AlertCircle size={30} className="mx-auto text-danger-text" />
+              <p className="mt-3 text-sm font-semibold text-ink-2">{err}</p>
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
+            <div className="relative overflow-hidden bg-black aspect-video">
               {!snapshot
                 ? <video ref={videoRef} playsInline muted className="w-full h-full object-cover" />
                 : <img src={snapshot} alt="" className="w-full h-full object-cover" />}
@@ -70,11 +70,11 @@ const WebcamCapture: React.FC<{ onCapture: (file: File) => void; onClose: () => 
           {!err && (
             <div className="flex justify-center gap-3 mt-4">
               {!snapshot ? (
-                <button onClick={capture} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700"><Camera size={18} /> Capturer</button>
+                <button onClick={capture} className="flex items-center gap-2 bg-primary text-white px-6 py-3 font-semibold hover:bg-primary-dark"><Camera size={18} /> Capturer</button>
               ) : (
                 <>
-                  <button onClick={retake} className="flex items-center gap-2 bg-gray-100 text-gray-600 px-5 py-3 rounded-2xl font-bold hover:bg-gray-200"><RefreshCw size={16} /> Reprendre</button>
-                  <button onClick={confirm} className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-green-700"><Check size={18} /> Utiliser cette photo</button>
+                  <button onClick={retake} className="flex items-center gap-2 bg-line-soft text-ink-2 px-5 py-3 font-semibold hover:bg-line"><RefreshCw size={16} /> Reprendre</button>
+                  <button onClick={confirm} className="flex items-center gap-2 bg-success text-white px-6 py-3 font-semibold hover:bg-success-text"><Check size={18} /> Utiliser cette photo</button>
                 </>
               )}
             </div>

@@ -125,6 +125,21 @@ export async function getGocardlessStats(): Promise<GocardlessStats> {
   return data as GocardlessStats;
 }
 
+export interface CollectionStats {
+  since: string;
+  paid: number;
+  failed: number;
+  pending: number;
+  rate: number | null;   // part des prélèvements aboutis (0 à 1)
+}
+
+/** Prélèvements des 30 derniers jours par statut. Renvoie null si GoCardless ne répond pas. */
+export async function getCollectionStats(): Promise<CollectionStats | null> {
+  const { data, error } = await supabase.functions.invoke('gocardless-collection');
+  if (error || (data as any)?.error) { console.error('getCollectionStats', error ?? (data as any).error); return null; }
+  return data as CollectionStats;
+}
+
 export interface GocardlessPayment {
   id: string;
   amount: number | null;       // en euros

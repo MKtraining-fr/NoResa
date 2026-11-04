@@ -101,7 +101,7 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
   };
 
   const inputCls =
-    'w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+    'w-full px-3 py-2 border border-line text-sm focus:outline-none ';
   const Check = ({
     k,
     label,
@@ -109,12 +109,12 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
     k: keyof typeof form;
     label: string;
   }) => (
-    <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+    <label className="flex items-start gap-2 text-sm text-ink-2 cursor-pointer">
       <input
         type="checkbox"
         checked={form[k] as boolean}
         onChange={(e) => set(k, e.target.checked as any)}
-        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        className="mt-0.5 h-4 w-4 border-subtle text-primary "
       />
       <span>{label}</span>
     </label>
@@ -122,19 +122,19 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line sticky top-0 bg-surface">
           <div className="flex items-center gap-2">
-            <span className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
+            <span className="p-2 bg-primary-soft text-primary">
               <ClipboardCheck size={18} />
             </span>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Séance d'essai</h2>
-              <p className="text-xs text-gray-500">Enregistrement du passage et de la décharge</p>
+              <h2 className="text-lg font-semibold text-ink">Séance d'essai</h2>
+              <p className="text-xs text-muted">Enregistrement du passage et de la décharge</p>
             </div>
           </div>
-          <button onClick={close} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500">
+          <button onClick={close} className="p-2 hover:bg-line-soft text-muted">
             <X size={18} />
           </button>
         </div>
@@ -142,7 +142,7 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
         {/* Body */}
         <div className="px-6 py-5 space-y-5">
           {error && (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="flex items-start gap-2 border border-warning-soft bg-warning-soft px-4 py-3 text-sm text-warning-text">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -151,35 +151,35 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
           {/* Identité */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Nom *</label>
+              <label className="block text-xs text-ink-2 mb-1">Nom *</label>
               <input className={inputCls} value={form.lastName} onChange={(e) => set('lastName', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Prénom *</label>
+              <label className="block text-xs text-ink-2 mb-1">Prénom *</label>
               <input className={inputCls} value={form.firstName} onChange={(e) => set('firstName', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Date de naissance</label>
+              <label className="block text-xs text-ink-2 mb-1">Date de naissance</label>
               <input type="date" className={inputCls} value={form.dateOfBirth} onChange={(e) => set('dateOfBirth', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Téléphone</label>
+              <label className="block text-xs text-ink-2 mb-1">Téléphone</label>
               <input className={inputCls} value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="06…" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <label className="block text-xs text-ink-2 mb-1">Email</label>
               <input type="email" className={inputCls} value={form.email} onChange={(e) => set('email', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Adresse postale</label>
+              <label className="block text-xs text-ink-2 mb-1">Adresse postale</label>
               <input className={inputCls} value={form.postalAddress} onChange={(e) => set('postalAddress', e.target.value)} />
             </div>
           </div>
-          <p className="text-xs text-gray-400 -mt-2">Téléphone ou email requis (pour éviter les doublons).</p>
+          <p className="text-xs text-muted -mt-2">Téléphone ou email requis (pour éviter les doublons).</p>
 
           {/* Déclarations / décharge */}
-          <div className="space-y-2.5 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3">
-            <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Décharge & déclarations</p>
+          <div className="space-y-2.5 bg-ground-2 border border-line px-4 py-3">
+            <p className="text-xs font-semibold text-ink-2">Décharge & déclarations</p>
             <Check k="healthDeclaration" label="Je déclare être en bonne condition physique et ne présenter aucune contre-indication médicale à la pratique d'activités sportives." />
             <Check k="rulesAcknowledged" label="J'ai pris connaissance du règlement intérieur et des consignes de sécurité, et m'engage à les respecter." />
             <Check k="liabilityWaiver" label="Je dégage La Salle, ses employés et représentants de toute responsabilité en cas de blessure ou accident (sauf faute lourde de la salle)." />
@@ -190,31 +190,31 @@ const TrialSessionModal: React.FC<Props> = ({ open, onClose, onCreated }) => {
 
           {/* Lu et approuvé */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">« Lu et approuvé » — Nom et prénom *</label>
+            <label className="block text-xs text-ink-2 mb-1">« Lu et approuvé » — Nom et prénom *</label>
             <input
               className={inputCls}
               value={form.signedName}
               onChange={(e) => set('signedName', e.target.value)}
               placeholder="Lu et approuvé — Prénom NOM"
             />
-            <p className="text-xs text-gray-400 mt-1">Horodaté automatiquement à la validation (valeur probante).</p>
+            <p className="text-xs text-muted mt-1">Horodaté automatiquement à la validation (valeur probante).</p>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optionnel)</label>
+            <label className="block text-xs text-ink-2 mb-1">Notes (optionnel)</label>
             <textarea className={inputCls} rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white rounded-b-2xl">
-          <button onClick={close} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-line sticky bottom-0 bg-surface">
+          <button onClick={close} className="px-4 py-2 border border-line text-sm text-ink-2 hover:bg-ground-2">
             Annuler
           </button>
           <button
             onClick={submit}
             disabled={!canSubmit || submitting}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2 bg-primary text-white text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting && <Loader2 size={16} className="animate-spin" />}
             Enregistrer la séance

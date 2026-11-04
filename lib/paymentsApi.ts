@@ -24,6 +24,33 @@ export async function getMemberPayments(memberId: string, limit = 50): Promise<M
   return (data ?? []) as MemberPayment[];
 }
 
+export interface RecentPayment {
+  id: string;
+  member_id: string | null;
+  member_name: string;
+  payment_type: string | null;
+  amount: number | null;
+  payment_date: string | null;
+  payment_method: string | null;
+  status: string | null;
+  notes: string | null;
+}
+
+/** Derniers paiements de la salle, tous membres confondus. */
+export async function listRecentPayments(limit = 100): Promise<RecentPayment[]> {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('id, member_id, payment_type, amount, payment_date, payment_method, status, notes, members(first_name, last_name)')
+    .order('payment_date', { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) { console.error('listRecentPayments', error); throw error; }
+  return (data ?? []).map((r: any) => ({
+    id: r.id, member_id: r.member_id, payment_type: r.payment_type, amount: r.amount, payment_date: r.payment_date,
+    payment_method: r.payment_method, status: r.status, notes: r.notes,
+    member_name: `${r.members?.first_name ?? ''} ${r.members?.last_name ?? ''}`.trim() || 'Client de passage',
+  }));
+}
+
 /** Modes de régularisation proposés (libellé → code stocké, conforme à la contrainte payments). */
 export const REGULARIZE_METHODS: { code: 'cash' | 'credit_card' | 'bank_transfer'; label: string }[] = [
   { code: 'cash', label: 'Espèces' },

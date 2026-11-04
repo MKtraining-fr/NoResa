@@ -23,6 +23,9 @@ import WebcamCapture from '../../components/WebcamCapture';
 import MergeMembersModal from '../../components/MergeMembersModal';
 import { Member, ContactStatus, Product } from '../../types';
 import { listProspects, type ProspectContact } from '../../lib/prospectsApi';
+import { Button, ChevronCell, EmptyState, Input, MemberCell, PageHeader, Select, Skeleton, Table, Tabs, Tag, Td, Th, Tr } from '../../components/ui';
+import type { TagTone } from '../../components/ui/Tag';
+import { phone as formatPhone } from '../../lib/format';
 
 // Initiales (ex. "Jean Dupont" -> "JD") pour les avatars, en attendant les photos webcam.
 const getInitials = (first?: string, last?: string): string => {
@@ -36,6 +39,19 @@ interface CRMPageProps {
   tab?: string;
 }
 
+
+// Statut affiché : jamais la valeur brute de la base.
+const contactStatus = (m: any): { label: string; tone: TagTone } => {
+  if (m.accessBlocked) return { label: 'Bloqué', tone: 'danger' };
+  switch (m.status) {
+    case 'MEMBER_ACTIVE': return { label: 'Actif', tone: 'success' };
+    case 'MEMBER_INACTIVE': return { label: 'Inactif', tone: 'neutral' };
+    case 'PARTNER': return { label: 'Partenaire', tone: 'neutral' };
+    case 'PROSPECT_TRIAL': return { label: "Séance d'essai", tone: 'warning' };
+    case 'PROSPECT_FOLLOWUP': return { label: 'À relancer', tone: 'warning' };
+    default: return { label: 'Prospect', tone: 'neutral' };
+  }
+};
 
 const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [activeTab, setActiveTab] = useState(tab);
@@ -73,6 +89,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   
   // State database & search
   const [contacts, setContacts] = useState<Member[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(true);
   const [prospectContacts, setProspectContacts] = useState<ProspectContact[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
@@ -135,7 +152,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
   useEffect(() => {
     const load = () => {
-      getMembers().then(setContacts).catch(console.error);
+      getMembers().then(setContacts).catch(console.error).finally(() => setContactsLoading(false));
       listProspects().then(setProspectContacts).catch(console.error);
     };
     load();
@@ -158,6 +175,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
   const [groupTree, setGroupTree] = useState<GroupNode[]>([]);
   const [savingGroup, setSavingGroup] = useState(false);
   const [filterGroup, setFilterGroup] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [filterSubgroup, setFilterSubgroup] = useState('');
   useEffect(() => { getGroupTree().then(setGroupTree).catch(() => {}); }, []);
 
@@ -238,7 +256,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       await resendActivationEmail(selectedContact.id);
       alert(`E-mail d'activation envoyé à ${selectedContact.email}.`);
     } catch (e: any) {
-      alert("Envoi impossible : " + (e?.message || ''));
+      alert("Envoi impossible :" + (e?.message || ''));
     } finally { setResendingActivation(false); }
   };
 
@@ -681,7 +699,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         // Stoppe le prélèvement en cours s'il y en a un (conserve le mandat réutilisable).
         if (hasMandate) {
           const resCancel = await cancelSubscriptionKeepMandate(selectedContact.id, formulaDraft.label, price, method, formulaDraft.periodicity || undefined);
-          if (resCancel.error) { alert("Échec de l'arrêt du prélèvement : " + resCancel.error); return; }
+          if (resCancel.error) { alert("Échec de l'arrêt du prélèvement :" + resCancel.error); return; }
         }
         await recordFormulaPayment({
           memberId: selectedContact.id, label: formulaDraft.label, price, method,
@@ -867,7 +885,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
         alert(`Membre créé (n° ${m.memberNumber || ''}).`);
       }
     } catch (e) {
-      alert("Échec de l'inscription : " + ((e as Error)?.message || ''));
+      alert("Échec de l'inscription :" + ((e as Error)?.message || ''));
     } finally {
       setSubmitting(false);
     }
@@ -979,6 +997,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
       );
     }
 
+    if (activeTab === 'membres' && filterStatus) {
+      filtered = filtered.filter((m: any) =>
+        filterStatus === 'blocked' ? m.accessBlocked
+          : filterStatus === 'active' ? m.status === 'MEMBER_ACTIVE' && !m.accessBlocked
+            : m.status === 'MEMBER_INACTIVE');
+    }
+
     const num = (m: any) => parseInt(m.memberNumber || '0', 10) || 0;
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
@@ -995,193 +1020,146 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
     return sorted;
   };
 
+  const filteredRows = getFilteredData();
+  const memberCount = contacts.filter((m) => m.status === 'MEMBER_ACTIVE').length;
+  const listSubtitle = contactsLoading ? '\u00a0'
+    : activeTab === 'membres' ? `${memberCount} actifs${searchTerm || filterGroup || filterStatus ? ` · ${filteredRows.length} affichés` : ''}`
+      : `${filteredRows.length} fiche${filteredRows.length > 1 ? 's' : ''}`;
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
-            <span className="bg-indigo-100 text-indigo-600 p-2 rounded-xl">
-              {activeTab === 'prospects' ? <Target size={18} /> : activeTab === 'membres' ? <UserCheck size={18} /> : <Briefcase size={18} />}
-            </span>
-            <span>CRM - {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</span>
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Gestion et suivi de votre base de données.</p>
+    <div className="space-y-4">
+      <PageHeader
+        title={activeTab === 'prospects' ? 'Prospects' : activeTab === 'partenaires' ? 'Partenaires' : 'Membres'}
+        subtitle={listSubtitle}
+        ruled={false}
+        actions={<>
+          <Button variant="secondary" icon={Trash2} onClick={openArchived}>Archivés</Button>
+          <Button
+            icon={UserPlus}
+            onClick={() => { if (activeTab === 'membres' || activeTab === undefined) { window.location.hash = '#/app/inscription'; } else { setIsAddModalOpen(true); } }}
+          >
+            {activeTab === 'partenaires' ? 'Ajouter un partenaire' : activeTab === 'prospects' ? 'Ajouter un prospect' : 'Nouvelle inscription'}
+          </Button>
+        </>}
+      />
+
+      <Tabs
+        value={activeTab}
+        onChange={setActiveTab}
+        items={[{ value: 'membres', label: 'Membres' }, { value: 'prospects', label: 'Prospects' }, { value: 'partenaires', label: 'Partenaires' }]}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" size={16} />
+          <Input
+            aria-label="Rechercher"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={activeTab === 'partenaires' ? 'Nom, téléphone…' : 'Nom, n° client, téléphone…'}
+            className="pl-9"
+          />
         </div>
-        <button 
-          onClick={() => { if (activeTab === 'membres' || activeTab === undefined) { window.location.hash = '#/app/inscription'; } else { setIsAddModalOpen(true); } }}
-          className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-        >
-          <UserPlus size={18} />
-          <span>{activeTab === 'partenaires' ? 'Ajouter un Partenaire' : activeTab === 'prospects' ? 'Ajouter un Prospect' : 'Nouvelle inscription'}</span>
-        </button>
+        <Select aria-label="Groupe" value={filterGroup} onChange={(e) => { setFilterGroup(e.target.value); setFilterSubgroup(''); }}>
+          <option value="">Tous les groupes</option>
+          {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+        </Select>
+        {filterGroup && (groupTree.find((g) => g.name === filterGroup)?.subgroups.length ?? 0) > 0 && (
+          <Select aria-label="Sous-groupe" value={filterSubgroup} onChange={(e) => setFilterSubgroup(e.target.value)}>
+            <option value="">Tous les sous-groupes</option>
+            {(groupTree.find((g) => g.name === filterGroup)?.subgroups ?? []).map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </Select>
+        )}
+        {activeTab === 'membres' && (
+          <Select aria-label="Statut" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">Statut : tous</option>
+            <option value="active">Actifs</option>
+            <option value="inactive">Inactifs</option>
+            <option value="blocked">Bloqués</option>
+          </Select>
+        )}
+        <Select aria-label="Trier" value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="ml-auto">
+          <option value="name_asc">Trier : nom A → Z</option>
+          <option value="name_desc">Trier : nom Z → A</option>
+          <option value="number_asc">Trier : n° client croissant</option>
+          <option value="number_desc">Trier : n° client décroissant</option>
+          <option value="date_desc">Trier : inscription récente</option>
+          <option value="date_asc">Trier : inscription ancienne</option>
+        </Select>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
-        <div className="px-6 border-b border-gray-100 flex items-center overflow-x-auto pwa-hide-scrollbar">
-          {['Membres', 'Prospects', 'Partenaires'].map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t.toLowerCase())}
-              className={`px-6 py-4 text-sm font-bold border-b-2 transition-all shrink-0 ${
-                activeTab === t.toLowerCase() 
-                  ? 'border-indigo-600 text-indigo-600' 
-                  : 'border-transparent text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {t}
-            </button>
+      <Table>
+        <thead>
+          <tr>
+            <Th>{activeTab === 'partenaires' ? 'Entreprise' : 'Membre'}</Th>
+            <Th>N° client</Th>
+            <Th>Téléphone</Th>
+            <Th>Abonnement</Th>
+            <Th>Statut</Th>
+            <Th />
+          </tr>
+        </thead>
+        <tbody>
+          {contactsLoading && contacts.length === 0 && [0, 1, 2, 3, 4, 5].map((i) => (
+            <tr key={i}><td colSpan={6} className="px-4 py-2.5 border-b border-line-soft"><Skeleton className="h-8 w-full" /></td></tr>
           ))}
-        </div>
-
-        <div className="p-6 bg-gray-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-grow max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={`Rechercher un ${activeTab.slice(0, -1)}...`}
-              className="w-full bg-white border border-gray-200 rounded-xl py-2.5 pl-12 pr-4 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium"
-            />
-          </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <Layers size={15} className="text-gray-400" />
-            <select
-              value={filterGroup}
-              onChange={(e) => { setFilterGroup(e.target.value); setFilterSubgroup(''); }}
-              className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium text-gray-700"
-            >
-              <option value="">Tous les groupes</option>
-              {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
-            </select>
-            {filterGroup && (groupTree.find((g) => g.name === filterGroup)?.subgroups.length ?? 0) > 0 && (
-              <select
-                value={filterSubgroup}
-                onChange={(e) => setFilterSubgroup(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-medium text-gray-700"
-              >
-                <option value="">Tous les sous-groupes</option>
-                {(groupTree.find((g) => g.name === filterGroup)?.subgroups ?? []).map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-              </select>
-            )}
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Trier</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold text-gray-700"
-            >
-              <option value="name_asc">Nom (A → Z)</option>
-              <option value="name_desc">Nom (Z → A)</option>
-              <option value="number_asc">N° client (croissant)</option>
-              <option value="number_desc">N° client (décroissant)</option>
-              <option value="date_desc">Inscription (récent)</option>
-              <option value="date_asc">Inscription (ancien)</option>
-            </select>
-            <button
-              type="button"
-              onClick={openArchived}
-              className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl py-2.5 px-4 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
-              title="Voir les fiches archivées"
-            >
-              <Trash2 size={16} /> Archivés
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 text-gray-400 text-xs font-bold uppercase tracking-wider border-y border-gray-100">
-                <th className="px-6 py-4">{activeTab === 'partenaires' ? 'Entreprise / Contact' : 'Nom / Prénom'}</th>
-                <th className="px-6 py-4">N° Client</th>
-                <th className="px-6 py-4">Téléphone</th>
-                <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {getFilteredData().map((member: any) => (
-                <tr
-                  key={member.id}
-                  onClick={() => { if (activeTab === 'prospects' && member.__kind === 'lead') return; openContactDetails(member); }}
-                  className="hover:bg-indigo-50/30 cursor-pointer transition-colors group"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl shadow-sm bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-semibold uppercase shrink-0" aria-hidden="true">
-                        {getInitials(member.firstName, member.lastName)}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">
-                          {member.status === 'PARTNER' ? member.lastName : `${member.firstName} ${member.lastName}`}
-                        </p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">{member.email || 'Pas d\'email'}</p>
-                      </div>
-                    </div>
+          {filteredRows.map((member: any) => {
+            const status = contactStatus(member);
+            const isLead = activeTab === 'prospects' && member.__kind === 'lead';
+            return (
+              <Tr key={member.id} onClick={isLead ? undefined : () => openContactDetails(member)}>
+                <Td><MemberCell name={member.status === 'PARTNER' ? member.lastName : `${member.firstName} ${member.lastName}`} email={member.email} /></Td>
+                <Td>{member.memberNumber}</Td>
+                <Td className="whitespace-nowrap">{member.phone ? formatPhone(member.phone) : null}</Td>
+                <Td>{member.subscription}</Td>
+                <Td><Tag tone={status.tone}>{status.label}</Tag></Td>
+                {isLead ? (
+                  <td className="px-4 py-2.5 border-b border-line-soft text-right">
+                    <Button variant="secondary" onClick={(e) => { e.stopPropagation(); convertProspect(member); }}>Convertir en membre</Button>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-gray-900">{member.memberNumber || '—'}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-gray-700">{member.phone || '—'}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                      member.status === 'MEMBER_ACTIVE' || member.status === 'PARTNER' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {member.status.replace('MEMBER_', '').replace('PROSPECT_', '')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {activeTab === 'prospects' && member.__kind === 'lead' ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); convertProspect(member); }}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
-                      >
-                        Convertir en membre
-                      </button>
-                    ) : (
-                      <button className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"><ChevronRight size={18} /></button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                ) : <ChevronCell />}
+              </Tr>
+            );
+          })}
+        </tbody>
+      </Table>
+      {!contactsLoading && filteredRows.length === 0 && (
+        <EmptyState title={searchTerm || filterGroup || filterStatus ? 'Aucun résultat' : 'Aucune fiche'}>
+          {searchTerm || filterGroup || filterStatus ? 'Essaie un autre filtre ou un autre terme.' : undefined}
+        </EmptyState>
+      )}
 
       {/* MODALE AJOUT UNIFIEE */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-ink/50 animate-in fade-in duration-300">
+          <div className="bg-surface w-full max-w-4xl max-h-[90vh] overflow-hidden animate-in duration-300 flex flex-col">
             
-            <div className="p-5 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+            <div className="p-5 bg-primary text-white flex justify-between items-center shrink-0">
               <div className="flex items-center space-x-4">
-                <div className="bg-white/20 p-3 rounded-2xl shadow-inner">
+                <div className="p-3 bg-ink-2">
                   <UserPlus size={28} />
                 </div>
                 <div>
                   <h2 className="text-2xl font-semibold">Ajouter un {activeTab.slice(0, -1)}</h2>
-                  <p className="text-indigo-100 text-xs font-bold uppercase tracking-wide mt-0.5">Enregistrement complet du profil</p>
+                  <p className="text-primary-soft text-xs font-semibold mt-0.5">Enregistrement complet du profil</p>
                 </div>
               </div>
-              <button onClick={closeAddModal} className="p-2 hover:bg-white/10 rounded-xl transition-all"><X size={24} /></button>
+              <button onClick={closeAddModal} className="p-2 hover:bg-white/10 transition-colors"><X size={24} /></button>
             </div>
 
             {mandateResult && (
               <div className="p-6 space-y-6 text-center overflow-y-auto">
-                <div className="mx-auto w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><CheckCircle2 size={32} /></div>
+                <div className="mx-auto w-16 h-16 rounded-full bg-success-soft text-success-text flex items-center justify-center"><CheckCircle2 size={32} /></div>
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900">Fiche créée{mandateResult.member_number ? ` (n° ${mandateResult.member_number})` : ''}</h3>
-                  <p className="text-sm font-medium text-gray-500 mt-1">Dernière étape : le client signe son mandat de prélèvement (sur place ou via ce lien).</p>
+                  <h3 className="text-xl font-semibold text-ink">Fiche créée{mandateResult.member_number ? ` (n° ${mandateResult.member_number})` : ''}</h3>
+                  <p className="text-sm text-muted mt-1">Dernière étape : le client signe son mandat de prélèvement (sur place ou via ce lien).</p>
                 </div>
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 text-left break-all text-xs font-bold text-gray-600">{mandateResult.authorisation_url}</div>
+                <div className="bg-ground-2 border border-line p-4 text-left break-all text-xs font-semibold text-ink-2">{mandateResult.authorisation_url}</div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <a href={mandateResult.authorisation_url} target="_blank" rel="noreferrer" className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-semibold text-sm uppercase tracking-wide hover:bg-indigo-700 transition-colors">Ouvrir la signature</a>
-                  <button type="button" onClick={() => { try { navigator.clipboard?.writeText(mandateResult.authorisation_url); } catch (_) {} }} className="px-8 py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold text-sm uppercase tracking-wide hover:bg-gray-200 transition-colors">Copier le lien</button>
+                  <a href={mandateResult.authorisation_url} target="_blank" rel="noreferrer" className="px-8 py-4 bg-primary text-white font-semibold text-sm hover:bg-primary-dark transition-colors">Ouvrir la signature</a>
+                  <button type="button" onClick={() => { try { navigator.clipboard?.writeText(mandateResult.authorisation_url); } catch (_) {} }} className="px-8 py-4 bg-line-soft text-ink-2 font-semibold text-sm hover:bg-line transition-colors">Copier le lien</button>
                 </div>
-                <button type="button" onClick={closeAddModal} className="text-xs font-bold text-gray-400 hover:text-gray-600 underline">Terminer</button>
+                <button type="button" onClick={closeAddModal} className="text-xs font-semibold text-muted hover:text-ink-2 underline">Terminer</button>
               </div>
             )}
 
@@ -1191,20 +1169,20 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 <div className="space-y-6">
-                  <h3 className="text-xs font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
+                  <h3 className="text-xs font-semibold text-primary flex items-center space-x-2">
                     <User size={14} /> <span>1. Informations Générales</span>
                   </h3>
 
                   {activeTab !== 'partenaires' && (
                     <div className="flex items-center space-x-4">
-                      <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="w-20 h-20 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden hover:border-indigo-400 transition-all shrink-0">
-                        {addPhotoPreview ? <img src={addPhotoPreview} alt="" className="w-full h-full object-cover" /> : <Camera size={22} className="text-gray-300" />}
+                      <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="w-20 h-20 bg-ground-2 border-2 border-dashed border-line flex items-center justify-center overflow-hidden hover:border-primary transition-colors shrink-0">
+                        {addPhotoPreview ? <img src={addPhotoPreview} alt="" className="w-full h-full object-cover" /> : <Camera size={22} className="text-subtle" />}
                       </button>
                       <div>
-                        <p className="text-xs font-semibold text-gray-700">Photo du membre</p>
+                        <p className="text-xs font-semibold text-ink-2">Photo du membre</p>
                         <div className="flex items-center gap-3 mt-1">
-                          <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:underline"><Upload size={13} /> Importer</button>
-                          <button type="button" onClick={() => setWebcamFor('add')} className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:underline"><Camera size={13} /> Webcam</button>
+                          <button type="button" onClick={() => addPhotoInputRef.current?.click()} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"><Upload size={13} /> Importer</button>
+                          <button type="button" onClick={() => setWebcamFor('add')} className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"><Camera size={13} /> Webcam</button>
                         </div>
                       </div>
                       <input ref={addPhotoInputRef} type="file" accept="image/*" onChange={handleAddPhoto} className="hidden" />
@@ -1214,12 +1192,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {activeTab === 'partenaires' ? (
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom de l'entreprise</label>
-                        <input type="text" required value={partnerCompany} onChange={(e) => setPartnerCompany(e.target.value)} placeholder="FitSupply Ltd" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Nom de l'entreprise</label>
+                        <input type="text" required value={partnerCompany} onChange={(e) => setPartnerCompany(e.target.value)} placeholder="FitSupply Ltd" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Catégorie</label>
-                        <select value={partnerCategory} onChange={(e) => setPartnerCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                        <label className="text-xs font-semibold text-muted">Catégorie</label>
+                        <select value={partnerCategory} onChange={(e) => setPartnerCategory(e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none">
                           <option value="Équipementier">Équipementier</option>
                           <option value="Nutrition">Nutrition</option>
                           <option value="Santé / Kiné">Santé / Kiné</option>
@@ -1230,12 +1208,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prénom</label>
-                        <input type="text" required value={addFirstName} onChange={(e) => setAddFirstName(e.target.value)} placeholder="Jean" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Prénom</label>
+                        <input type="text" required value={addFirstName} onChange={(e) => setAddFirstName(e.target.value)} placeholder="Jean" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom</label>
-                        <input type="text" required value={addLastName} onChange={(e) => setAddLastName(e.target.value)} placeholder="Dupont" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Nom</label>
+                        <input type="text" required value={addLastName} onChange={(e) => setAddLastName(e.target.value)} placeholder="Dupont" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                     </div>
                   )}
@@ -1243,73 +1221,73 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {activeTab !== 'partenaires' && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Date de Naissance</label>
-                        <input type="date" required value={addDob} onChange={(e) => setAddDob(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Date de Naissance</label>
+                        <input type="date" required value={addDob} onChange={(e) => setAddDob(e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Métier</label>
-                        <input type="text" value={addJob} onChange={(e) => setAddJob(e.target.value)} placeholder="Ingénieur, Chef..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Métier</label>
+                        <input type="text" value={addJob} onChange={(e) => setAddJob(e.target.value)} placeholder="Ingénieur, Chef..." className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                     </div>
                   )}
 
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
+                      <label className="text-xs font-semibold text-muted flex items-center space-x-1">
                         <Mail size={10} /> <span>Email {activeTab === 'partenaires' ? 'de contact' : ''}</span>
                       </label>
-                      <input type="email" required value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="contact@domaine.com" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <input type="email" required value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="contact@domaine.com" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
+                      <label className="text-xs font-semibold text-muted flex items-center space-x-1">
                         <Phone size={10} /> <span>Téléphone</span>
                       </label>
-                      <input type="tel" required value={addPhone} onChange={(e) => setAddPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <input type="tel" required value={addPhone} onChange={(e) => setAddPhone(e.target.value)} placeholder="06 12 34 56 78" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-1">
+                      <label className="text-xs font-semibold text-muted flex items-center space-x-1">
                         <MapPin size={10} /> <span>Adresse</span>
                       </label>
-                      <input type="text" value={addAddress} onChange={(e) => setAddAddress(e.target.value)} placeholder="12 rue des Lilas" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <input type="text" value={addAddress} onChange={(e) => setAddAddress(e.target.value)} placeholder="12 rue des Lilas" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Code postal</label>
-                        <input type="text" value={addPostalCode} onChange={(e) => setAddPostalCode(e.target.value)} placeholder="11400" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Code postal</label>
+                        <input type="text" value={addPostalCode} onChange={(e) => setAddPostalCode(e.target.value)} placeholder="11400" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                       <div className="col-span-2 space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Ville</label>
-                        <input type="text" value={addCity} onChange={(e) => setAddCity(e.target.value)} placeholder="Castelnaudary" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                        <label className="text-xs font-semibold text-muted">Ville</label>
+                        <input type="text" value={addCity} onChange={(e) => setAddCity(e.target.value)} placeholder="Castelnaudary" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-6">
-                  <h3 className="text-xs font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
+                  <h3 className="text-xs font-semibold text-primary flex items-center space-x-2">
                     <Target size={14} /> <span>2. {activeTab === 'membres' ? 'Formule & Paiement' : 'Qualification & Suivi'}</span>
                   </h3>
 
                   {activeTab === 'membres' ? (
                     <div className="space-y-5">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Formule d'abonnement</label>
-                        <select value={addFormula} onChange={(e) => selectFormula(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
+                        <label className="text-xs font-semibold text-muted">Formule d'abonnement</label>
+                        <select value={addFormula} onChange={(e) => selectFormula(e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none">
                           <option value="">— Choisir une formule —</option>
                           {formulaOptions.map(f => <option key={f.id} value={f.name}>{f.name} ({f.price.toFixed(2).replace('.', ',')} €)</option>)}
                         </select>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prix (€)</label>
-                          <input type="text" value={addPrice} onChange={(e) => setAddPrice(e.target.value)} placeholder="29.90" className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                          <label className="text-xs font-semibold text-muted">Prix (€)</label>
+                          <input type="text" value={addPrice} onChange={(e) => setAddPrice(e.target.value)} placeholder="29.90" className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Périodicité</label>
-                          <select value={addPeriodicity} onChange={(e) => setAddPeriodicity(e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                          <label className="text-xs font-semibold text-muted">Périodicité</label>
+                          <select value={addPeriodicity} onChange={(e) => setAddPeriodicity(e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none">
                             <option>Mensuel</option>
                             <option>Trimestriel</option>
                             <option>Annuel</option>
@@ -1318,26 +1296,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-5 bg-indigo-50 rounded-2xl border border-indigo-100">
+                      <div className="flex items-center justify-between p-5 bg-primary-soft border border-line">
                         <div className="flex items-center space-x-3">
-                          <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><CreditCard size={20} /></div>
+                          <div className="bg-surface p-2 text-primary"><CreditCard size={20} /></div>
                           <div>
-                            <p className="text-sm font-semibold text-indigo-900">Prélèvement GoCardless</p>
-                            <p className="text-[10px] font-bold text-indigo-400 uppercase">Génère un mandat à faire signer</p>
+                            <p className="text-sm font-semibold text-primary-dark">Prélèvement GoCardless</p>
+                            <p className="text-xs font-semibold text-primary">Génère un mandat à faire signer</p>
                           </div>
                         </div>
-                        <button type="button" onClick={() => setUseMandate(!useMandate)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${useMandate ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${useMandate ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <button type="button" onClick={() => setUseMandate(!useMandate)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${useMandate ? 'bg-primary' : 'bg-subtle'}`}>
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-surface transition-transform ${useMandate ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                       </div>
-                      {useMandate && <p className="text-[11px] font-bold text-gray-400 px-1">Un lien de signature sera généré : le client le signe sur place (tablette) ou via le lien. L'email est alors obligatoire.</p>}
+                      {useMandate && <p className="text-xs font-semibold text-muted px-1">Un lien de signature sera généré : le client le signe sur place (tablette) ou via le lien. L'email est alors obligatoire.</p>}
 
                       {!useMandate && (
-                        <div className="space-y-3 p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Paiement & période (sans prélèvement)</p>
+                        <div className="space-y-3 p-5 bg-ground-2 border border-line">
+                          <p className="text-xs font-semibold text-muted">Paiement & période (sans prélèvement)</p>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
-                            <select value={addPaymentMethod} onChange={(e) => setAddPaymentMethod(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10">
+                            <label className="text-xs font-semibold text-muted">Mode de paiement</label>
+                            <select value={addPaymentMethod} onChange={(e) => setAddPaymentMethod(e.target.value)} className="w-full bg-surface border border-line px-4 py-3 text-sm font-semibold outline-none">
                               <option>Espèces</option>
                               <option>Carte bancaire</option>
                               <option>Chèque</option>
@@ -1347,12 +1325,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div className="space-y-1">
-                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Début</label>
-                              <input type="date" value={addStartDate} onChange={(e) => onStartChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                              <label className="text-xs font-semibold text-muted">Début</label>
+                              <input type="date" value={addStartDate} onChange={(e) => onStartChange(e.target.value)} className="w-full bg-surface border border-line px-4 py-3 text-sm font-semibold outline-none" />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Durée</label>
-                              <select value={addDuration} onChange={(e) => onDurationChange(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                              <label className="text-xs font-semibold text-muted">Durée</label>
+                              <select value={addDuration} onChange={(e) => onDurationChange(e.target.value)} className="w-full bg-surface border border-line px-4 py-3 text-sm font-semibold outline-none">
                                 <option>1 mois</option>
                                 <option>3 mois</option>
                                 <option>6 mois</option>
@@ -1361,30 +1339,30 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                               </select>
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Fin</label>
-                              <input type="date" value={addEndDate} onChange={(e) => setAddEndDate(e.target.value)} className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                              <label className="text-xs font-semibold text-muted">Fin</label>
+                              <input type="date" value={addEndDate} onChange={(e) => setAddEndDate(e.target.value)} className="w-full bg-surface border border-line px-4 py-3 text-sm font-semibold outline-none" />
                             </div>
                           </div>
-                          <p className="text-[11px] font-bold text-gray-400 px-1">La date de fin se calcule automatiquement selon la durée, et reste modifiable. Elle sert aux alertes de renouvellement du tableau de bord.</p>
+                          <p className="text-xs font-semibold text-muted px-1">La date de fin se calcule automatiquement selon la durée, et reste modifiable. Elle sert aux alertes de renouvellement du tableau de bord.</p>
                         </div>
                       )}
                     </div>
                   ) : (
                     <>
-                      <div className="space-y-4 p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Étape de conversion</label>
+                      <div className="space-y-4 p-6 bg-ground-2 border border-line">
+                        <label className="text-xs font-semibold text-muted">Étape de conversion</label>
                         <div className="grid grid-cols-1 gap-2">
                           {activeTab === 'prospects' ? (
                             ['PROSPECT_NEW', 'PROSPECT_FOLLOWUP', 'PROSPECT_TRIAL'].map(status => (
-                              <label key={status} className="flex items-center space-x-3 p-3 bg-white rounded-xl border border-transparent hover:border-indigo-200 cursor-pointer transition-all">
-                                <input type="radio" name="status" value={status} checked={addStatus === status} onChange={() => setAddStatus(status as ContactStatus)} className="w-4 h-4 text-indigo-600" />
-                                <span className="text-xs font-bold">
+                              <label key={status} className="flex items-center space-x-3 p-3 bg-surface border border-transparent hover:border-line cursor-pointer transition-colors">
+                                <input type="radio" name="status" value={status} checked={addStatus === status} onChange={() => setAddStatus(status as ContactStatus)} className="w-4 h-4 text-primary" />
+                                <span className="text-xs font-semibold">
                                   {status === 'PROSPECT_NEW' ? 'Nouveau Prospect' : status === 'PROSPECT_FOLLOWUP' ? 'Relancé' : 'En période d\'essai'}
                                 </span>
                               </label>
                             ))
                           ) : (
-                            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-indigo-700 text-xs font-bold flex items-center space-x-2">
+                            <div className="p-3 bg-primary-soft border border-line text-primary-dark text-xs font-semibold flex items-center space-x-2">
                               <Briefcase size={16} /> <span>Partenaire Officiel</span>
                             </div>
                           )}
@@ -1392,29 +1370,29 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
 
                       {activeTab === 'prospects' && (
-                        <div className="flex items-center justify-between p-6 bg-indigo-50 rounded-2xl border border-indigo-100">
+                        <div className="flex items-center justify-between p-6 bg-primary-soft border border-line">
                           <div className="flex items-center space-x-3">
-                            <div className="bg-white p-2 rounded-xl text-indigo-600 shadow-sm"><Activity size={20} /></div>
+                            <div className="bg-surface p-2 text-primary"><Activity size={20} /></div>
                             <div>
-                              <p className="text-sm font-semibold text-indigo-900">Séance d'essai</p>
-                              <p className="text-[10px] font-bold text-indigo-400 uppercase">A-t-il testé la salle ?</p>
+                              <p className="text-sm font-semibold text-primary-dark">Séance d'essai</p>
+                              <p className="text-xs font-semibold text-primary">A-t-il testé la salle ?</p>
                             </div>
                           </div>
-                          <button type="button" onClick={() => setTrialSession(!trialSession)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${trialSession ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${trialSession ? 'translate-x-6' : 'translate-x-1'}`} />
+                          <button type="button" onClick={() => setTrialSession(!trialSession)} className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${trialSession ? 'bg-primary' : 'bg-subtle'}`}>
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-surface transition-transform ${trialSession ? 'translate-x-6' : 'translate-x-1'}`} />
                           </button>
                         </div>
                       )}
                     </>
                   )}
 
-                  <div className="p-6 bg-red-50/50 rounded-2xl border border-red-100 space-y-4">
-                    <div className="flex items-center space-x-2 text-red-600">
+                  <div className="p-6 bg-danger-soft border border-danger-soft space-y-4">
+                    <div className="flex items-center space-x-2 text-danger-text">
                       <ShieldAlert size={16} />
-                      <span className="text-[10px] font-semibold uppercase tracking-wide">Notes & Informations complémentaires</span>
+                      <span className="text-xs font-semibold">Notes & Informations complémentaires</span>
                     </div>
                     <div className="w-full">
-                      <textarea rows={3} value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Commentaires ou objectifs du membre/prospect..." className="w-full bg-white border border-red-100 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 focus:ring-red-100"></textarea>
+                      <textarea rows={3} value={addNotes} onChange={(e) => setAddNotes(e.target.value)} placeholder="Commentaires ou objectifs du membre/prospect..." className="w-full bg-surface border border-danger-soft px-4 py-3 text-xs font-semibold outline-none"></textarea>
                     </div>
                   </div>
                 </div>
@@ -1423,13 +1401,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             )}
 
             {!mandateResult && (
-            <div className="p-5 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
-               <button onClick={closeAddModal} className="px-6 py-4 text-gray-400 font-bold text-sm hover:text-gray-600">Annuler</button>
+            <div className="p-5 border-t border-line flex items-center justify-between shrink-0 bg-surface">
+               <button onClick={closeAddModal} className="px-6 py-4 text-muted font-semibold text-sm hover:text-ink-2">Annuler</button>
                {activeTab === 'membres' ? (
                  <button
                    onClick={handleInscribeMember}
                    disabled={submitting}
-                   className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-60"
+                   className="flex items-center space-x-2 bg-primary text-white px-10 py-4 font-semibold text-sm hover:bg-primary-dark transition-colors disabled:opacity-60"
                  >
                    <Save size={18} />
                    <span>{submitting ? 'Création…' : (useMandate ? 'Inscrire + générer le mandat' : 'Inscrire le membre')}</span>
@@ -1437,7 +1415,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                ) : (
                  <button
                   onClick={handleSaveAdd}
-                  className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                  className="flex items-center space-x-2 bg-primary text-white px-10 py-4 font-semibold text-sm hover:bg-primary-dark transition-colors"
                  >
                    <Save size={18} />
                    <span>Enregistrer le {activeTab.slice(0, -1)}</span>
@@ -1451,17 +1429,16 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
       {/* MODALE DE DETAIL CONTACT ENRICHE (Consultation) */}
       {isDetailModalOpen && selectedContact && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-xl overflow-hidden animate-in zoom-in duration-300 flex flex-col">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-ink/50 animate-in fade-in duration-300">
+          <div className="bg-surface w-full max-w-4xl max-h-[90vh] overflow-hidden animate-in duration-300 flex flex-col">
             
-            <div className={`p-10 ${activeTab === 'membres' ? 'bg-indigo-600' : activeTab === 'prospects' ? 'bg-amber-500' : 'bg-slate-800'} text-white flex items-center justify-between shrink-0 relative overflow-hidden`}>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
-              <div className="flex items-center space-x-8 relative z-10">
+            <div className="px-6 py-4 bg-surface border-b-2 border-ink flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-5 min-w-0">
                 <div className="relative shrink-0">
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="w-24 h-24 rounded-2xl border-4 border-white/20 shadow-xl bg-white/20 flex items-center justify-center text-3xl font-semibold uppercase overflow-hidden group relative"
+                    className="w-16 h-16 rounded-full bg-line-soft text-ink-2 flex items-center justify-center text-xl font-semibold overflow-hidden group relative"
                     title="Ajouter ou changer la photo"
                   >
                     {photoUrl ? (
@@ -1469,39 +1446,39 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     ) : (
                       <span>{getInitials(selectedContact.firstName, selectedContact.lastName)}</span>
                     )}
-                    <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="absolute inset-0 bg-ink/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Camera size={22} className="text-white" />
                     </span>
                   </button>
                   {photoUploading && (
-                    <span className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center text-white text-[10px] font-semibold uppercase tracking-wide">Envoi…</span>
+                    <span className="absolute inset-0 bg-ink/50 rounded-full flex items-center justify-center text-white text-xs font-semibold">Envoi…</span>
                   )}
-                  <button type="button" onClick={() => setWebcamFor('member')} title="Prendre une photo (webcam)" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-white text-indigo-600 shadow-lg flex items-center justify-center border border-gray-200 hover:bg-indigo-50"><Camera size={13} /></button>
+                  <button type="button" onClick={() => setWebcamFor('member')} title="Prendre une photo (webcam)" className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-surface text-primary flex items-center justify-center border border-line hover:bg-primary-soft"><Camera size={13} /></button>
                   <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-semibold">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
+                  <h2 className="text-2xl font-extrabold text-ink truncate">{activeTab === 'partenaires' ? selectedContact.company : `${selectedContact.firstName} ${selectedContact.lastName}`}</h2>
                   <div className="flex items-center space-x-3 mt-2">
-                    <span className="bg-white/20 px-3 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide">
-                      {activeTab === 'prospects' ? 'Prospect chaud' : activeTab === 'membres' ? (selectedContact.subscription || 'Membre Actif') : selectedContact.category}
+                    <span className="bg-line-soft text-ink-2 px-2 py-0.5 text-xs font-semibold">
+                      {activeTab === 'prospects' ? 'Prospect' : activeTab === 'membres' ? (selectedContact.subscription || 'Membre actif') : selectedContact.category}
                     </span>
                     {activeTab === 'membres' && (
-                      <span className="flex items-center text-[10px] font-bold">
-                        <Zap size={10} className="mr-1" /> N° adhérent {selectedContact.memberNumber || '—'}
+                      <span className="text-sm text-muted">
+                        N° adhérent {selectedContact.memberNumber || '—'}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-              <button onClick={closeDetail} className="p-3 hover:bg-white/10 rounded-2xl transition-colors relative z-10"><X size={28} /></button>
+              <button aria-label="Fermer" onClick={closeDetail} className="h-9 w-9 inline-flex items-center justify-center shrink-0 text-ink hover:bg-ground transition-colors"><X size={18} /></button>
             </div>
 
             {/* Onglets de navigation interne à la fiche client */}
             {activeTab === 'membres' && (
-              <div className="px-10 border-b border-gray-100 flex items-center bg-gray-50/50">
-                <button onClick={() => setDetailTab('profil')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'profil' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Profil</button>
-                <button onClick={() => setDetailTab('activite')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'activite' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Visites & Cours</button>
-                <button onClick={() => setDetailTab('finance')} className={`px-6 py-4 text-xs font-semibold uppercase tracking-wide border-b-4 transition-all ${detailTab === 'finance' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400'}`}>Abonnement & Achats</button>
+              <div className="px-10 border-b border-line flex items-center bg-ground-2">
+                <button onClick={() => setDetailTab('profil')} className={`px-6 py-4 text-xs font-semibold border-b-4 transition-colors ${detailTab === 'profil' ? 'border-primary text-primary' : 'border-transparent text-muted'}`}>Profil</button>
+                <button onClick={() => setDetailTab('activite')} className={`px-6 py-4 text-xs font-semibold border-b-4 transition-colors ${detailTab === 'activite' ? 'border-primary text-primary' : 'border-transparent text-muted'}`}>Visites & Cours</button>
+                <button onClick={() => setDetailTab('finance')} className={`px-6 py-4 text-xs font-semibold border-b-4 transition-colors ${detailTab === 'finance' ? 'border-primary text-primary' : 'border-transparent text-muted'}`}>Abonnement & Achats</button>
               </div>
             )}
 
@@ -1509,57 +1486,57 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
               {isEditing ? (
                 <div className="max-w-2xl mx-auto space-y-6">
-                  <h3 className="text-[10px] font-semibold text-indigo-600 uppercase tracking-wide flex items-center space-x-2">
+                  <h3 className="text-xs font-semibold text-primary flex items-center space-x-2">
                     <Edit2 size={14} /> <span>Modifier la fiche</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Prénom</label>
-                      <input type="text" value={selectedContact.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <label className="text-xs font-semibold text-muted">Prénom</label>
+                      <input type="text" value={selectedContact.firstName || ''} onChange={(e) => updateField('firstName', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Nom</label>
-                      <input type="text" value={selectedContact.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Email</label>
-                      <input type="email" value={selectedContact.email || ''} onChange={(e) => updateField('email', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Téléphone</label>
-                      <input type="tel" value={selectedContact.phone || ''} onChange={(e) => updateField('phone', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <label className="text-xs font-semibold text-muted">Nom</label>
+                      <input type="text" value={selectedContact.lastName || ''} onChange={(e) => updateField('lastName', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Abonnement</label>
-                      <input type="text" value={selectedContact.subscription || ''} onChange={(e) => updateField('subscription', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <label className="text-xs font-semibold text-muted">Email</label>
+                      <input type="email" value={selectedContact.email || ''} onChange={(e) => updateField('email', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tarif (€)</label>
-                      <input type="number" step="0.01" value={selectedContact.price ?? ''} onChange={(e) => updateField('price', e.target.value === '' ? undefined : Number(e.target.value))} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <label className="text-xs font-semibold text-muted">Téléphone</label>
+                      <input type="tel" value={selectedContact.phone || ''} onChange={(e) => updateField('phone', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Statut</label>
-                      <select value={selectedContact.status === 'MEMBER_ACTIVE' ? 'MEMBER_ACTIVE' : 'MEMBER_INACTIVE'} onChange={(e) => updateField('status', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none">
+                      <label className="text-xs font-semibold text-muted">Abonnement</label>
+                      <input type="text" value={selectedContact.subscription || ''} onChange={(e) => updateField('subscription', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted">Tarif (€)</label>
+                      <input type="number" step="0.01" value={selectedContact.price ?? ''} onChange={(e) => updateField('price', e.target.value === '' ? undefined : Number(e.target.value))} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted">Statut</label>
+                      <select value={selectedContact.status === 'MEMBER_ACTIVE' ? 'MEMBER_ACTIVE' : 'MEMBER_INACTIVE'} onChange={(e) => updateField('status', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none">
                         <option value="MEMBER_ACTIVE">Actif</option>
                         <option value="MEMBER_INACTIVE">Inactif</option>
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
-                      <input type="text" value={selectedContact.paymentMethod || ''} onChange={(e) => updateField('paymentMethod', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10" />
+                      <label className="text-xs font-semibold text-muted">Mode de paiement</label>
+                      <input type="text" value={selectedContact.paymentMethod || ''} onChange={(e) => updateField('paymentMethod', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none" />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Notes</label>
-                    <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"></textarea>
+                    <label className="text-xs font-semibold text-muted">Notes</label>
+                    <textarea rows={3} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} className="w-full bg-ground-2 border border-line px-4 py-3 text-sm font-semibold outline-none"></textarea>
                   </div>
-                  <p className="text-[11px] font-bold text-gray-400">L'adresse et la photo (webcam) seront modifiables dans une prochaine étape.</p>
+                  <p className="text-xs font-semibold text-muted">L'adresse et la photo (webcam) seront modifiables dans une prochaine étape.</p>
                 </div>
               ) : (
               <>
@@ -1569,52 +1546,52 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {/* Identifiants compacts : n° adhérent · badge · code clavier */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* N° adhérent */}
-                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Hash size={11} /> N° adhérent</p>
+                    <div className="bg-ground-2 px-4 py-3">
+                      <p className="text-xs font-semibold text-muted mb-1 flex items-center gap-1"><Hash size={11} /> N° adhérent</p>
                       {editingNumber ? (
                         <div className="flex items-center gap-1">
-                          <input type="text" value={numberDraft} onChange={(e) => setNumberDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold" placeholder="ex. 338" />
-                          <button type="button" onClick={handleSaveNumber} disabled={savingNumber} className="p-1.5 bg-indigo-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
-                          <button type="button" onClick={() => setEditingNumber(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                          <input type="text" value={numberDraft} onChange={(e) => setNumberDraft(e.target.value)} className="w-full bg-surface border border-line py-1.5 px-2 outline-none text-sm font-semibold" placeholder="ex. 338" />
+                          <button type="button" onClick={handleSaveNumber} disabled={savingNumber} className="p-1.5 bg-primary text-white disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingNumber(false)} className="p-1.5 bg-line text-muted"><X size={13} /></button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-gray-900">{selectedContact.memberNumber || '—'}</span>
-                          <button type="button" onClick={startEditNumber} className="p-1 text-gray-300 hover:text-indigo-600 transition-colors"><Edit2 size={13} /></button>
+                          <span className="text-lg font-semibold text-ink">{selectedContact.memberNumber || '—'}</span>
+                          <button type="button" onClick={startEditNumber} className="p-1 text-subtle hover:text-primary transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
                     </div>
                     {/* Badge */}
-                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><CreditCard size={11} /> Badge</p>
+                    <div className="bg-ground-2 px-4 py-3">
+                      <p className="text-xs font-semibold text-muted mb-1 flex items-center gap-1"><CreditCard size={11} /> Badge</p>
                       {editingCard ? (
                         <div className="flex items-center gap-1">
-                          <input type="text" value={cardDraft} onChange={(e) => setCardDraft(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-red-500/20 text-sm font-bold" placeholder="ex. 3616701" />
-                          <button type="button" onClick={handleGenerateCard} title="Générer" className="p-1.5 bg-gray-200 text-gray-600 rounded-lg"><RotateCcw size={13} /></button>
-                          <button type="button" onClick={handleSaveCard} disabled={savingCard} className="p-1.5 bg-red-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
-                          <button type="button" onClick={() => setEditingCard(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                          <input type="text" value={cardDraft} onChange={(e) => setCardDraft(e.target.value)} className="w-full bg-surface border border-line py-1.5 px-2 outline-none text-sm font-semibold" placeholder="ex. 3616701" />
+                          <button type="button" onClick={handleGenerateCard} title="Générer" className="p-1.5 bg-line text-ink-2"><RotateCcw size={13} /></button>
+                          <button type="button" onClick={handleSaveCard} disabled={savingCard} className="p-1.5 bg-primary text-white disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingCard(false)} className="p-1.5 bg-line text-muted"><X size={13} /></button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-gray-900">{selectedContact.cardNumber || '—'}</span>
-                          <button type="button" onClick={startEditCard} className="p-1 text-gray-300 hover:text-red-600 transition-colors"><Edit2 size={13} /></button>
+                          <span className="text-lg font-semibold text-ink">{selectedContact.cardNumber || '—'}</span>
+                          <button type="button" onClick={startEditCard} className="p-1 text-subtle hover:text-danger-text transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
                     </div>
                     {/* Code clavier */}
-                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Hash size={11} /> Code clavier</p>
+                    <div className="bg-ground-2 px-4 py-3">
+                      <p className="text-xs font-semibold text-muted mb-1 flex items-center gap-1"><Hash size={11} /> Code clavier</p>
                       {editingCode ? (
                         <div className="flex items-center gap-1">
-                          <input type="text" inputMode="numeric" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500/20 text-sm font-bold tracking-wide" placeholder="6 chiffres" />
-                          <button type="button" onClick={handleGenerateCode} title="Générer" className="p-1.5 bg-gray-200 text-gray-600 rounded-lg"><RotateCcw size={13} /></button>
-                          <button type="button" onClick={handleSaveCode} disabled={savingCode} className="p-1.5 bg-amber-600 text-white rounded-lg disabled:opacity-50"><Save size={13} /></button>
-                          <button type="button" onClick={() => setEditingCode(false)} className="p-1.5 bg-gray-200 text-gray-500 rounded-lg"><X size={13} /></button>
+                          <input type="text" inputMode="numeric" value={codeDraft} onChange={(e) => setCodeDraft(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full bg-surface border border-line py-1.5 px-2 outline-none text-sm font-semibold" placeholder="6 chiffres" />
+                          <button type="button" onClick={handleGenerateCode} title="Générer" className="p-1.5 bg-line text-ink-2"><RotateCcw size={13} /></button>
+                          <button type="button" onClick={handleSaveCode} disabled={savingCode} className="p-1.5 bg-warning text-white disabled:opacity-50"><Save size={13} /></button>
+                          <button type="button" onClick={() => setEditingCode(false)} className="p-1.5 bg-line text-muted"><X size={13} /></button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-gray-900 tracking-wide">{(selectedContact as any).keypadCode || '—'}</span>
-                          <button type="button" onClick={startEditCode} className="p-1 text-gray-300 hover:text-amber-600 transition-colors"><Edit2 size={13} /></button>
+                          <span className="text-lg font-semibold text-ink">{(selectedContact as any).keypadCode || '—'}</span>
+                          <button type="button" onClick={startEditCode} className="p-1 text-subtle hover:text-warning-text transition-colors"><Edit2 size={13} /></button>
                         </div>
                       )}
                     </div>
@@ -1622,20 +1599,20 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {/* Groupe / sous-groupe */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><Layers size={11} /> Groupe</p>
+                    <div className="bg-ground-2 px-4 py-3">
+                      <p className="text-xs font-semibold text-muted mb-1 flex items-center gap-1"><Layers size={11} /> Groupe</p>
                       <select
                         value={(selectedContact as any).groupName || ''}
                         onChange={(e) => saveGroupField('group_name', e.target.value)}
                         disabled={savingGroup}
-                        className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold disabled:opacity-50"
+                        className="w-full bg-surface border border-line py-1.5 px-2 outline-none text-sm font-semibold disabled:opacity-50"
                       >
                         <option value="">— Aucun —</option>
                         {groupTree.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
                       </select>
                     </div>
-                    <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1"><CornerDownRight size={11} /> Sous-groupe</p>
+                    <div className="bg-ground-2 px-4 py-3">
+                      <p className="text-xs font-semibold text-muted mb-1 flex items-center gap-1"><CornerDownRight size={11} /> Sous-groupe</p>
                       {(() => {
                         const subs = groupTree.find((g) => g.name === (selectedContact as any).groupName)?.subgroups ?? [];
                         return (
@@ -1643,7 +1620,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             value={(selectedContact as any).subgroupName || ''}
                             onChange={(e) => saveGroupField('subgroup_name', e.target.value)}
                             disabled={savingGroup || !(selectedContact as any).groupName || subs.length === 0}
-                            className="w-full bg-white border border-gray-200 rounded-lg py-1.5 px-2 outline-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-semibold disabled:opacity-50"
+                            className="w-full bg-surface border border-line py-1.5 px-2 outline-none text-sm font-semibold disabled:opacity-50"
                           >
                             <option value="">{!(selectedContact as any).groupName ? '— Choisir un groupe —' : subs.length === 0 ? '— Aucun sous-groupe —' : '— Aucun —'}</option>
                             {subs.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -1654,78 +1631,78 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   </div>
 
                   {/* Note interne (compacte) */}
-                  <div className="rounded-xl border border-gray-100 p-3">
+                  <div className="border border-line p-3">
                     <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex items-center gap-1.5"><StickyNote size={12} className="text-amber-500" /> Note interne <span className="normal-case font-medium text-gray-300">· visible au contrôle d'accès</span></p>
-                      <button type="button" onClick={saveNote} disabled={savingNote} className="text-[10px] font-bold uppercase tracking-wide text-amber-600 hover:text-amber-700 disabled:opacity-40">{savingNote ? '…' : 'Enregistrer'}</button>
+                      <p className="text-xs font-semibold text-muted flex items-center gap-1.5"><StickyNote size={12} className="text-warning-text" /> Note interne <span className="normal-case text-subtle">· visible au contrôle d'accès</span></p>
+                      <button type="button" onClick={saveNote} disabled={savingNote} className="text-xs font-semibold text-warning-text hover:text-warning-text disabled:opacity-40">{savingNote ? '…' : 'Enregistrer'}</button>
                     </div>
-                    <textarea rows={2} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} placeholder="Ex. paiement en attente, blessure, consigne accueil…" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/20 resize-none" />
+                    <textarea rows={2} value={selectedContact.notes || ''} onChange={(e) => updateField('notes', e.target.value)} placeholder="Ex. paiement en attente, blessure, consigne accueil…" className="w-full bg-ground-2 border border-line px-3 py-2 text-sm outline-none resize-none" />
                   </div>
 
                   {/* Carte 10 séances : séances restantes */}
                   {packStatus?.is_pack && (
-                    <div className={`rounded-2xl p-4 border ${packStatus.remaining === 0 ? 'bg-red-50 border-red-100' : packStatus.remaining <= 3 ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100'}`}>
+                    <div className={`p-4 border ${packStatus.remaining === 0 ? 'bg-danger-soft border-danger-soft' : packStatus.remaining <= 3 ? 'bg-warning-soft border-warning-soft' : 'bg-success-soft border-success-soft'}`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 flex items-center gap-1.5"><CalendarCheck size={13} /> {packStatus.total === 1 ? 'Séance unique' : `Carte ${packStatus.total} séances`}</span>
-                        <span className={`text-sm font-semibold ${packStatus.remaining === 0 ? 'text-red-700' : packStatus.remaining <= 3 ? 'text-amber-700' : 'text-green-700'}`}>
+                        <span className="text-xs font-semibold text-muted flex items-center gap-1.5"><CalendarCheck size={13} /> {packStatus.total === 1 ? 'Séance unique' : `Carte ${packStatus.total} séances`}</span>
+                        <span className={`text-sm font-semibold ${packStatus.remaining === 0 ? 'text-danger-text' : packStatus.remaining <= 3 ? 'text-warning-text' : 'text-success-text'}`}>
                           {packStatus.remaining === 0 ? 'Épuisée — accès bloqué' : `${packStatus.remaining} séance${packStatus.remaining > 1 ? 's' : ''} restante${packStatus.remaining > 1 ? 's' : ''}`}
                         </span>
                       </div>
                       <div className="h-2.5 w-full bg-white/70 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${packStatus.remaining === 0 ? 'bg-red-500' : packStatus.remaining <= 3 ? 'bg-amber-500' : 'bg-green-500'}`} style={{ width: `${Math.min(100, (packStatus.used / packStatus.total) * 100)}%` }} />
+                        <div className={`h-full rounded-full ${packStatus.remaining === 0 ? 'bg-primary' : packStatus.remaining <= 3 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${Math.min(100, (packStatus.used / packStatus.total) * 100)}%` }} />
                       </div>
-                      <p className="text-[11px] font-bold text-gray-400 mt-1.5">{packStatus.used} / {packStatus.total} séances utilisées</p>
+                      <p className="text-xs font-semibold text-muted mt-1.5">{packStatus.used} / {packStatus.total} séances utilisées</p>
                     </div>
                   )}
 
                   {/* Bandeau « accès bloqué » + motif */}
                   {(selectedContact as any).accessBlocked && (
-                    <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
-                      <ShieldAlert size={16} className="text-red-600 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2.5 bg-danger-soft border border-danger-soft px-4 py-3">
+                      <ShieldAlert size={16} className="text-danger-text shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-red-700">Accès bloqué</p>
-                        <p className="text-sm font-semibold text-red-900 break-words">{(selectedContact as any).accessBlockReason || 'Sans motif précisé'}</p>
+                        <p className="text-xs font-semibold text-danger-text">Accès bloqué</p>
+                        <p className="text-sm font-semibold text-danger-text break-words">{(selectedContact as any).accessBlockReason || 'Sans motif précisé'}</p>
                       </div>
                     </div>
                   )}
 
                   {/* Contrôle d'accès (compact) */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
-                    <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-gray-900 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
-                    <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-green-700 disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
-                    <button type="button" onClick={openBlockModal} disabled={accessBusy} className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-700 disabled:opacity-50"><X size={13} /> Bloquer</button>
+                    <span className="text-xs font-semibold text-muted flex items-center gap-1.5 mr-1"><ShieldAlert size={13} /> Accès</span>
+                    <button type="button" onClick={() => sendAccess('grant')} disabled={accessBusy} className="flex items-center gap-1.5 bg-ink text-white px-3 py-2 font-semibold text-xs hover:bg-black disabled:opacity-50"><UserCheck size={13} /> Activer</button>
+                    <button type="button" onClick={() => sendAccess('unblock')} disabled={accessBusy} className="flex items-center gap-1.5 bg-success text-white px-3 py-2 font-semibold text-xs hover:bg-success-text disabled:opacity-50"><CheckCircle2 size={13} /> Débloquer</button>
+                    <button type="button" onClick={openBlockModal} disabled={accessBusy} className="flex items-center gap-1.5 bg-primary text-white px-3 py-2 font-semibold text-xs hover:bg-primary-dark disabled:opacity-50"><X size={13} /> Bloquer</button>
                   </div>
 
                   {/* Blocage programmé (date future) */}
                   {(selectedContact as any).accessBlockScheduledAt ? (
-                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                      <Clock size={14} className="text-amber-600 shrink-0" />
-                      <p className="text-[12px] font-bold text-amber-800 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 bg-warning-soft border border-warning-soft px-3 py-2">
+                      <Clock size={14} className="text-warning-text shrink-0" />
+                      <p className="text-xs font-semibold text-warning-text flex-1 min-w-0">
                         Blocage programmé le {new Date((selectedContact as any).accessBlockScheduledAt).toLocaleDateString('fr-FR')}
                         {(selectedContact as any).accessBlockScheduledReason ? ` · ${(selectedContact as any).accessBlockScheduledReason}` : ''}
                       </p>
-                      <button type="button" onClick={cancelScheduledBlock} disabled={accessBusy} className="text-[11px] font-bold text-amber-700 hover:text-amber-900 underline shrink-0">Annuler</button>
+                      <button type="button" onClick={cancelScheduledBlock} disabled={accessBusy} className="text-xs font-semibold text-warning-text hover:text-warning-text underline shrink-0">Annuler</button>
                     </div>
                   ) : scheduleOpen ? (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Programmer un blocage</p>
+                    <div className="bg-ground-2 border border-line p-3 space-y-2">
+                      <p className="text-xs font-semibold text-muted">Programmer un blocage</p>
                       <div className="flex flex-wrap items-center gap-2">
-                        <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none" />
-                        <input type="text" value={scheduleReason} onChange={(e) => setScheduleReason(e.target.value)} placeholder="Motif (facultatif)" className="flex-1 min-w-[140px] bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm outline-none" />
-                        <button type="button" onClick={saveScheduledBlock} disabled={accessBusy || !scheduleDate} className="bg-gray-900 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] uppercase tracking-wide disabled:opacity-50">Programmer</button>
-                        <button type="button" onClick={() => { setScheduleOpen(false); setScheduleDate(''); setScheduleReason(''); }} className="text-[11px] font-bold text-gray-400 px-2">Fermer</button>
+                        <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="bg-surface border border-line px-2.5 py-1.5 text-sm font-semibold outline-none" />
+                        <input type="text" value={scheduleReason} onChange={(e) => setScheduleReason(e.target.value)} placeholder="Motif (facultatif)" className="flex-1 min-w-[140px] bg-surface border border-line px-2.5 py-1.5 text-sm outline-none" />
+                        <button type="button" onClick={saveScheduledBlock} disabled={accessBusy || !scheduleDate} className="bg-ink text-white px-3 py-1.5 font-semibold text-xs disabled:opacity-50">Programmer</button>
+                        <button type="button" onClick={() => { setScheduleOpen(false); setScheduleDate(''); setScheduleReason(''); }} className="text-xs font-semibold text-muted px-2">Fermer</button>
                       </div>
-                      <p className="text-[10.5px] text-gray-400">L'accès sera coupé automatiquement à cette date (sans tolérance).</p>
+                      <p className="text-[10.5px] text-muted">L'accès sera coupé automatiquement à cette date (sans tolérance).</p>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => setScheduleOpen(true)} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-amber-600">
+                    <button type="button" onClick={() => setScheduleOpen(true)} className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-warning-text">
                       <Clock size={13} /> Programmer un blocage à une date
                     </button>
                   )}
 
                   {/* Conversion en profil staff (quitte les vues membres) */}
-                  <button type="button" onClick={convertToStaff} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-indigo-600">
+                  <button type="button" onClick={convertToStaff} className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary">
                     <ShieldAlert size={13} /> Passer en profil staff (masquer des membres)
                   </button>
 
@@ -1735,22 +1712,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                     const dname = `${d.firstName} ${d.lastName}`.trim() || '—';
                     const byEmail = d.matchType === 'email';
                     return (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+                      <div className="border border-warning-soft bg-warning-soft p-3.5">
                         <div className="flex items-start gap-2">
-                          <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                          <AlertTriangle size={16} className="text-warning-text shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <p className="text-[12px] font-bold text-amber-800">{byEmail ? 'Rapprochement possible' : 'Doublon potentiel (même nom)'}</p>
-                            <p className="text-[11.5px] text-amber-700 mt-0.5 leading-relaxed">
+                            <p className="text-xs font-semibold text-warning-text">{byEmail ? 'Rapprochement possible' : 'Doublon potentiel (même nom)'}</p>
+                            <p className="text-[11.5px] text-warning-text mt-0.5 leading-relaxed">
                               {byEmail ? 'Une autre fiche utilise le même e-mail : ' : 'Une autre fiche porte le même nom : '}
                               <b>{dname}</b>
                               {d.memberNumber ? ` (n° ${d.memberNumber})` : ''}{d.hasAccount ? ' · a un compte app' : ''}.
                               {byEmail
-                                ? " C'est sûrement le compte créé sur l'app à relier à cette fiche."
+                                ?" C'est sûrement le compte créé sur l'app à relier à cette fiche."
                                 : ' Vérifie qu’il s’agit bien de la même personne avant de rapprocher (homonyme possible).'}
                               {emailDupes.length > 1 ? ` (+${emailDupes.length - 1} autre${emailDupes.length - 1 > 1 ? 's' : ''})` : ''}
                             </p>
                             <button type="button" onClick={() => { setMergePrefill(d); setMergeOpen(true); }}
-                              className="mt-2 inline-flex items-center gap-1.5 bg-amber-500 text-white px-3.5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide hover:bg-amber-600">
+                              className="mt-2 inline-flex items-center gap-1.5 bg-warning text-white px-3.5 py-2 text-xs font-semibold hover:bg-warning">
                               <Link2 size={13} /> {byEmail ? 'Rapprocher les fiches' : 'Vérifier et rapprocher'}
                             </button>
                           </div>
@@ -1760,56 +1737,56 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   })()}
 
                   {/* Fusion de deux fiches en doublon */}
-                  <button type="button" onClick={() => { setMergePrefill(null); setMergeOpen(true); }} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-red-600">
+                  <button type="button" onClick={() => { setMergePrefill(null); setMergeOpen(true); }} className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-danger-text">
                     <Link2 size={13} /> Fusionner avec une fiche en doublon
                   </button>
 
                   {/* Renvoi de l'e-mail d'activation (création de mot de passe app) */}
-                  <button type="button" onClick={resendActivation} disabled={resendingActivation} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-indigo-600 disabled:opacity-50">
+                  <button type="button" onClick={resendActivation} disabled={resendingActivation} className="flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary disabled:opacity-50">
                     <Mail size={13} /> {resendingActivation ? 'Envoi…' : "Renvoyer l'e-mail d'activation (app)"}
                   </button>
 
                   {/* Contact + abonnement résumé */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-3">
-                      <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><User size={14} /> <span>Contact</span></h3>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Email</span>
-                        <span className="text-sm font-semibold text-gray-900 truncate ml-3">{selectedContact.email || '—'}</span>
+                      <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><User size={14} /> <span>Contact</span></h3>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Email</span>
+                        <span className="text-sm font-semibold text-ink truncate ml-3">{selectedContact.email || '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Téléphone</span>
-                        <span className="text-sm font-semibold text-gray-900">{selectedContact.phone || '—'}</span>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Téléphone</span>
+                        <span className="text-sm font-semibold text-ink">{selectedContact.phone || '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Adresse</span>
-                        <span className="text-sm font-semibold text-gray-900 text-right ml-3">{selectedContact.address || '—'}</span>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Adresse</span>
+                        <span className="text-sm font-semibold text-ink text-right ml-3">{selectedContact.address || '—'}</span>
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><Award size={14} /> <span>Abonnement</span></h3>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Formule</span>
-                        <span className="text-sm font-semibold text-gray-900 text-right ml-3">{selectedContact.subscription || '—'}</span>
+                      <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><Award size={14} /> <span>Abonnement</span></h3>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Formule</span>
+                        <span className="text-sm font-semibold text-ink text-right ml-3">{selectedContact.subscription || '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Tarif</span>
-                        <span className="text-sm font-semibold text-gray-900">{selectedContact.price != null ? `${Number(selectedContact.price).toFixed(2).replace('.', ',')} €` : '—'}</span>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Tarif</span>
+                        <span className="text-sm font-semibold text-ink">{selectedContact.price != null ? `${Number(selectedContact.price).toFixed(2).replace('.', ',')} €` : '—'}</span>
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-                        <span className="text-xs font-bold text-gray-400">Inscription</span>
-                        <span className="text-sm font-semibold text-gray-900">{selectedContact.joinDate || '—'}</span>
+                      <div className="flex items-center justify-between p-3 bg-ground-2">
+                        <span className="text-xs font-semibold text-muted">Inscription</span>
+                        <span className="text-sm font-semibold text-ink">{selectedContact.joinDate || '—'}</span>
                       </div>
                       {selectedContact.emergencyContact?.phone && (
-                        <div className="p-3 bg-red-50/50 rounded-xl border border-red-100 flex items-center justify-between">
-                          <span className="text-xs font-semibold text-red-600">Urgence</span>
-                          <span className="text-sm font-semibold text-red-900">{selectedContact.emergencyContact.phone}</span>
+                        <div className="p-3 bg-danger-soft border border-danger-soft flex items-center justify-between">
+                          <span className="text-xs font-semibold text-danger-text">Urgence</span>
+                          <span className="text-sm font-semibold text-danger-text">{selectedContact.emergencyContact.phone}</span>
                         </div>
                       )}
                       {selectedContact.notes && (
-                        <div className="flex flex-col p-3 bg-amber-50/60 rounded-xl border border-amber-100 space-y-1">
-                          <span className="text-xs font-bold text-amber-600">Notes</span>
-                          <span className="text-sm font-bold text-gray-800 leading-relaxed">{selectedContact.notes}</span>
+                        <div className="flex flex-col p-3 bg-warning-soft border border-warning-soft space-y-1">
+                          <span className="text-xs font-semibold text-warning-text">Notes</span>
+                          <span className="text-sm font-semibold text-ink leading-relaxed">{selectedContact.notes}</span>
                         </div>
                       )}
                     </div>
@@ -1821,22 +1798,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               {detailTab === 'activite' && (
                 <div className="space-y-5">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
+                    <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><CalendarCheck size={14} /> <span>Derniers passages</span></h3>
                     <div className="flex items-center gap-2">
                       {packStatus?.is_pack && (
-                        <span className={`text-[11px] font-semibold px-3 py-1.5 rounded-full ${packStatus.remaining === 0 ? 'bg-red-100 text-red-700' : packStatus.remaining <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${packStatus.remaining === 0 ? 'bg-danger-soft text-danger-text' : packStatus.remaining <= 3 ? 'bg-warning-soft text-warning-text' : 'bg-success-soft text-success-text'}`}>
                           {packStatus.remaining === 0 ? 'Carte épuisée' : `${packStatus.remaining}/${packStatus.total} restantes`}
                         </span>
                       )}
-                      <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
+                      <span className="text-xs font-semibold text-primary bg-primary-soft px-3 py-1.5 rounded-full">{visitCount} ce mois-ci</span>
                     </div>
                   </div>
 
                   {memberVisits.length === 0 && !visitsLoading ? (
-                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
-                      <div className="bg-gray-100 p-4 rounded-2xl text-gray-400 mb-4"><CalendarCheck size={28} /></div>
-                      <p className="text-sm font-semibold text-gray-700">Aucun passage enregistré</p>
-                      <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les passages au tripode et à la porte apparaîtront ici dès que le membre badgera (ou tapera son code).</p>
+                    <div className="flex flex-col items-center justify-center text-center py-16 px-6 border border-dashed border-line bg-ground-2">
+                      <div className="bg-line-soft p-4 text-muted mb-4"><CalendarCheck size={28} /></div>
+                      <p className="text-sm font-semibold text-ink-2">Aucun passage enregistré</p>
+                      <p className="text-xs font-semibold text-muted mt-2 max-w-md">Les passages au tripode et à la porte apparaîtront ici dès que le membre badgera (ou tapera son code).</p>
                     </div>
                   ) : (
                     <>
@@ -1845,17 +1822,17 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           const dt = new Date(v.access_datetime);
                           const denied = v.status === 'denied';
                           return (
-                            <div key={v.id} className="flex items-center justify-between p-3.5 bg-white border border-gray-100 rounded-2xl">
+                            <div key={v.id} className="flex items-center justify-between p-3.5 bg-surface border border-line">
                               <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${denied ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                <div className={`p-2 ${denied ? 'bg-danger-soft text-danger-text' : 'bg-success-soft text-success-text'}`}>
                                   {denied ? <X size={16} /> : <CheckCircle2 size={16} />}
                                 </div>
                                 <div>
-                                  <p className="text-sm font-semibold text-gray-900 capitalize">{dt.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
-                                  <p className="text-[11px] font-bold text-gray-400">{dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{v.identification_method === 'qr_code' ? '' : ''}</p>
+                                  <p className="text-sm font-semibold text-ink capitalize">{dt.toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
+                                  <p className="text-xs font-semibold text-muted">{dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}{v.identification_method === 'qr_code' ? '' : ''}</p>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full ${denied ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${denied ? 'bg-danger-soft text-danger-text' : 'bg-success-soft text-success-text'}`}>
                                 {denied ? 'Refusé' : 'Entrée'}
                               </span>
                             </div>
@@ -1864,7 +1841,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                       {visitsHasMore && (
                         <div className="flex justify-center pt-2">
-                          <button type="button" onClick={loadMoreVisits} disabled={visitsLoading} className="flex items-center gap-2 bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-gray-200 disabled:opacity-50">
+                          <button type="button" onClick={loadMoreVisits} disabled={visitsLoading} className="flex items-center gap-2 bg-line-soft text-ink-2 px-6 py-3 font-semibold text-xs hover:bg-line disabled:opacity-50">
                             <History size={14} /> {visitsLoading ? 'Chargement…' : 'Charger plus'}
                           </button>
                         </div>
@@ -1878,11 +1855,11 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
               {detailTab === 'finance' && (activeTab === 'membres') && (
                 <div className="space-y-5">
                   <div className="space-y-3">
-                    <div className="p-5 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-indigo-100">
+                    <div className="p-5 bg-ink text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">Abonnement actuel</p>
-                          <button type="button" onClick={editingFormula ? () => setEditingFormula(false) : startEditFormula} className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-lg transition-colors">
+                          <p className="text-xs font-semibold opacity-80">Abonnement actuel</p>
+                          <button type="button" onClick={editingFormula ? () => setEditingFormula(false) : startEditFormula} className="flex items-center gap-1 text-xs font-semibold bg-white/20 hover:bg-white/30 px-2.5 py-1 transition-colors">
                             <Edit2 size={11} /> {editingFormula ? 'Fermer' : 'Changer de formule'}
                           </button>
                         </div>
@@ -1898,14 +1875,14 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           <p className="text-xs opacity-75">Commercial : {(selectedContact as any).commercialName}</p>
                         )}
                         {(selectedContact.subscriptionStart || selectedContact.subscriptionEnd) && (
-                          <p className="text-xs opacity-90 font-bold mt-1">
+                          <p className="text-xs opacity-90 font-semibold mt-1">
                             Période : {selectedContact.subscriptionStart || '—'} → {selectedContact.subscriptionEnd || '—'}
                           </p>
                         )}
                       </div>
                       <div className="text-right">
                         <p className="text-3xl font-semibold">{selectedContact.price != null ? `${Number(selectedContact.price).toFixed(2).replace('.', ',')} €` : '—'}</p>
-                        <p className="text-[10px] font-semibold opacity-80 uppercase mt-1">
+                        <p className="text-xs font-semibold opacity-80 mt-1">
                           Statut : {selectedContact.status === 'MEMBER_ACTIVE' ? 'ACTIF' : 'INACTIF'}
                         </p>
                       </div>
@@ -1934,9 +1911,9 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         return (
                           <button key={o.label + o.price} type="button"
                             onClick={() => setFormulaDraft({ ...formulaDraft, label: o.label, price: String(o.price) })}
-                            className={`flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${active ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
-                            <span className="text-sm font-semibold text-gray-900">{o.label}</span>
-                            <span className={`text-sm font-semibold ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{o.price.toFixed(2).replace('.', ',')} €</span>
+                            className={`flex items-center justify-between px-4 py-3 border text-left transition-colors ${active ? 'border-primary bg-primary-soft' : 'border-line bg-ground-2 hover:bg-line-soft'}`}>
+                            <span className="text-sm font-semibold text-ink">{o.label}</span>
+                            <span className={`text-sm font-semibold ${active ? 'text-primary' : 'text-muted'}`}>{o.price.toFixed(2).replace('.', ',')} €</span>
                           </button>
                         );
                       };
@@ -1945,23 +1922,23 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       const isCash = method !== 'Prélèvement';
                       const amountStr = formulaDraft.amount !== '' ? formulaDraft.amount : (formulaDraft.price || '');
                       return (
-                        <div className="p-5 bg-white border border-gray-100 rounded-2xl space-y-4">
+                        <div className="p-5 bg-surface border border-line space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Formules à prélèvement (engagement)</label>
+                            <label className="text-xs font-semibold text-muted">Formules à prélèvement (engagement)</label>
                             <div className="grid grid-cols-1 gap-2">{recurringList.map(Opt)}</div>
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sans engagement / produits</label>
+                            <label className="text-xs font-semibold text-muted">Sans engagement / produits</label>
                             <div className="grid grid-cols-1 gap-2">{downgradeList.map(Opt)}</div>
                           </div>
 
                           {/* Mode de paiement */}
                           <div className="space-y-1.5 pt-1">
-                            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Mode de paiement</label>
+                            <label className="text-xs font-semibold text-muted">Mode de paiement</label>
                             <div className="flex flex-wrap gap-2">
                               {METHODS.map((m) => (
                                 <button key={m} type="button" onClick={() => setFormulaDraft({ ...formulaDraft, method: m })}
-                                  className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${method === m ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+                                  className={`px-4 py-2 border text-sm font-semibold transition-colors ${method === m ? 'border-primary bg-primary-soft text-primary-dark' : 'border-line bg-ground-2 text-ink-2 hover:bg-line-soft'}`}>
                                   {m}
                                 </button>
                               ))}
@@ -1972,41 +1949,41 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           {isCash && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="space-y-1.5">
-                                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Montant encaissé (€)</label>
+                                <label className="text-xs font-semibold text-muted">Montant encaissé (€)</label>
                                 <input type="number" step="0.01" min="0" value={amountStr}
                                   onChange={(e) => setFormulaDraft({ ...formulaDraft, amount: e.target.value })}
                                   placeholder={formulaDraft.price || '0'}
-                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-100" />
+                                  className="w-full bg-ground-2 border border-line px-3 py-2.5 text-sm font-semibold outline-none" />
                               </div>
                               <div className="space-y-1.5">
-                                <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Accès jusqu'au (facultatif)</label>
+                                <label className="text-xs font-semibold text-muted">Accès jusqu'au (facultatif)</label>
                                 <input type="date" value={formulaDraft.end || ''}
                                   onChange={(e) => setFormulaDraft({ ...formulaDraft, end: e.target.value })}
-                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-indigo-100" />
+                                  className="w-full bg-ground-2 border border-line px-3 py-2.5 text-sm font-semibold outline-none" />
                               </div>
                             </div>
                           )}
 
                           {/* Info selon le mode choisi */}
                           {isCash ? (
-                            <p className="text-[11px] font-bold text-green-700 bg-green-50 rounded-xl px-3 py-2 leading-relaxed">
+                            <p className="text-xs font-semibold text-success-text bg-success-soft px-3 py-2 leading-relaxed">
                               Encaissement direct en <b>{method}</b> : la formule est mise à jour et le montant entre dans le CA.
                               {hasMandate && <> Le <b>prélèvement automatique en cours sera arrêté</b> (mandat conservé).</>}
                               {formulaDraft.end && <> Accès ouvert jusqu'au <b>{new Date(formulaDraft.end).toLocaleDateString('fr-FR')}</b>.</>}
                             </p>
                           ) : hasMandate ? (
-                            <p className="text-[11px] font-bold text-amber-600 bg-amber-50 rounded-xl px-3 py-2 leading-relaxed">
+                            <p className="text-xs font-semibold text-warning-text bg-warning-soft px-3 py-2 leading-relaxed">
                               Prélèvement : GoCardless sera mis à jour (ancien abonnement annulé, nouveau créé, prélevé le 10).
                             </p>
                           ) : (
-                            <p className="text-[11px] font-bold text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2 leading-relaxed">
+                            <p className="text-xs font-semibold text-primary bg-primary-soft px-3 py-2 leading-relaxed">
                               Prélèvement : le membre sera redirigé vers GoCardless pour saisir son RIB (création du mandat).
                             </p>
                           )}
 
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : (isCash ? 'Encaisser et appliquer' : 'Appliquer la formule')}</button>
-                            <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3">Annuler</button>
+                            <button type="button" onClick={handleSaveFormula} disabled={savingFormula} className="flex items-center gap-2 bg-primary text-white px-6 py-3 font-semibold text-xs hover:bg-primary-dark disabled:opacity-50"><Save size={14} /> {savingFormula ? 'Application…' : (isCash ? 'Encaisser et appliquer' : 'Appliquer la formule')}</button>
+                            <button type="button" onClick={() => setEditingFormula(false)} className="text-xs font-semibold text-muted hover:text-ink-2 px-3">Annuler</button>
                           </div>
                         </div>
                       );
@@ -2031,33 +2008,33 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   {/* Sous-onglets finance */}
                   <div className="flex items-center gap-2 flex-wrap">
                     {([['paiements', 'Paiements'], ['contrats', 'Contrats'], ['ventes', 'Ventes']] as const).map(([key, label]) => (
-                      <button key={key} type="button" onClick={() => setFinanceTab(key)} className={`px-4 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide transition-colors ${financeTab === key ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{label}</button>
+                      <button key={key} type="button" onClick={() => setFinanceTab(key)} className={`px-4 py-2 font-semibold text-xs transition-colors ${financeTab === key ? 'bg-primary text-white' : 'bg-line-soft text-muted hover:bg-line'}`}>{label}</button>
                     ))}
                   </div>
 
                   {financeTab === 'paiements' && (<>
                   {/* Paiements */}
                   <div className="space-y-3">
-                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
+                    <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><CreditCard size={14} /> <span>Paiements</span></h3>
 
                     {/* Barre de régularisation des impayés cochés */}
                     {regulSel.size > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-2xl px-3 py-2.5">
-                        <span className="text-[11px] font-bold text-indigo-700">{regulSel.size} impayé(s) — régulariser en</span>
-                        <select value={regulMethod} onChange={(e) => setRegulMethod(e.target.value as any)} className="bg-white border border-indigo-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none">
+                      <div className="flex flex-wrap items-center gap-2 bg-primary-soft border border-line px-3 py-2.5">
+                        <span className="text-xs font-semibold text-primary-dark">{regulSel.size} impayé(s) — régulariser en</span>
+                        <select value={regulMethod} onChange={(e) => setRegulMethod(e.target.value as any)} className="bg-surface border border-line px-2.5 py-1.5 text-sm font-semibold outline-none">
                           {REGULARIZE_METHODS.map((m) => <option key={m.code} value={m.code}>{m.label}</option>)}
                         </select>
-                        <span className="text-[11px] font-bold text-indigo-700">le</span>
-                        <input type="date" value={regulDate} onChange={(e) => setRegulDate(e.target.value)} className="bg-white border border-indigo-200 rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none" />
-                        <button type="button" onClick={regularizeSelected} disabled={regulBusy} className="ml-auto flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wide hover:bg-indigo-700 disabled:opacity-50">
+                        <span className="text-xs font-semibold text-primary-dark">le</span>
+                        <input type="date" value={regulDate} onChange={(e) => setRegulDate(e.target.value)} className="bg-surface border border-line px-2.5 py-1.5 text-sm font-semibold outline-none" />
+                        <button type="button" onClick={regularizeSelected} disabled={regulBusy} className="ml-auto flex items-center gap-1.5 bg-primary text-white px-4 py-1.5 text-xs font-semibold hover:bg-primary-dark disabled:opacity-50">
                           <CheckCircle2 size={13} /> {regulBusy ? 'Validation…' : 'Valider'}
                         </button>
-                        <button type="button" onClick={() => setRegulSel(new Set<string>())} className="text-[11px] font-bold text-indigo-400 hover:text-indigo-600 px-1">Annuler</button>
+                        <button type="button" onClick={() => setRegulSel(new Set<string>())} className="text-xs font-semibold text-primary hover:text-primary px-1">Annuler</button>
                       </div>
                     )}
 
                     {memberPayments.length === 0 ? (
-                      <p className="text-xs font-bold text-gray-400 px-1">Aucun paiement enregistré pour ce membre.</p>
+                      <p className="text-xs font-semibold text-muted px-1">Aucun paiement enregistré pour ce membre.</p>
                     ) : (
                       <div className="space-y-2">
                         {memberPayments.map((pay) => {
@@ -2067,30 +2044,30 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                           const history = st === 'cancelled';             // régularisé / écarté : conservé en historique
                           const selected = regulSel.has(pay.id);
                           const method = ({ cash: 'Espèces', credit_card: 'CB', sepa_debit: 'Prélèvement', bank_transfer: 'Virement', stripe: 'Carte' } as Record<string, string>)[pay.payment_method || ''] || pay.payment_method;
-                          const badge = ok ? { c: 'bg-green-100 text-green-700', t: 'Payé' }
-                            : impaye ? { c: 'bg-red-100 text-red-700', t: 'Impayé' }
-                            : history ? { c: 'bg-gray-100 text-gray-500', t: 'Historique' }
-                            : { c: 'bg-amber-100 text-amber-700', t: pay.status || '' };
+                          const badge = ok ? { c: 'bg-success-soft text-success-text', t: 'Payé' }
+                            : impaye ? { c: 'bg-danger-soft text-danger-text', t: 'Impayé' }
+                            : history ? { c: 'bg-line-soft text-muted', t: 'Historique' }
+                            : { c: 'bg-warning-soft text-warning-text', t: pay.status || '' };
                           return (
-                            <div key={pay.id} className={`flex items-center justify-between p-4 bg-white border rounded-2xl gap-3 ${impaye && selected ? 'border-indigo-300 ring-2 ring-indigo-500/10' : 'border-gray-100'}`}>
+                            <div key={pay.id} className={`flex items-center justify-between p-4 bg-surface border gap-3 ${impaye && selected ? 'border-line ring-2 ring-primary' : 'border-line'}`}>
                               <div className="flex items-center gap-3 min-w-0">
                                 {impaye && (
                                   <input type="checkbox" checked={selected} title="Sélectionner pour régulariser"
                                     onChange={() => setRegulSel((prev) => { const s = new Set(prev); if (s.has(pay.id)) s.delete(pay.id); else s.add(pay.id); return s; })}
-                                    className="w-4 h-4 accent-indigo-600 shrink-0" />
+                                    className="w-4 h-4 accent-primary shrink-0" />
                                 )}
                                 <div className="min-w-0">
-                                  <p className={`text-sm font-semibold capitalize truncate ${history ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{pay.payment_type || 'Paiement'}{method ? ` · ${method}` : ''}</p>
-                                  <p className="text-[11px] font-bold text-gray-400 truncate">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}{history && pay.notes ? ` · ${pay.notes}` : ''}</p>
+                                  <p className={`text-sm font-semibold capitalize truncate ${history ? 'text-muted line-through' : 'text-ink'}`}>{pay.payment_type || 'Paiement'}{method ? ` · ${method}` : ''}</p>
+                                  <p className="text-xs font-semibold text-muted truncate">{pay.payment_date ? new Date(pay.payment_date).toLocaleDateString('fr-FR') : '—'}{history && pay.notes ? ` · ${pay.notes}` : ''}</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-3 shrink-0">
-                                <span className={`text-base font-semibold ${history ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{pay.amount != null ? `${Number(pay.amount).toFixed(2).replace('.', ',')} €` : '—'}</span>
+                                <span className={`text-base font-semibold ${history ? 'text-muted line-through' : 'text-ink'}`}>{pay.amount != null ? `${Number(pay.amount).toFixed(2).replace('.', ',')} €` : '—'}</span>
                                 {pay.status && (
-                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full ${badge.c}`}>{badge.t}</span>
+                                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${badge.c}`}>{badge.t}</span>
                                 )}
                                 {pay.invoice_url && (
-                                  <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100"><FileText size={13} /> Reçu</a>
+                                  <a href={pay.invoice_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 bg-primary-soft text-primary px-3 py-2 text-xs font-semibold hover:bg-primary-soft"><FileText size={13} /> Reçu</a>
                                 )}
                               </div>
                             </div>
@@ -2101,15 +2078,15 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                   </div>
 
                   {(selectedContact.gocardlessStatus || selectedContact.gocardlessMandateId) ? (
-                    <div className="p-4 bg-white rounded-2xl border border-gray-100 space-y-3">
+                    <div className="p-4 bg-surface border border-line space-y-3">
                       <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
-                        <span className={`text-[10px] font-semibold uppercase px-3 py-1 rounded-full ${
-                          selectedContact.gocardlessStatus === 'mandate_active' ? 'bg-green-100 text-green-700'
-                          : selectedContact.gocardlessStatus === 'pending' ? 'bg-amber-100 text-amber-700'
-                          : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'bg-blue-100 text-blue-700'
-                          : selectedContact.gocardlessStatus === 'cancelled' || selectedContact.gocardlessStatus === 'failed' ? 'bg-red-100 text-red-700'
-                          : 'bg-gray-100 text-gray-600'}`}>
+                        <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><CreditCard size={14} /> <span>Prélèvement GoCardless</span></h3>
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                          selectedContact.gocardlessStatus === 'mandate_active' ? 'bg-success-soft text-success-text'
+                          : selectedContact.gocardlessStatus === 'pending' ? 'bg-warning-soft text-warning-text'
+                          : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'bg-line-soft text-ink-2'
+                          : selectedContact.gocardlessStatus === 'cancelled' || selectedContact.gocardlessStatus === 'failed' ? 'bg-danger-soft text-danger-text'
+                          : 'bg-line-soft text-ink-2'}`}>
                           {selectedContact.gocardlessStatus === 'mandate_active' ? 'Mandat actif'
                             : selectedContact.gocardlessStatus === 'pending' ? 'En attente de signature'
                             : selectedContact.gocardlessStatus === 'mandate_submitted' ? 'Mandat soumis'
@@ -2120,37 +2097,37 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                         </span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="bg-gray-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase">Mandat</p>
-                          <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessMandateId || '—'}</p>
+                        <div className="bg-ground-2 px-4 py-3">
+                          <p className="text-xs font-semibold text-muted">Mandat</p>
+                          <p className="text-xs font-semibold text-ink break-all">{selectedContact.gocardlessMandateId || '—'}</p>
                         </div>
-                        <div className="bg-gray-50 rounded-xl px-4 py-3">
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase">Client GoCardless</p>
-                          <p className="text-xs font-bold text-gray-800 break-all">{selectedContact.gocardlessCustomerId || '—'}</p>
+                        <div className="bg-ground-2 px-4 py-3">
+                          <p className="text-xs font-semibold text-muted">Client GoCardless</p>
+                          <p className="text-xs font-semibold text-ink break-all">{selectedContact.gocardlessCustomerId || '—'}</p>
                         </div>
                       </div>
                       {selectedContact.gocardlessStatus === 'pending' && (
                         <div className="space-y-1.5">
                           <button type="button" onClick={resumeMandateSignature} disabled={resumingMandate}
-                            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wide hover:bg-amber-600 disabled:opacity-50">
+                            className="w-full flex items-center justify-center gap-2 bg-warning text-white px-4 py-2.5 font-semibold text-xs hover:bg-warning disabled:opacity-50">
                             <CreditCard size={14} /> {resumingMandate ? 'Ouverture…' : 'Faire signer le mandat (RIB)'}
                           </button>
-                          <p className="text-[10.5px] text-gray-400 px-1">Ouvre la page GoCardless de saisie du RIB — le client signe sur place, ici.</p>
+                          <p className="text-[10.5px] text-muted px-1">Ouvre la page GoCardless de saisie du RIB — le client signe sur place, ici.</p>
                         </div>
                       )}
                       {selectedContact.gocardlessCustomerId && (
-                        <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-semibold text-indigo-600 hover:text-indigo-800">
+                        <a href={`https://manage.gocardless.com/customers/${selectedContact.gocardlessCustomerId}`} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-2 text-xs font-semibold text-primary hover:text-primary-dark">
                           <ChevronRight size={14} /> <span>Ouvrir la fiche dans GoCardless</span>
                         </a>
                       )}
 
                       {/* Prélèvements GoCardless (temps réel) */}
-                      <div className="pt-2 border-t border-gray-100">
-                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Prélèvements</p>
+                      <div className="pt-2 border-t border-line">
+                        <p className="text-xs font-semibold text-muted mb-2">Prélèvements</p>
                         {gcPaymentsLoading ? (
-                          <p className="text-xs font-bold text-gray-400">Chargement des prélèvements…</p>
+                          <p className="text-xs font-semibold text-muted">Chargement des prélèvements…</p>
                         ) : memberGcPayments.length === 0 ? (
-                          <p className="text-xs font-bold text-gray-400">Aucun prélèvement pour ce membre.</p>
+                          <p className="text-xs font-semibold text-muted">Aucun prélèvement pour ce membre.</p>
                         ) : (
                           <div className="space-y-2">
                             {memberGcPayments.map((gp) => {
@@ -2161,12 +2138,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                               const label = green ? 'Encaissé' : red ? 'Échec' : gray ? 'Annulé' : 'En cours';
                               const when = gp.charge_date || gp.created_at;
                               return (
-                                <div key={gp.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 gap-3">
+                                <div key={gp.id} className="flex items-center justify-between bg-ground-2 px-3 py-2.5 gap-3">
                                   <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-gray-900">{gp.amount != null ? `${gp.amount.toFixed(2).replace('.', ',')} €` : '—'}</p>
-                                    <p className="text-[11px] font-bold text-gray-400 truncate">{when ? new Date(when).toLocaleDateString('fr-FR') : '—'}{gp.description ? ` · ${gp.description}` : ''}</p>
+                                    <p className="text-sm font-semibold text-ink">{gp.amount != null ? `${gp.amount.toFixed(2).replace('.', ',')} €` : '—'}</p>
+                                    <p className="text-xs font-semibold text-muted truncate">{when ? new Date(when).toLocaleDateString('fr-FR') : '—'}{gp.description ? ` · ${gp.description}` : ''}</p>
                                   </div>
-                                  <span className={`text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full shrink-0 ${green ? 'bg-green-100 text-green-700' : red ? 'bg-red-100 text-red-700' : gray ? 'bg-gray-200 text-gray-600' : 'bg-amber-100 text-amber-700'}`}>{label}</span>
+                                  <span className={`text-xs font-semibold px-2 py-1 rounded-full shrink-0 ${green ? 'bg-success-soft text-success-text' : red ? 'bg-danger-soft text-danger-text' : gray ? 'bg-line text-ink-2' : 'bg-warning-soft text-warning-text'}`}>{label}</span>
                                 </div>
                               );
                             })}
@@ -2175,22 +2152,22 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+                    <div className="p-4 bg-ground-2 border border-line space-y-3">
                       <div>
-                        <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
-                        <p className="text-[11px] font-medium text-gray-400 mt-1">Aucun mandat de prélèvement pour l'instant. Si ce client a déjà un mandat GoCardless (voir le fichier de rapprochement), colle ses identifiants ici.</p>
+                        <h3 className="text-xs font-semibold text-muted flex items-center space-x-2"><Link2 size={14} /> <span>Rattacher un mandat existant</span></h3>
+                        <p className="text-xs text-muted mt-1">Aucun mandat de prélèvement pour l'instant. Si ce client a déjà un mandat GoCardless (voir le fichier de rapprochement), colle ses identifiants ici.</p>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] font-semibold text-gray-400 uppercase">mandate_id</label>
-                          <input type="text" value={linkMandateId} onChange={(e) => setLinkMandateId(e.target.value)} placeholder="MD000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
+                          <label className="text-xs font-semibold text-muted">mandate_id</label>
+                          <input type="text" value={linkMandateId} onChange={(e) => setLinkMandateId(e.target.value)} placeholder="MD000..." className="w-full mt-1 bg-surface border border-line py-2.5 px-3 outline-none text-xs font-semibold break-all" />
                         </div>
                         <div>
-                          <label className="text-[10px] font-semibold text-gray-400 uppercase">customer_id (optionnel)</label>
-                          <input type="text" value={linkCustomerId} onChange={(e) => setLinkCustomerId(e.target.value)} placeholder="CU000..." className="w-full mt-1 bg-white border border-gray-200 rounded-xl py-2.5 px-3 outline-none focus:ring-2 focus:ring-indigo-500/20 text-xs font-bold break-all" />
+                          <label className="text-xs font-semibold text-muted">customer_id (optionnel)</label>
+                          <input type="text" value={linkCustomerId} onChange={(e) => setLinkCustomerId(e.target.value)} placeholder="CU000..." className="w-full mt-1 bg-surface border border-line py-2.5 px-3 outline-none text-xs font-semibold break-all" />
                         </div>
                       </div>
-                      <button type="button" onClick={handleLinkMandate} disabled={linkingMandate} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-xs uppercase tracking-wide hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                      <button type="button" onClick={handleLinkMandate} disabled={linkingMandate} className="flex items-center gap-2 bg-primary text-white px-6 py-3 font-semibold text-xs hover:bg-primary-dark transition-colors disabled:opacity-50">
                         <Link2 size={14} /> {linkingMandate ? 'Rattachement…' : 'Lier ce mandat'}
                       </button>
                     </div>
@@ -2199,18 +2176,18 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {financeTab === 'contrats' && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2">
+                    <h3 className="text-xs font-semibold text-muted flex items-center space-x-2">
                       <FileText size={14} /> <span>Contrat d'adhésion</span>
                     </h3>
                     {memberContracts.length === 0 ? (
-                      <p className="text-xs font-bold text-gray-400 px-1">Aucun contrat signé pour ce membre.</p>
+                      <p className="text-xs font-semibold text-muted px-1">Aucun contrat signé pour ce membre.</p>
                     ) : (
                       <div className="space-y-3">
                         {memberContracts.map((c: any) => (
-                          <div key={c.id} className="p-4 border border-gray-100 rounded-2xl bg-white flex items-center justify-between gap-3">
+                          <div key={c.id} className="p-4 border border-line bg-surface flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-gray-900">Contrat {c.contract_number || '—'}</p>
-                              <p className="text-[11px] font-bold text-gray-400">
+                              <p className="text-sm font-semibold text-ink">Contrat {c.contract_number || '—'}</p>
+                              <p className="text-xs font-semibold text-muted">
                                 {(c.signed_at || c.created_at) ? new Date(c.signed_at || c.created_at).toLocaleDateString('fr-FR') : ''}
                                 {c.formula_label ? ' · ' + c.formula_label : ''}
                                 {c.total_due != null ? ' · ' + Number(c.total_due).toFixed(2).replace('.', ',') + ' €' : ''}
@@ -2227,12 +2204,12 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                     } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
                                   }}
                                   title="Voir / télécharger le contrat signé (PDF)"
-                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors"
+                                  className="flex items-center gap-1.5 bg-primary-soft text-primary px-3 py-2 text-xs font-semibold hover:bg-primary-soft transition-colors"
                                 >
                                   <FileText size={14} /> Contrat
                                 </button>
                               ) : (
-                                <span className="text-[11px] font-semibold text-amber-600 uppercase">En cours</span>
+                                <span className="text-xs font-semibold text-warning-text">En cours</span>
                               )}
                               <button
                                 onClick={async () => {
@@ -2246,7 +2223,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                   } catch (e) { alert('Échec de la suppression : ' + ((e as Error)?.message || '')); }
                                 }}
                                 title="Supprimer définitivement ce contrat"
-                                className="flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-red-100 transition-colors"
+                                className="flex items-center gap-1.5 bg-danger-soft text-danger-text px-3 py-2 text-xs font-semibold hover:bg-danger-soft transition-colors"
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -2260,26 +2237,26 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
                   {financeTab === 'ventes' && (
                   <div className="space-y-4">
-                    <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide flex items-center space-x-2">
+                    <h3 className="text-xs font-semibold text-muted flex items-center space-x-2">
                       <ShoppingBag size={14} /> <span>Historique des achats Boutique</span>
                     </h3>
                     {memberSales.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center text-center py-10 px-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
-                        <div className="bg-gray-100 p-3 rounded-2xl text-gray-400 mb-3"><ShoppingBag size={24} /></div>
-                        <p className="text-sm font-semibold text-gray-700">Aucun achat enregistré</p>
-                        <p className="text-xs font-bold text-gray-400 mt-2 max-w-md">Les ventes rattachées à ce client apparaîtront ici.</p>
+                      <div className="flex flex-col items-center justify-center text-center py-10 px-6 border border-dashed border-line bg-ground-2">
+                        <div className="bg-line-soft p-3 text-muted mb-3"><ShoppingBag size={24} /></div>
+                        <p className="text-sm font-semibold text-ink-2">Aucun achat enregistré</p>
+                        <p className="text-xs font-semibold text-muted mt-2 max-w-md">Les ventes rattachées à ce client apparaîtront ici.</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {memberSales.map((s: any) => (
-                          <div key={s.id} className="p-4 border border-gray-100 rounded-2xl bg-white">
+                          <div key={s.id} className="p-4 border border-line bg-surface">
                             <div className="flex items-center justify-between mb-2">
                               <div>
-                                <p className="text-sm font-semibold text-gray-900">Facture {s.invoice_number || '—'}</p>
-                                <p className="text-[11px] font-bold text-gray-400">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : ''} · {s.payment_method || '—'}</p>
+                                <p className="text-sm font-semibold text-ink">Facture {s.invoice_number || '—'}</p>
+                                <p className="text-xs font-semibold text-muted">{s.sale_date ? new Date(s.sale_date).toLocaleDateString('fr-FR') : ''} · {s.payment_method || '—'}</p>
                               </div>
                               <div className="flex items-center gap-3">
-                                <span className="text-lg font-semibold text-indigo-600">{Number(s.total_ttc || 0).toFixed(2).replace('.', ',')} €</span>
+                                <span className="text-lg font-semibold text-primary">{Number(s.total_ttc || 0).toFixed(2).replace('.', ',')} €</span>
                                 <button
                                   onClick={async () => {
                                     try {
@@ -2289,7 +2266,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                                     } catch (e) { alert('Échec : ' + ((e as Error)?.message || '')); }
                                   }}
                                   title="Voir / télécharger la facture PDF"
-                                  className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-xl text-[11px] font-semibold uppercase tracking-wide hover:bg-indigo-100 transition-colors"
+                                  className="flex items-center gap-1.5 bg-primary-soft text-primary px-3 py-2 text-xs font-semibold hover:bg-primary-soft transition-colors"
                                 >
                                   <FileText size={14} /> Facture
                                 </button>
@@ -2297,7 +2274,7 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {(s.lines || []).map((l: any, i: number) => (
-                                <span key={i} className="inline-flex items-center bg-gray-50 border border-gray-100 rounded-lg px-2 py-1 text-[11px] font-bold text-gray-600">
+                                <span key={i} className="inline-flex items-center bg-ground-2 border border-line px-2 py-1 text-xs font-semibold text-ink-2">
                                   {l.quantity}× {l.product?.name || l.label || 'Article'}
                                 </span>
                               ))}
@@ -2315,13 +2292,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
             </div>
 
             {/* Footer de la modale */}
-            <div className="p-6 border-t border-gray-100 flex items-center justify-between shrink-0 bg-white">
+            <div className="p-6 border-t border-line flex items-center justify-between shrink-0 bg-surface">
                {isEditing ? (
                  <>
-                   <button onClick={cancelEditing} className="text-xs font-bold text-gray-400 hover:text-gray-600">Annuler</button>
+                   <button onClick={cancelEditing} className="text-xs font-semibold text-muted hover:text-ink-2">Annuler</button>
                    <button
                      onClick={handleUpdateContact}
-                     className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                     className="flex items-center space-x-2 bg-primary text-white px-10 py-4 font-semibold text-sm hover:bg-primary-dark transition-colors"
                    >
                      <Save size={18} />
                      <span>Enregistrer</span>
@@ -2336,13 +2313,13 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
                        setContacts(await getMembers());
                        closeDetail();
                      }}
-                     className="text-xs font-bold text-red-500 hover:underline"
+                     className="text-xs font-semibold text-danger-text hover:underline"
                    >
                      Archiver le contact
                    </button>
                    <div className="flex space-x-4">
-                     <button onClick={closeDetail} className="px-8 py-4 bg-gray-100 text-gray-600 font-bold rounded-2xl text-sm transition-all hover:bg-gray-200">Fermer</button>
-                     <button onClick={startEditing} className="flex items-center space-x-2 bg-indigo-600 text-white px-10 py-4 rounded-2xl font-semibold text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                     <button onClick={closeDetail} className="px-8 py-4 bg-line-soft text-ink-2 font-semibold text-sm transition-colors hover:bg-line">Fermer</button>
+                     <button onClick={startEditing} className="flex items-center space-x-2 bg-primary text-white px-10 py-4 font-semibold text-sm hover:bg-primary-dark transition-colors">
                        <Edit2 size={18} />
                        <span>Modifier la fiche</span>
                      </button>
@@ -2356,38 +2333,38 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
       {/* MODALE ARCHIVÉS (corbeille) */}
       {showArchived && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-ink/50 animate-in fade-in duration-300">
+          <div className="bg-surface w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-line flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-gray-100 text-gray-500 p-2.5 rounded-xl"><Trash2 size={18} /></div>
+                <div className="bg-line-soft text-muted p-2.5"><Trash2 size={18} /></div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Fiches archivées</h3>
-                  <p className="text-xs font-bold text-gray-400">{archivedContacts.length} fiche(s) · données conservées · restaurables</p>
+                  <h3 className="text-lg font-semibold text-ink">Fiches archivées</h3>
+                  <p className="text-xs font-semibold text-muted">{archivedContacts.length} fiche(s) · données conservées · restaurables</p>
                 </div>
               </div>
-              <button onClick={() => setShowArchived(false)} className="p-2 text-gray-400 hover:text-gray-700"><X size={22} /></button>
+              <button onClick={() => setShowArchived(false)} className="p-2 text-muted hover:text-ink-2"><X size={22} /></button>
             </div>
             <div className="overflow-y-auto p-4">
               {archivedContacts.length === 0 ? (
                 <div className="text-center py-16">
-                  <p className="text-sm font-semibold text-gray-700">Aucune fiche archivée</p>
-                  <p className="text-xs font-bold text-gray-400 mt-1">Les contacts archivés apparaîtront ici.</p>
+                  <p className="text-sm font-semibold text-ink-2">Aucune fiche archivée</p>
+                  <p className="text-xs font-semibold text-muted mt-1">Les contacts archivés apparaîtront ici.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-line-soft">
                   {archivedContacts.map((m: any) => (
                     <div key={m.id} className="flex items-center justify-between gap-4 py-3 px-2">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-semibold uppercase shrink-0">{getInitials(m.firstName, m.lastName)}</div>
+                        <div className="w-10 h-10 bg-line-soft text-muted flex items-center justify-center text-xs font-semibold shrink-0">{getInitials(m.firstName, m.lastName)}</div>
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate">{m.firstName} {m.lastName} {m.memberNumber ? <span className="text-gray-400 font-semibold">· n° {m.memberNumber}</span> : null}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide truncate">{m.email || 'Pas d\'email'}{m.archivedAt ? ` · archivé le ${String(m.archivedAt).split('T')[0]}` : ''}</p>
+                          <p className="text-sm font-semibold text-ink truncate">{m.firstName} {m.lastName} {m.memberNumber ? <span className="text-muted font-semibold">· n° {m.memberNumber}</span> : null}</p>
+                          <p className="text-xs text-muted font-semibold truncate">{m.email || 'Pas d\'email'}{m.archivedAt ? ` · archivé le ${String(m.archivedAt).split('T')[0]}` : ''}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button type="button" onClick={() => handleRestore(m.id)} className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-indigo-700"><RotateCcw size={14} /> Restaurer</button>
-                        <button type="button" onClick={() => handleHardDelete(m.id)} className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-2 rounded-xl font-semibold text-[11px] uppercase tracking-wide hover:bg-red-100"><Trash2 size={14} /></button>
+                        <button type="button" onClick={() => handleRestore(m.id)} className="flex items-center gap-1 bg-primary text-white px-4 py-2 font-semibold text-xs hover:bg-primary-dark"><RotateCcw size={14} /> Restaurer</button>
+                        <button type="button" onClick={() => handleHardDelete(m.id)} className="flex items-center gap-1 bg-danger-soft text-danger-text px-3 py-2 font-semibold text-xs hover:bg-danger-soft"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -2400,21 +2377,21 @@ const CRMPage: React.FC<CRMPageProps> = ({ tab = 'membres' }) => {
 
       {/* Modale de confirmation de blocage (+ motif optionnel) */}
       {blockModalOpen && selectedContact && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => !accessBusy && setBlockModalOpen(false)}>
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-ink/50 animate-in fade-in duration-200" onClick={() => !accessBusy && setBlockModalOpen(false)}>
+          <div className="bg-surface w-full max-w-md shadow-modal p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert size={22} /></div>
+              <div className="w-11 h-11 bg-danger-soft text-danger-text flex items-center justify-center shrink-0"><ShieldAlert size={22} /></div>
               <div>
-                <h3 className="font-bold text-gray-900 text-lg leading-tight">Bloquer l'accès</h3>
-                <p className="text-sm text-gray-500">{selectedContact.firstName} {selectedContact.lastName}{selectedContact.memberNumber ? ` · n° ${selectedContact.memberNumber}` : ''}</p>
+                <h3 className="font-semibold text-ink text-lg leading-tight">Bloquer l'accès</h3>
+                <p className="text-sm text-muted">{selectedContact.firstName} {selectedContact.lastName}{selectedContact.memberNumber ? ` · n° ${selectedContact.memberNumber}` : ''}</p>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mb-3">Le badge et le code de ce membre seront retirés du contrôleur. Tu peux préciser un motif (facultatif) — il restera visible sur sa fiche et sur la page contrôle d'accès.</p>
-            <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Motif (facultatif)</label>
-            <textarea rows={3} value={blockReason} onChange={(e) => setBlockReason(e.target.value)} autoFocus placeholder="Ex. impayé, comportement, badge perdu…" className="mt-1 w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-red-500/20" />
+            <p className="text-sm text-ink-2 mb-3">Le badge et le code de ce membre seront retirés du contrôleur. Tu peux préciser un motif (facultatif) — il restera visible sur sa fiche et sur la page contrôle d'accès.</p>
+            <label className="text-xs font-semibold text-muted">Motif (facultatif)</label>
+            <textarea rows={3} value={blockReason} onChange={(e) => setBlockReason(e.target.value)} autoFocus placeholder="Ex. impayé, comportement, badge perdu…" className="mt-1 w-full bg-ground-2 border border-line px-4 py-3 text-sm outline-none" />
             <div className="flex gap-2 mt-5">
-              <button type="button" onClick={() => setBlockModalOpen(false)} disabled={accessBusy} className="flex-1 bg-gray-100 text-gray-600 py-3 rounded-2xl font-bold text-sm">Annuler</button>
-              <button type="button" onClick={confirmBlock} disabled={accessBusy} className="flex-1 bg-red-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-1.5"><X size={16} /> {accessBusy ? 'Blocage…' : "Bloquer l'accès"}</button>
+              <button type="button" onClick={() => setBlockModalOpen(false)} disabled={accessBusy} className="flex-1 bg-line-soft text-ink-2 py-3 font-semibold text-sm">Annuler</button>
+              <button type="button" onClick={confirmBlock} disabled={accessBusy} className="flex-1 bg-primary text-white py-3 font-semibold text-sm hover:bg-primary-dark disabled:opacity-60 flex items-center justify-center gap-1.5"><X size={16} /> {accessBusy ? 'Blocage…' : "Bloquer l'accès"}</button>
             </div>
           </div>
         </div>

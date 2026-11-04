@@ -4,7 +4,8 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { APP_NAV_ITEMS, MOCK_MEMBERS, MOCK_PARTNERS, MOCK_PRODUCTS } from '../constants';
 import { searchMembers } from '../lib/membersApi';
 import { phone as formatPhone } from '../lib/format';
-
+import { useAuth } from '../lib/AuthContext';
+
 const initials = (a?: string, b?: string) =>
   `${(a || '').charAt(0)}${(b || '').charAt(0)}`.toUpperCase() || '?';
 import { ChevronDown, ChevronRight, LogOut, Search, Bell, Menu, PanelLeftClose, X, ArrowUpRight } from 'lucide-react';

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Search, Loader2, ArrowRightLeft, GitMerge, AlertTriangle, Check, X } from 'lucide-react';
 import { searchMembers, mergeMembers } from '../lib/membersApi';
 
-const RED = '#e11d2a';
 
 interface Props {
   open: boolean;
@@ -93,12 +92,12 @@ const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged, 
   };
 
   const Card: React.FC<{ m: any; tone: 'keep' | 'drop' }> = ({ m, tone }) => (
-    <div className={`flex-1 rounded-2xl border-2 p-4 ${tone === 'keep' ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-      <div className={`text-[10px] font-extrabold uppercase tracking-wide ${tone === 'keep' ? 'text-green-700' : 'text-gray-400'}`}>
+    <div className={`flex-1 border-2 p-4 ${tone === 'keep' ? 'border-success-soft bg-success-soft' : 'border-line bg-ground-2'}`}>
+      <div className={`text-xs font-extrabold ${tone === 'keep' ? 'text-success-text' : 'text-muted'}`}>
         {tone === 'keep' ? '✓ À conserver' : 'À archiver'}
       </div>
-      <div className="font-bold text-gray-900 mt-1">{nameOf(m)}</div>
-      <div className="text-[12px] text-gray-500 mt-0.5">
+      <div className="font-semibold text-ink mt-1">{nameOf(m)}</div>
+      <div className="text-xs text-muted mt-0.5">
         {hasNumber(m) ? `N° ${m.memberNumber}` : 'sans n° adhérent'}{m?.email ? ` · ${m.email}` : ''}
       </div>
     </div>
@@ -106,34 +105,34 @@ const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged, 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div className="flex items-center gap-2 font-extrabold text-gray-900"><GitMerge size={18} style={{ color: RED }} /> Fusionner deux fiches</div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+      <div className="bg-surface shadow-modal w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-line">
+          <div className="flex items-center gap-2 font-extrabold text-ink"><GitMerge size={18} className="text-primary" /> Fusionner deux fiches</div>
+          <button onClick={onClose} className="text-muted hover:text-ink-2"><X size={20} /></button>
         </div>
 
         <div className="p-5 space-y-4">
           {!other ? (
             <>
-              <p className="text-[13px] text-gray-500">
-                Cherchez la fiche en doublon de <span className="font-bold text-gray-800">{nameOf(current)}</span> (nom, e-mail, n° adhérent…).
+              <p className="text-sm text-muted">
+                Cherchez la fiche en doublon de <span className="font-semibold text-ink">{nameOf(current)}</span> (nom, e-mail, n° adhérent…).
               </p>
               <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={17} />
                 <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher l'autre fiche…"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-11 pr-4 outline-none focus:ring-2 focus:ring-red-100 text-sm" />
-                {searching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-300 animate-spin" size={16} />}
+                  className="w-full bg-ground-2 border border-line py-3 pl-11 pr-4 outline-none text-sm" />
+                {searching && <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-subtle animate-spin" size={16} />}
               </div>
               <div className="space-y-1.5">
                 {results.map((m) => (
                   <button key={m.id} onClick={() => pickOther(m)}
-                    className="w-full text-left p-3 rounded-xl border border-gray-100 hover:border-red-200 hover:bg-red-50/40 transition-colors">
-                    <div className="font-semibold text-sm text-gray-900">{nameOf(m)}</div>
-                    <div className="text-[12px] text-gray-500">{hasNumber(m) ? `N° ${m.memberNumber}` : 'sans n° adhérent'}{m.email ? ` · ${m.email}` : ''}</div>
+                    className="w-full text-left p-3 border border-line hover:border-danger-soft hover:bg-danger-soft transition-colors">
+                    <div className="font-semibold text-sm text-ink">{nameOf(m)}</div>
+                    <div className="text-xs text-muted">{hasNumber(m) ? `N° ${m.memberNumber}` : 'sans n° adhérent'}{m.email ? ` · ${m.email}` : ''}</div>
                   </button>
                 ))}
                 {q.trim().length >= 2 && !searching && results.length === 0 && (
-                  <p className="text-[12px] text-gray-400 py-2 text-center">Aucune autre fiche trouvée.</p>
+                  <p className="text-xs text-muted py-2 text-center">Aucune autre fiche trouvée.</p>
                 )}
               </div>
             </>
@@ -145,28 +144,28 @@ const MergeMembersModal: React.FC<Props> = ({ open, current, onClose, onMerged, 
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <button type="button" onClick={() => setKeeperIsCurrent((v) => !v)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-indigo-600 hover:text-indigo-800">
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary-dark">
                   <ArrowRightLeft size={14} /> Inverser (garder l'autre)
                 </button>
-                <button type="button" onClick={() => setOther(null)} className="text-[12px] font-bold text-gray-400 hover:text-gray-700">Changer de fiche</button>
+                <button type="button" onClick={() => setOther(null)} className="text-xs font-semibold text-muted hover:text-ink-2">Changer de fiche</button>
               </div>
 
-              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100 cursor-pointer">
+              <label className="flex items-start gap-2.5 p-3 bg-warning-soft border border-warning-soft cursor-pointer">
                 <input type="checkbox" checked={preferOtherLogin} onChange={(e) => setPreferOtherLogin(e.target.checked)} className="mt-0.5" />
-                <span className="text-[12px] text-amber-800">
-                  Utiliser plutôt le <span className="font-bold">compte de connexion du doublon</span> (à cocher seulement si les deux fiches ont déjà un compte app et que le bon e-mail est sur le doublon).
+                <span className="text-xs text-warning-text">
+                  Utiliser plutôt le <span className="font-semibold">compte de connexion du doublon</span> (à cocher seulement si les deux fiches ont déjà un compte app et que le bon e-mail est sur le doublon).
                 </span>
               </label>
 
-              <div className="flex items-start gap-2 text-[11.5px] text-gray-500">
-                <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+              <div className="flex items-start gap-2 text-[11.5px] text-muted">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5 text-warning-text" />
                 <span>La fiche « à archiver » quitte toutes les listes ; ses contrats, paiements, passages et son compte app passent sur la fiche conservée. Réversible via les archives.</span>
               </div>
 
-              {err && <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-[13px] font-medium">{err}</div>}
+              {err && <div className="p-3 bg-danger-soft border border-danger-soft text-danger-text text-sm">{err}</div>}
 
               <button onClick={confirm} disabled={busy}
-                className="w-full inline-flex items-center justify-center gap-2 text-white font-bold py-3 rounded-2xl disabled:opacity-60" style={{ backgroundColor: RED }}>
+                className="w-full inline-flex items-center justify-center gap-2 text-white font-semibold py-3 disabled:opacity-60 bg-primary hover:bg-primary-dark">
                 {busy ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />} Fusionner les deux fiches
               </button>
             </>
